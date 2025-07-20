@@ -1,348 +1,353 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Syosset Debate Elo Tracker</title>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-        <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
-        <style>
-          body {
-            font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Syosset Debate Elo Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.124.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta/dist/vanta.waves.min.js"></script>
+
+    <style>
+        html,
+        body {
             margin: 0;
             padding: 0;
-            color: #333;
-            background: linear-gradient(-45deg, #f5f7fa, #c3cfe2, #dff1ff, #f5f7fa);
-            background-size: 400% 400%;
-            animation: gradient 15s ease infinite;
-            min-height: 100vh;
-          }
-        
-          @keyframes gradient {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-          }
-        
-          .container {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            overflow-x: hidden;
+            color: #f0f0f0;
+        }
+
+        #vanta-bg {
+            position: fixed;
+            width: 100vw;
+            height: 100vh;
+            z-index: -10;
+        }
+
+        .container {
             max-width: 1200px;
-            margin: auto;
-            background: white;
-            padding: 30px;
-            margin-top: 40px;
+            margin: 3rem auto;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(20px);
             border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-            animation: fadeIn 0.7s ease-in-out;
-          }
-        
-          .card {
-            background: #ffffff;
-            border: none;
+            padding: 3rem;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
             border-radius: 14px;
-            padding: 25px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.07);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-          }
-        
-          .card:hover {
+            padding: 2rem;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease;
+            margin-bottom: 2rem;
+        }
+
+        .card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 6px 30px rgba(0,0,0,0.12);
-          }
-        
-          h1, h2, h3 {
-            font-weight: 600;
-            color: #2c3e50;
-          }
-        
-          button {
-            background: #3498db;
-            color: white;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #00d9ff;
+            margin-bottom: 1rem;
+        }
+
+        button {
+            background: #00d9ff;
+            color: #000;
             border: none;
             border-radius: 6px;
             padding: 10px 18px;
             font-size: 15px;
             cursor: pointer;
             transition: all 0.25s ease;
-          }
-        
-          button:hover {
-            background: #2980b9;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-            transform: translateY(-1px);
-          }
-        
-          button.danger {
-            background: #e74c3c;
-          }
-        
-          button.danger:hover {
-            background: #c0392b;
-          }
-        
-          button.secondary {
-            background: #95a5a6;
-          }
-        
-          button.secondary:hover {
-            background: #7f8c8d;
-          }
-        
-          select, input[type="text"], input[type="number"], input[type="date"] {
-            width: 100%;
-            padding: 10px 14px;
-            border: 1px solid #ccc;
+            margin-top: 0.5rem;
+        }
+
+        button:hover {
+            background: #00b5cc;
+            transform: scale(1.03);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        }
+
+        button.danger {
+            background: #ff5c5c;
+        }
+
+        button.danger:hover {
+            background: #e04848;
+        }
+
+        button.secondary {
+            background: #aaa;
+            color: #000;
+        }
+
+        button.secondary:hover {
+            background: #999;
+        }
+
+        select,
+        input[type="text"],
+        input[type="number"],
+        input[type="date"] {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid #00d9ff;
             border-radius: 6px;
-            box-sizing: border-box;
-            transition: border 0.2s;
-          }
-        
-          select:focus, input:focus {
-            border-color: #3498db;
-            outline: none;
-          }
-        
-          .note {
-            background: #eef9ff;
             padding: 12px;
-            border-left: 4px solid #3498db;
-            border-radius: 6px;
-            font-size: 14px;
-            color: #2c3e50;
-          }
-        
-          #loginScreen {
+            width: 100%;
+            margin-bottom: 1.25rem;
+            font-size: 15px;
+        }
+
+        input::placeholder {
+            color: #ccc;
+        }
+
+        #loginScreen {
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin-top: 80px;
+            margin-top: 120px;
+            color: #fff;
             animation: fadeIn 1s ease-in-out;
-          }
-        
-          #loginBtn {
+            gap: 1.5rem;
+        }
+
+        #loginBtn {
             background: #4285f4;
             color: white;
-            border: none;
-            padding: 10px 20px;
+            padding: 12px 20px;
             border-radius: 6px;
             font-size: 16px;
-            cursor: pointer;
-            transition: background 0.2s ease;
-          }
-        
-          #loginBtn:hover {
+        }
+
+        #loginBtn:hover {
             background: #3367d6;
-          }
-        
-          #authBar {
+        }
+
+        #authBar {
             margin: 10px 20px;
             display: none;
             justify-content: flex-end;
-          }
-        
-          .grid-container {
+            align-items: center;
+            gap: 12px;
+        }
+
+        .note {
+            background: rgba(0, 217, 255, 0.1);
+            padding: 14px 16px;
+            border-left: 4px solid #00d9ff;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #eee;
+            margin-top: 1rem;
+        }
+
+        .grid-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 25px;
-            margin-top: 20px;
-          }
-        
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-        </style>
-    </head>
-    <body>
-        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100vh; z-index: -1; overflow: hidden;">
-            <svg width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 1920 1080">
-              <path fill="#3498db" fill-opacity="0.2">
-                <animate attributeName="d" dur="10s" repeatCount="indefinite"
-                  values="
+            gap: 30px;
+            margin-top: 2rem;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="vanta-bg"></div>
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100vh; z-index: -1; overflow: hidden;">
+        <svg width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 1920 1080">
+            <path fill="#3498db" fill-opacity="0.2">
+                <animate attributeName="d" dur="10s" repeatCount="indefinite" values="
                     M0,400 C600,300 1200,500 1920,300 L1920,1080 L0,1080 Z;
                     M0,300 C700,500 1100,200 1920,400 L1920,1080 L0,1080 Z;
                     M0,400 C600,300 1200,500 1920,300 L1920,1080 L0,1080 Z
                   " />
-              </path>
-            </svg>
-          </div>
-          
-        <!-- LOGIN SCREEN -->
-        <div id="loginScreen">
-            <h2>Login to Access Elo Tracker</h2>
-            <button id="loginBtn">Sign in with Google</button>
-        </div>
-        <div
-            id="authBar"
-            style="display: none; justify-content: flex-end; margin-bottom: 20px;"
-            >
-            <button
-                id="logoutBtn"
-                style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer;"
-                >
+            </path>
+        </svg>
+    </div>
+
+    <!-- LOGIN SCREEN -->
+    <div id="loginScreen">
+        <h2>Login to Access Elo Tracker</h2>
+        <button id="loginBtn">Sign in with Google</button>
+    </div>
+    <div id="authBar" style="display: none; justify-content: flex-end; margin-bottom: 20px;">
+        <button id="logoutBtn" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer;">
             Logout
-            </button>
-        </div>
-        <!-- MAIN APP CONTENT -->
-        <div class="container">
-            <h1>Syosset Debate Elo Tracker</h1>
-            <div class="grid-container">
-                <!-- DEBATER MANAGEMENT CARD -->
-                <div class="card">
-                    <h2>Manage Debaters</h2>
-                    <label for="debaterName">Debater Name</label>
-                    <input
-                        type="text"
-                        id="debaterName"
-                        placeholder="Enter debater's name"
-                        />
-                    <label for="debaterElo">Starting Elo</label>
-                    <input type="number" id="debaterElo" value="1500" />
-                    <button onclick="addDebater()">Add Debater</button>
-                    <div style="margin-top: 15px;">
-                        <input
-                            type="checkbox"
-                            id="showGraduated"
-                            onchange="handleShowGraduatedChange()"
-                            />
-                        <label for="showGraduated">Show Graduated Debaters</label>
-                    </div>
-                    <h3>Debater List</h3>
-                    <ul id="debatersList"></ul>
+        </button>
+    </div>
+    <!-- MAIN APP CONTENT -->
+    <div class="container">
+        <h1>Syosset Debate Elo Tracker</h1>
+        <div class="grid-container">
+            <!-- DEBATER MANAGEMENT CARD -->
+            <div class="card">
+                <h2>Manage Debaters</h2>
+                <label for="debaterName">Debater Name</label>
+                <input type="text" id="debaterName" placeholder="Enter debater's name" />
+                <label for="debaterElo">Starting Elo</label>
+                <input type="number" id="debaterElo" value="1500" />
+                <button onclick="addDebater()">Add Debater</button>
+                <div style="margin-top: 15px;">
+                    <input type="checkbox" id="showGraduated" onchange="handleShowGraduatedChange()" />
+                    <label for="showGraduated">Show Graduated Debaters</label>
                 </div>
-                <!-- PRACTICE ROUND CARD -->
-                <div class="card">
-                    <h2>Record Practice Round</h2>
-                    <form id="matchForm">
-                        <label for="player1">Winner</label>
-                        <select id="player1" required></select>
-                        <label for="player2">Loser</label>
-                        <select id="player2" required></select>
-                        <button type="button" onclick="recordPracticeRound()">
+                <h3>Debater List</h3>
+                <ul id="debatersList"></ul>
+            </div>
+            <!-- PRACTICE ROUND CARD -->
+            <div class="card">
+                <h2>Record Practice Round</h2>
+                <form id="matchForm">
+                    <label for="player1">Winner</label>
+                    <select id="player1" required></select>
+                    <label for="player2">Loser</label>
+                    <select id="player2" required></select>
+                    <button type="button" onclick="recordPracticeRound()">
                         Record Round
-                        </button>
-                    </form>
-                    <div class="note">
-                        <strong>1v1 Formula Note:</strong> Using zero-sum main change and
-                        flipped bonuses.
-                    </div>
-                </div>
-                <!-- TOURNAMENT CARD -->
-                <div class="card">
-                    <h2>Record Tournament Results</h2>
-                    <label for="tournamentName">Tournament Name (for graph)</label>
-                    <input
-                        type="text"
-                        id="tournamentName"
-                        placeholder="Optional, e.g., 'State Qualifiers'"
-                        />
-                    <div style="display: flex; gap: 10px;">
-                        <div style="flex-basis: 25%;">
-                            <label for="tournamentRounds">Rounds</label>
-                            <input type="number" id="tournamentRounds" placeholder="n" />
-                        </div>
-                        <div style="flex-basis: 25%;">
-                            <label for="tournamentBonus">Bonus</label>
-                            <input type="number" id="tournamentBonus" placeholder="b" />
-                        </div>
-                        <div style="flex-basis: 25%;">
-                            <label for="tournamentAffectValue">Affect</label>
-                            <input type="number" id="tournamentAffectValue" value="35" />
-                        </div>
-                        <div style="flex-basis: 25%;">
-                            <label for="tournamentMaxGain">Max Gain</label>
-                            <input type="number" id="tournamentMaxGain" value="300" />
-                        </div>
-                    </div>
-                    <label for="tournamentAddDebater">Add Participant</label>
-                    <select id="tournamentAddDebater" style="margin-bottom: 0;"></select>
-                    <label for="tournamentDivision">Competing Division</label>
-                    <select id="tournamentDivision">
-                        <option value="Novice">Novice</option>
-                        <option value="JV">JV</option>
-                        <option value="Varsity">Varsity</option>
-                    </select>
-                    <button onclick="addParticipant()">Add to Tournament</button>
-                    <ul id="tournamentParticipantsList"></ul>
-                    <button
-                        onclick="recordTournament()"
-                        style="width: 100%; margin-top: 10px;"
-                        >
-                    Calculate Tournament Elo
                     </button>
-                    <div
-                        class="note"
-                        style="background-color: #fffbe6; border-left-color: #f0ad4e;"
-                        >
-                        <strong>P-Value Note:</strong> The `p` value is calculated using the
-                        average Elo of your entire active roster.
-                    </div>
+                </form>
+                <div class="note">
+                    <strong>1v1 Formula Note:</strong> Using zero-sum main change and
+                    flipped bonuses.
                 </div>
             </div>
-            <!-- ANALYTICS CARD -->
-            <div class="card" style="margin-top: 20px;">
-                <h2>Analytics & Data</h2>
-                <div class="grid-container">
-                    <div>
-                        <h3>Elo History Graph</h3>
-                        <div class="chart-controls">
-                            <div>
-                                <label for="analyticsDebater">Select Debater</label>
-                                <select id="analyticsDebater" onchange="renderChart()"></select>
-                            </div>
-                            <div>
-                                <input
-                                    type="checkbox"
-                                    id="showAnnotations"
-                                    checked
-                                    onchange="renderChart()"
-                                    />
-                                <label for="showAnnotations">Show Important Dates</label>
-                            </div>
+            <!-- TOURNAMENT CARD -->
+            <div class="card">
+                <h2>Record Tournament Results</h2>
+                <label for="tournamentName">Tournament Name (for graph)</label>
+                <input type="text" id="tournamentName" placeholder="Optional, e.g., 'State Qualifiers'" />
+                <div style="display: flex; gap: 10px;">
+                    <div style="flex-basis: 25%;">
+                        <label for="tournamentRounds">Rounds</label>
+                        <input type="number" id="tournamentRounds" placeholder="n" />
+                    </div>
+                    <div style="flex-basis: 25%;">
+                        <label for="tournamentBonus">Bonus</label>
+                        <input type="number" id="tournamentBonus" placeholder="b" />
+                    </div>
+                    <div style="flex-basis: 25%;">
+                        <label for="tournamentAffectValue">Affect</label>
+                        <input type="number" id="tournamentAffectValue" value="35" />
+                    </div>
+                    <div style="flex-basis: 25%;">
+                        <label for="tournamentMaxGain">Max Gain</label>
+                        <input type="number" id="tournamentMaxGain" value="300" />
+                    </div>
+                </div>
+                <label for="tournamentAddDebater">Add Participant</label>
+                <select id="tournamentAddDebater" style="margin-bottom: 0;"></select>
+                <label for="tournamentDivision">Competing Division</label>
+                <select id="tournamentDivision">
+                    <option value="Novice">Novice</option>
+                    <option value="JV">JV</option>
+                    <option value="Varsity">Varsity</option>
+                </select>
+                <button onclick="addParticipant()">Add to Tournament</button>
+                <ul id="tournamentParticipantsList"></ul>
+                <button onclick="recordTournament()" style="width: 100%; margin-top: 10px;">
+                    Calculate Tournament Elo
+                </button>
+                <div class="note" style="background-color: #fffbe6; border-left-color: #f0ad4e;">
+                    <strong>P-Value Note:</strong> The `p` value is calculated using the
+                    average Elo of your entire active roster.
+                </div>
+            </div>
+        </div>
+        <!-- ANALYTICS CARD -->
+        <div class="card" style="margin-top: 20px;">
+            <h2>Analytics & Data</h2>
+            <div class="grid-container">
+                <div>
+                    <h3>Elo History Graph</h3>
+                    <div class="chart-controls">
+                        <div>
+                            <label for="analyticsDebater">Select Debater</label>
+                            <select id="analyticsDebater" onchange="renderChart()"></select>
                         </div>
                         <div>
-                            <canvas id="eloChart"></canvas>
+                            <input type="checkbox" id="showAnnotations" checked onchange="renderChart()" />
+                            <label for="showAnnotations">Show Important Dates</label>
                         </div>
                     </div>
                     <div>
-                        <h3>Manage Important Dates</h3>
-                        <input type="date" id="eventDate" />
-                        <input
-                            type="text"
-                            id="eventName"
-                            placeholder="Event Name (e.g., 'Practice Tournament')"
-                            />
-                        <button class="secondary" onclick="addAnnotation()">
-                        Mark Date
-                        </button>
-                        <h3 style="margin-top: 20px;">Marked Dates</h3>
-                        <ul id="annotationsList"></ul>
+                        <canvas id="eloChart"></canvas>
                     </div>
+                </div>
+                <div>
+                    <h3>Manage Important Dates</h3>
+                    <input type="date" id="eventDate" />
+                    <input type="text" id="eventName" placeholder="Event Name (e.g., 'Practice Tournament')" />
+                    <button class="secondary" onclick="addAnnotation()">
+                        Mark Date
+                    </button>
+                    <h3 style="margin-top: 20px;">Marked Dates</h3>
+                    <ul id="annotationsList"></ul>
                 </div>
             </div>
         </div>
-        <script src="scripts/login.js"></script>
-        <script>
-            // --- SUPABASE CONNECTION ---
-            const SUPABASE_URL = 'https://fuxqbiiyrpvpxvyswzyz.supabase.co'; // Paste your Project URL here
-            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1eHFiaWl5cnB2cHh2eXN3enl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMwMjkzOTksImV4cCI6MjA2ODYwNTM5OX0.nMfZW__cQllAKmmCBEWI5rjXFhBGEv1O0gB1p64UKOE'; // Paste your anon public Project API Key here
-            const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-            
-            // --- GLOBAL STATE ---
-            let appData = {
-                debaters: [],
-                annotations: []
-            };
-            let tournamentParticipants = new Map();
-            let eloChart = null;
-        </script>
-        <script src="scripts/UI.js"></script>
-        <script src="scripts/updateDebaters.js"></script>
-        <script src="scripts/updateElo.js"></script>
-        <script src="scripts/data.js"></script>
-        <script src="scripts/leaderboard.js"></script>
-    </body>
+    </div>
+    <script src="scripts/login.js"></script>
+    <script>
+        VANTA.WAVES({
+            el: "#vanta-bg",
+            mouseControls: true,
+            touchControls: true,
+            minHeight: 200.00,
+            minWidth: 200.00,
+            scale: 1.0,
+            scaleMobile: 1.0,
+            color: 0x00d9ff,
+            shininess: 50.0,
+            waveHeight: 20.0,
+            waveSpeed: 0.75,
+            zoom: 1.0
+        });
+        // --- SUPABASE CONNECTION ---
+        const SUPABASE_URL = 'https://fuxqbiiyrpvpxvyswzyz.supabase.co'; // Paste your Project URL here
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1eHFiaWl5cnB2cHh2eXN3enl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMwMjkzOTksImV4cCI6MjA2ODYwNTM5OX0.nMfZW__cQllAKmmCBEWI5rjXFhBGEv1O0gB1p64UKOE'; // Paste your anon public Project API Key here
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // --- GLOBAL STATE ---
+        let appData = {
+            debaters: [],
+            annotations: []
+        };
+        let tournamentParticipants = new Map();
+        let eloChart = null;
+    </script>
+    <script src="scripts/UI.js"></script>
+    <script src="scripts/updateDebaters.js"></script>
+    <script src="scripts/updateElo.js"></script>
+    <script src="scripts/data.js"></script>
+    <script src="scripts/leaderboard.js"></script>
+</body>
+
 </html>
