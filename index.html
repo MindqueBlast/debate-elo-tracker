@@ -9,8 +9,9 @@
         <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
         <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
         <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/three@0.124.0/build/three.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/vanta/dist/vanta.waves.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/p5@1.4.2/lib/p5.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/vanta/dist/vanta.topology.min.js"></script>
+        
         <link rel="stylesheet" href="index.css" />
     </head>
     <body>
@@ -171,17 +172,6 @@
         </div>
         <script src="scripts/login.js"></script>
         <script>
-VANTA.WAVES({
-  el: "#vanta-bg",
-  mouseControls: true,
-  touchControls: true,
-  gyroControls: false,
-  minHeight: 200.00,
-  minWidth: 200.00,
-  scale: 1.00,
-  scaleMobile: 1.00,
-  color: 0x414141
-})
             // --- SUPABASE CONNECTION ---
             const SUPABASE_URL = 'https://fuxqbiiyrpvpxvyswzyz.supabase.co'; // Paste your Project URL here
             const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1eHFiaWl5cnB2cHh2eXN3enl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMwMjkzOTksImV4cCI6MjA2ODYwNTM5OX0.nMfZW__cQllAKmmCBEWI5rjXFhBGEv1O0gB1p64UKOE'; // Paste your anon public Project API Key here
@@ -200,5 +190,20 @@ VANTA.WAVES({
         <script src="scripts/updateElo.js"></script>
         <script src="scripts/data.js"></script>
         <script src="scripts/leaderboard.js"></script>
+        <script>
+            VANTA.TOPOLOGY({
+              el: "#vanta-bg",
+              mouseControls: true,
+              touchControls: true,
+              gyroControls: false,
+              minHeight: 200.00,
+              minWidth: 200.00,
+              scale: 1.0,
+              scaleMobile: 1.0,
+              color: 0xff4e4e,           // red-ish lines
+              backgroundColor: 0x3a3a3a  // gray-ish background
+            })
+          </script>
+          
     </body>
 </html>
