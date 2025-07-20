@@ -11,7 +11,7 @@ firebase.initializeApp(firebaseConfig);
 const allowedEmails = [
     "jiayimeng12@gmail.com",
     "aadityasahu26@gmail.com",
-    "your.email3@gmail.com"
+    "zile.zhao@gmail.com"
 ];
 
 const loginBtn = document.getElementById("loginBtn");
