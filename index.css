@@ -391,4 +391,8 @@ ul {
       transform: rotate(360deg);
     }
   }
-  
+  #logoutBtn:hover svg {
+      stroke: #e74c3c;
+      transform: scale(1.1);
+      transition: all 0.2s ease;
+  }

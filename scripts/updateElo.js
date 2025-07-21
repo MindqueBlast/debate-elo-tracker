@@ -75,7 +75,6 @@ async function recordPracticeRound() {
 
         document.getElementById('matchForm').reset();
         await loadData();
-        renderPracticeRounds(); // You’ll want to make sure you have this function to show the PRs
     } catch (error) {
         console.error('Error saving practice round and Elo update:', error);
         alert('Failed to save match results.');

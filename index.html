@@ -30,13 +30,21 @@
       
     <!-- LOGIN SCREEN -->
 
-    <div id="authBar" style="display: none; justify-content: flex-end; margin-bottom: 20px;">
-        <button id="logoutBtn" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; position: fixed;">
-            Logout
-        </button>
-    </div>
+
     <!-- MAIN APP CONTENT -->
     <div class="container" >
+            <div id="authBar" style="
+                    display: none; 
+                    position: absolute;
+                    top: 20px;
+                    right: 20px;
+                    z-index: 1000;
+                ">
+                <button id="logoutBtn"
+                    style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer;">
+                    Logout
+                </button>
+            </div>
         <h1>Syosset Debate Elo Tracker</h1>
 
         <!-- Manage Debaters: Full Width -->
