@@ -34,40 +34,43 @@ async function recordPracticeRound() {
         elo: new_elo_b
     }];
 
+    const winner_change = new_elo_a - elo_a;
+    const loser_change = new_elo_b - elo_b;
+
     try {
-        const {
-            error: errorA
-        } = await supabaseClient.from('debaters').update({
-            elo: new_elo_a,
-            history: newHistoryA
-        }).eq('id', a.id);
+        // Update debaters' Elo
+        const { error: errorA } = await supabaseClient
+            .from('debaters')
+            .update({ elo: new_elo_a, history: newHistoryA })
+            .eq('id', a.id);
         if (errorA) throw errorA;
-        const {
-            error: errorB
-        } = await supabaseClient.from('debaters').update({
-            elo: new_elo_b,
-            history: newHistoryB
-        }).eq('id', b.id);
+
+        const { error: errorB } = await supabaseClient
+            .from('debaters')
+            .update({ elo: new_elo_b, history: newHistoryB })
+            .eq('id', b.id);
         if (errorB) throw errorB;
 
-        alert(
-            `1v1 Round Results:\n\n` +
-            `Expected Win Chance (E): ${E.toFixed(4)}\n\n` +
-            `${a.name} (Winner):\n` +
-            `  Old Elo: ${Math.round(elo_a)}\n` +
-            `  Main Change (C): +${C_a.toFixed(2)}\n` +
-            `  Bonus (B): +${B_a.toFixed(2)}\n` +
-            `  New Elo: ${Math.round(new_elo_a)} (Total: +${(new_elo_a - elo_a).toFixed(2)})\n\n` +
-            `${b.name} (Loser):\n` +
-            `  Old Elo: ${Math.round(elo_b)}\n` +
-            `  Main Change (C): ${C_b.toFixed(2)}\n` +
-            `  Bonus (B): +${B_b.toFixed(2)}\n` +
-            `  New Elo: ${Math.round(new_elo_b)} (Total: ${(new_elo_b - elo_b).toFixed(2)})`
-        );
+        // **INSERT the practice round record**
+        const { error: insertError } = await supabaseClient
+            .from('practice_rounds')
+            .insert([{
+                date: getLocalDateString(),
+                winner_id: a.id,
+                loser_id: b.id,
+                winner_change: new_elo_a - elo_a,
+                loser_change: new_elo_b - elo_b,
+            }]);
+        if (insertError) throw insertError;
+
+        alert("Practice round recorded successfully!");
+
         document.getElementById('matchForm').reset();
         await loadData();
+        renderPracticeRounds();  // You’ll want to make sure you have this function to show the PRs
+
     } catch (error) {
-        console.error("Error updating Elo after practice round:", error);
+        console.error("Error saving practice round and Elo update:", error);
         alert("Failed to save match results.");
     }
 }
@@ -146,40 +149,64 @@ async function recordTournament() {
             newElo: p.elo + C,
             change: C,
             W_adjusted: p.W_adjusted,
-            p_value: p_prop
+            p_value: p_prop,
+            W_raw: p.W_raw,
+            division: p.division
         });
     });
 
     const today = getLocalDateString();
 
     try {
-        if (tournamentName) {
-            const {
-                error
-            } = await supabaseClient.from('annotations').insert({
-                date: today,
-                name: tournamentName
-            });
-            if (error) throw error;
-        }
+        // Insert tournament info and get its ID
+        const { data: insertedTournament, error: insertTournamentError } = await supabaseClient
+            .from('tournaments')
+            .insert([{ date: today, name: tournamentName }])
+            .select()
+            .single();
 
-        const updates = results.map(res => {
+        if (insertTournamentError) throw insertTournamentError;
+
+        // Update debaters Elo and histories, and prepare participants rows
+        const participantInserts = [];
+        const debaterUpdates = [];
+
+        for (const res of results) {
             const debater = appData.debaters.find(d => d.id === res.id);
             const newHistory = [...(debater.history || []), {
                 date: today,
                 elo: res.newElo,
                 event: 'Tournament'
             }];
-            return supabaseClient.from('debaters').update({
-                elo: res.newElo,
-                history: newHistory
-            }).eq('id', res.id);
-        });
+            debaterUpdates.push(
+                supabaseClient.from('debaters').update({
+                    elo: res.newElo,
+                    history: newHistory
+                }).eq('id', res.id)
+            );
 
-        const responses = await Promise.all(updates);
-        for (const response of responses) {
+            participantInserts.push({
+                tournament_id: insertedTournament.id,
+                debater_id: res.id,
+                raw_wins: res.W_raw,
+                adjusted_wins: res.W_adjusted,
+                elo_change: res.change,
+                division: res.division
+            });
+        }
+
+        // Run all debater Elo updates
+        const updateResponses = await Promise.all(debaterUpdates);
+        for (const response of updateResponses) {
             if (response.error) throw response.error;
         }
+
+        // Insert tournament participants
+        const { error: participantsInsertError } = await supabaseClient
+            .from('tournament_participants')
+            .insert(participantInserts);
+
+        if (participantsInsertError) throw participantsInsertError;
 
         const resultsText = `Tournament Results:\n\nOverall Expected Wins (E_tourney): ${E_tourney.toFixed(3)}\n\n` +
             results.map(r =>
@@ -198,5 +225,73 @@ async function recordTournament() {
     } catch (error) {
         console.error("Error recording tournament:", error);
         alert("Failed to record tournament results.");
+    }
+}
+
+
+async function deletePracticeRound(roundId) {
+    const { data: round, error } = await supabaseClient.from("practice_rounds").select("*").eq("id", roundId).single();
+    if (error || !round) {
+        alert("Could not find practice round.");
+        return;
+    }
+    if (!confirm("Are you sure you want to delete this practice round and undo its Elo changes?")) return;
+
+    const winner = appData.debaters.find((d) => d.id === round.winner_id);
+    const loser = appData.debaters.find((d) => d.id === round.loser_id);
+
+    if (!winner || !loser) return alert("Could not find both debaters.");
+
+    const newEloWinner = winner.elo - round.winner_change;
+    const newEloLoser = loser.elo - round.loser_change;
+
+    try {
+        await Promise.all([
+            supabaseClient.from("debaters").update({ elo: newEloWinner }).eq("id", winner.id),
+            supabaseClient.from("debaters").update({ elo: newEloLoser }).eq("id", loser.id),
+            supabaseClient.from("practice_rounds").delete().eq("id", roundId),
+        ]);
+        alert("Practice round deleted and ELO changes reverted.");
+        await loadData();
+        renderPracticeRounds();
+    } catch (err) {
+        console.error("Failed to delete practice round:", err);
+        alert("Failed to delete and undo changes.");
+    }
+}
+
+// --- MANAGE TOURNAMENTS ---
+
+async function deleteTournament(tournamentId) {
+    const { data: participants, error } = await supabaseClient
+        .from("tournament_participants")
+        .select("*")
+        .eq("tournament_id", tournamentId);
+
+    if (error || !participants.length) {
+        return alert("Could not find tournament participants.");
+    }
+
+    if (!confirm("Are you sure you want to delete this tournament and revert Elo changes for all participants?")) return;
+
+    const updates = participants.map((p) => {
+        const debater = appData.debaters.find((d) => d.id === p.debater_id);
+        if (!debater) return null;
+        const newElo = debater.elo - p.elo_change;
+        return supabaseClient.from("debaters").update({ elo: newElo }).eq("id", debater.id);
+    }).filter(Boolean);
+
+    try {
+        await Promise.all([
+            ...updates,
+            supabaseClient.from("tournaments").delete().eq("id", tournamentId),
+            supabaseClient.from("tournament_participants").delete().eq("tournament_id", tournamentId),
+        ]);
+        alert("Tournament deleted and ELO changes reverted.");
+        await loadData();
+        renderTournaments();
+    } catch (err) {
+        console.error("Failed to delete tournament:", err);
+        alert("Error while deleting tournament.");
     }
 }

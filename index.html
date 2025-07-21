@@ -184,6 +184,12 @@
             color: 0xff4e4e, // red-ish lines
             backgroundColor: 0x3a3a3a // gray-ish background
         })
+
+        function getName(id) {
+            const d = appData.debaters.find(x => x.id === id);
+            return d ? d.name : '(Unknown)';
+        }
+
     </script>
 
 </body>
