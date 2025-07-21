@@ -43,50 +43,51 @@ if (isLocalFile) {
     testModeBadge.style.opacity = '0.9';
     document.body.appendChild(testModeBadge);
 } else {
-    firebase.auth().onAuthStateChanged(async (user) => {
-        const loginScreen = document.getElementById('loginScreen');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const mainContainer = document.querySelector('.container');
-        const authBar = document.getElementById('authBar');
+    document.addEventListener('DOMContentLoaded', () => {
+        firebase.auth().onAuthStateChanged(async (user) => {
+            const loginScreen = document.getElementById('loginScreen');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const mainContainer = document.querySelector('.container');
+            const authBar = document.getElementById('authBar');
 
-        if (user) {
-            const email = user.email;
-            if (allowedEmails.includes(email)) {
-                // Step 1: Hide login screen and show loading screen
-                loginScreen.style.display = 'none';
-                loadingOverlay.style.display = 'flex';
-                loadingOverlay.style.opacity = '1'; // just in case
+            if (user) {
+                const email = user.email;
+                if (allowedEmails.includes(email)) {
+                    // Step 1: Hide login screen and show loading screen
+                    loginScreen.style.display = 'none';
+                    loadingOverlay.style.display = 'flex';
+                    loadingOverlay.style.opacity = '1';
 
-                try {
-                    // Step 2: Wait for data to load
-                    await loadData();
+                    try {
+                        await loadData(); // Step 2: Load all Supabase data
 
-                    // Step 3: Then fade out loading screen
-                    loadingOverlay.style.transition = 'opacity 0.6s ease';
-                    loadingOverlay.style.opacity = '0';
+                        // Step 3: Animate in the main container
+                        loadingOverlay.style.transition = 'opacity 0.6s ease';
+                        loadingOverlay.style.opacity = '0';
 
-                    setTimeout(() => {
-                        loadingOverlay.remove(); // remove from DOM
-                        mainContainer.style.display = 'block';
-                        authBar.style.display = 'flex';
-                    }, 600);
-                } catch (err) {
-                    console.error('❌ Failed to load app data:', err);
-                    alert(
-                        'Something went wrong while loading. Try refreshing.'
-                    );
+                        setTimeout(() => {
+                            loadingOverlay.remove(); // Done loading
+                            mainContainer.style.display = 'block';
+                            authBar.style.display = 'flex';
+                        }, 600);
+                    } catch (err) {
+                        console.error('❌ Failed to load app data:', err);
+                        alert(
+                            'Something went wrong while loading. Try refreshing.'
+                        );
+                    }
+                } else {
+                    alert('Access denied. Your account is not authorized.');
+                    firebase.auth().signOut();
                 }
             } else {
-                alert('Access denied. Your account is not authorized.');
-                firebase.auth().signOut();
+                // Not logged in
+                loginScreen.style.display = 'flex';
+                loadingOverlay.style.display = 'none';
+                mainContainer.style.display = 'none';
+                authBar.style.display = 'none';
             }
-        } else {
-            // Not logged in
-            loginScreen.style.display = 'flex';
-            loadingOverlay.style.display = 'none';
-            mainContainer.style.display = 'none';
-            authBar.style.display = 'none';
-        }
+        });
     });
 
     loginBtn.onclick = () => {
