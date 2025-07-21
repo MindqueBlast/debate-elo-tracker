@@ -3,14 +3,14 @@ async function recordPracticeRound() {
     const winnerId = document.getElementById('player1').value;
     const loserId = document.getElementById('player2').value;
     if (!winnerId || !loserId || winnerId === loserId) {
-        alert('Please select two different debaters.');
+        showToast('Please select two different debaters.', 'warning');
         return;
     }
 
     const a = appData.debaters.find((d) => d.id === winnerId);
     const b = appData.debaters.find((d) => d.id === loserId);
     if (!a || !b) {
-        alert('Could not find one of the debaters.');
+        showToast('Could not find one of the debaters.', 'error');
         return;
     }
 
@@ -71,13 +71,13 @@ async function recordPracticeRound() {
             ]);
         if (insertError) throw insertError;
 
-        alert('Practice round recorded successfully!');
+        showToast('Practice round recorded successfully!', 'success');
 
         document.getElementById('matchForm').reset();
         await loadData();
     } catch (error) {
         console.error('Error saving practice round and Elo update:', error);
-        alert('Failed to save match results.');
+        showToast('Failed to save match results.', 'error');
     }
 }
 
@@ -101,38 +101,44 @@ async function recordTournament() {
 
     // Validation only if not null
     if (maxRounds !== null && (isNaN(maxRounds) || maxRounds < 0)) {
-        alert('Please enter a valid Max Rounds value or leave it empty.');
+        showToast(
+            'Please enter a valid Max Rounds value or leave it empty.',
+            'warning'
+        );
         return;
     }
 
     if (isNaN(maxRounds) || maxRounds < 0) {
-        alert('Please enter a valid Max Rounds value.');
+        showToast('Please enter a valid Max Rounds value.', 'warning');
         return;
     }
     if (isNaN(n) || n <= 0) {
-        alert('Please enter a valid number of rounds (n).');
+        showToast('Please enter a valid number of rounds (n).', 'warning');
         return;
     }
     if (isNaN(b)) {
-        alert('Please enter a valid tournament bonus (b).');
+        showToast('Please enter a valid tournament bonus (b).', 'warning');
         return;
     }
     if (isNaN(k)) {
-        alert('Please enter a valid affect value (k).');
+        showToast('Please enter a valid affect value (k).', 'warning');
         return;
     }
     if (isNaN(maxGain) || maxGain < 0) {
-        alert('Please enter a valid max Elo gain.');
+        showToast('Please enter a valid max Elo gain.', 'warning');
         return;
     }
     if (tournamentParticipants.size < 1) {
-        alert('Please add at least one participant.');
+        showToast('Please add at least one participant.', 'warning');
         return;
     }
 
     const participants = Array.from(tournamentParticipants.values());
     if (participants.some((p) => p.W_raw === undefined || p.W_raw < 0)) {
-        alert('Please enter valid raw wins for every participant.');
+        showToast(
+            'Please enter valid raw wins for every participant.',
+            'warning'
+        );
         return;
     }
 
@@ -141,8 +147,9 @@ async function recordTournament() {
         (d) => d.status === 'active'
     );
     if (activeDebaters.length === 0) {
-        alert(
-            'There are no active debaters on the roster to calculate an average Elo.'
+        showToast(
+            'There are no active debaters on the roster to calculate an average Elo.',
+            'warning'
         );
         return;
     }
@@ -273,18 +280,17 @@ async function recordTournament() {
                         )}, P-val: ${r.p_value.toFixed(2)})`
                 )
                 .join('\n\n');
-        alert(resultsText);
+        showToast(resultsText, 'success', 8000);
 
         tournamentParticipants.clear();
         document.getElementById('tournamentRounds').value = '';
         document.getElementById('tournamentBonus').value = '';
         document.getElementById('tournamentName').value = '';
-        renderTournamentParticipants();
 
         await loadData();
     } catch (error) {
         console.error('Error recording tournament:', error);
-        alert('Failed to record tournament results.');
+        showToast('Failed to record tournament results.', 'error');
     }
 }
 
@@ -295,7 +301,7 @@ async function deletePracticeRound(roundId) {
         .eq('id', roundId)
         .single();
     if (error || !round) {
-        alert('Could not find practice round.');
+        showToast('Could not find practice round.', 'error');
         return;
     }
     if (
@@ -308,7 +314,8 @@ async function deletePracticeRound(roundId) {
     const winner = appData.debaters.find((d) => d.id === round.winner_id);
     const loser = appData.debaters.find((d) => d.id === round.loser_id);
 
-    if (!winner || !loser) return alert('Could not find both debaters.');
+    if (!winner || !loser)
+        return showToast('Could not find both debaters.', 'error');
 
     const newEloWinner = winner.elo - round.winner_change;
     const newEloLoser = loser.elo - round.loser_change;
@@ -325,12 +332,14 @@ async function deletePracticeRound(roundId) {
                 .eq('id', loser.id),
             supabaseClient.from('practice_rounds').delete().eq('id', roundId),
         ]);
-        alert('Practice round deleted and ELO changes reverted.');
+        showToast(
+            'Practice round deleted and ELO changes reverted.',
+            'success'
+        );
         await loadData();
-        renderPracticeRounds();
     } catch (err) {
         console.error('Failed to delete practice round:', err);
-        alert('Failed to delete and undo changes.');
+        showToast('Failed to delete and undo changes.', 'error');
     }
 }
 
@@ -343,11 +352,31 @@ async function deleteTournament(tournamentId) {
         .eq('tournament_id', tournamentId);
 
     if (error) {
-        alert('Error fetching tournament participants: ' + error.message);
+        showToast(
+            'Error fetching tournament participants: ' + error.message,
+            'error'
+        );
         return;
     }
     if (!participants.length) {
-        alert('No participants found for this tournament.');
+        // 3. Delete the tournament itself
+        const { error: tournamentDeleteError } = await supabaseClient
+            .from('tournaments')
+            .delete()
+            .eq('id', tournamentId);
+
+        if (tournamentDeleteError) {
+            showToast(
+                'Failed to delete tournament: ' + tournamentDeleteError.message,
+                'error'
+            );
+            return;
+        }
+        showToast(
+            'No participants found for this tournament but still deleted.',
+            'warning'
+        );
+        await loadData();
         return;
     }
 
@@ -363,7 +392,10 @@ async function deleteTournament(tournamentId) {
     for (const p of participants) {
         const debater = appData.debaters.find((d) => d.id === p.debater_id);
         if (!debater) {
-            alert(`Could not find debater with id ${p.debater_id}`);
+            showToast(
+                `Could not find debater with id ${p.debater_id}`,
+                'error'
+            );
             return;
         }
         const newElo = debater.elo - p.elo_change;
@@ -373,7 +405,10 @@ async function deleteTournament(tournamentId) {
             .eq('id', debater.id);
 
         if (eloError) {
-            alert('Failed to revert Elo for a debater: ' + eloError.message);
+            showToast(
+                'Failed to revert Elo for a debater: ' + eloError.message,
+                'error'
+            );
             return;
         }
     }
@@ -385,9 +420,10 @@ async function deleteTournament(tournamentId) {
         .eq('tournament_id', tournamentId);
 
     if (participantsDeleteError) {
-        alert(
+        showToast(
             'Failed to delete tournament participants: ' +
-                participantsDeleteError.message
+                participantsDeleteError.message,
+            'error'
         );
         return;
     }
@@ -399,11 +435,13 @@ async function deleteTournament(tournamentId) {
         .eq('id', tournamentId);
 
     if (tournamentDeleteError) {
-        alert('Failed to delete tournament: ' + tournamentDeleteError.message);
+        showToast(
+            'Failed to delete tournament: ' + tournamentDeleteError.message,
+            'error'
+        );
         return;
     }
 
-    alert('Tournament deleted and ELO changes reverted.');
+    showToast('Tournament deleted and ELO changes reverted.', 'success');
     await loadData();
-    renderTournaments();
 }

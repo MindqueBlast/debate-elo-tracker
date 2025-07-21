@@ -362,10 +362,14 @@ ul {
         transform: translateY(0);
     }
 }
+
 #loadingOverlay {
     position: fixed;
     z-index: 9999;
-    top: 0; left: 0; right: 0; bottom: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background-color: #121212;
     color: #fff;
     display: flex;
@@ -374,9 +378,9 @@ ul {
     align-items: center;
     font-size: 1.5rem;
     animation: fadeInSlide 0.5s ease-in-out;
-  }
-  
-  .spinner {
+}
+
+.spinner {
     width: 60px;
     height: 60px;
     border: 6px solid #f04545;
@@ -384,15 +388,56 @@ ul {
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 20px;
-  }
-  
-  @keyframes spin {
+}
+
+@keyframes spin {
     to {
-      transform: rotate(360deg);
+        transform: rotate(360deg);
     }
-  }
-  #logoutBtn:hover svg {
-      stroke: #e74c3c;
-      transform: scale(1.1);
-      transition: all 0.2s ease;
-  }
+}
+
+#logoutBtn:hover svg {
+    stroke: #e74c3c;
+    transform: scale(1.1);
+    transition: all 0.2s ease;
+}
+#toast {
+    visibility: hidden;
+    min-width: 280px;
+    max-width: 80%;
+    background-color: #333;
+    color: #fff;
+    text-align: left;
+    border-radius: 8px;
+    padding: 16px 24px;
+    position: fixed;
+    z-index: 9999;
+    bottom: 40px;
+    right: 40px;
+    font-size: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease-in-out;
+    opacity: 0;
+}
+
+#toast.show {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast-success {
+    background-color: #2ecc71;
+}
+
+.toast-error {
+    background-color: #e74c3c;
+}
+
+.toast-warning {
+    background-color: #f39c12;
+}
+
+.toast-info {
+    background-color: #3498db;
+}
