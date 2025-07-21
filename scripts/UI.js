@@ -49,23 +49,48 @@ function renderDebaters() {
     const list = document.getElementById('debatersList');
     const showGraduated = document.getElementById('showGraduated').checked;
     list.innerHTML = '';
+
     const sortedDebaters = [...appData.debaters].sort((a, b) => b.elo - a.elo);
-    
-    sortedDebaters.forEach(debater => {
+
+    sortedDebaters.forEach((debater, index) => {
         if (debater.status === 'graduated' && !showGraduated) return;
+
+        const currentRank = index + 1;
+        const previousRank = appData.previousRanks[debater.id];
+        let arrow = '';
+        let rankDiffHTML = '';
+        let rankDiffClass = '';
+
+        if (previousRank !== undefined && previousRank !== currentRank) {
+            const diff = previousRank - currentRank;
+            const isUp = diff > 0;
+            arrow = isUp ? '🔺' : '🔻';
+            rankDiffClass = isUp ? 'rank-up' : 'rank-down';
+            rankDiffHTML = `<span class="rank-diff ${rankDiffClass}">${arrow} (${diff > 0 ? '+' : ''}${diff})</span>`;
+        }
+
+        // Store new rank
+        appData.previousRanks[debater.id] = currentRank;
+
         const li = document.createElement('li');
         li.className = `list-item ${debater.status === 'graduated' ? 'graduated' : ''}`;
         li.innerHTML = `
-            <div class="item-info">${debater.name} - <span class="elo-rating">${Math.round(debater.elo)}</span></div>
+            <div class="item-info">
+                <span class="rank-number">#${currentRank}</span> ${rankDiffHTML}
+                ${debater.name} - <span class="elo-rating">${Math.round(debater.elo)}</span>
+            </div>
             <div class="item-controls">
                 <button class="secondary" onclick="setElo('${debater.id}')">Set Elo</button>
-                <button class="secondary" onclick="toggleGraduate('${debater.id}')">${debater.status === 'active' ? 'Graduate' : 'Activate'}</button>
+                <button class="secondary" onclick="toggleGraduate('${debater.id}')">
+                    ${debater.status === 'active' ? 'Graduate' : 'Activate'}
+                </button>
                 <button class="danger" onclick="removeDebater('${debater.id}')">Remove</button>
             </div>
         `;
         list.appendChild(li);
     });
 }
+
 
 function updateSelects() {
     const showGraduated = document.getElementById('showGraduated').checked;
