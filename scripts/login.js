@@ -44,34 +44,47 @@ if (isLocalFile) {
     document.body.appendChild(testModeBadge);
 } else {
     firebase.auth().onAuthStateChanged(async (user) => {
+        const loginScreen = document.getElementById('loginScreen');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const mainContainer = document.querySelector('.container');
+        const authBar = document.getElementById('authBar');
+
         if (user) {
             const email = user.email;
             if (allowedEmails.includes(email)) {
+                // Step 1: Hide login screen and show loading screen
                 loginScreen.style.display = 'none';
+                loadingOverlay.style.display = 'flex';
+                loadingOverlay.style.opacity = '1'; // just in case
 
-                // ✅ Show loading screen now
-                const loadingOverlay =
-                    document.getElementById('loadingOverlay');
-                loadingOverlay.style.display = 'flex'; // show immediately
-                await loadData(); // assuming this fetches all necessary app data
+                try {
+                    // Step 2: Wait for data to load
+                    await loadData();
 
-                // ✅ Then fade it out and show main content
-                loadingOverlay.style.opacity = '0';
-                loadingOverlay.style.transition = 'opacity 0.6s ease';
+                    // Step 3: Then fade out loading screen
+                    loadingOverlay.style.transition = 'opacity 0.6s ease';
+                    loadingOverlay.style.opacity = '0';
 
-                setTimeout(() => {
-                    loadingOverlay.remove();
-                    document.querySelector('.container').style.display =
-                        'block';
-                    authBar.style.display = 'flex';
-                }, 600);
+                    setTimeout(() => {
+                        loadingOverlay.remove(); // remove from DOM
+                        mainContainer.style.display = 'block';
+                        authBar.style.display = 'flex';
+                    }, 600);
+                } catch (err) {
+                    console.error('❌ Failed to load app data:', err);
+                    alert(
+                        'Something went wrong while loading. Try refreshing.'
+                    );
+                }
             } else {
                 alert('Access denied. Your account is not authorized.');
                 firebase.auth().signOut();
             }
         } else {
+            // Not logged in
             loginScreen.style.display = 'flex';
-            document.querySelector('.container').style.display = 'none';
+            loadingOverlay.style.display = 'none';
+            mainContainer.style.display = 'none';
             authBar.style.display = 'none';
         }
     });
