@@ -160,28 +160,6 @@
 
 
     </div>
-        
-    <script src="scripts/login.js"></script>
-    <script>
-        // --- SUPABASE CONNECTION ---
-        const SUPABASE_URL = 'https://fuxqbiiyrpvpxvyswzyz.supabase.co'; // Paste your Project URL here
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1eHFiaWl5cnB2cHh2eXN3enl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMwMjkzOTksImV4cCI6MjA2ODYwNTM5OX0.nMfZW__cQllAKmmCBEWI5rjXFhBGEv1O0gB1p64UKOE'; // Paste your anon public Project API Key here
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        // --- GLOBAL STATE ---
-        let appData = {
-            debaters: [],
-            annotations: [],
-            previousRanks: {}
-        };
-
-        let tournamentParticipants = new Map();
-        let eloChart = null;
-    </script>
-    <script src="scripts/UI.js"></script>
-    <script src="scripts/updateDebaters.js"></script>
-    <script src="scripts/updateElo.js"></script>
-    <script src="scripts/data.js"></script>
     <script>
         VANTA.TOPOLOGY({
             el: "#vanta-bg",
@@ -202,6 +180,13 @@
         }
 
     </script>
+    <script src="scripts/login.js"></script>
+    <script src= "scripts/utilities.js"></script>
+    <script src="scripts/UI.js"></script>
+    <script src="scripts/updateDebaters.js"></script>
+    <script src="scripts/updateElo.js"></script>
+    <script src="scripts/data.js"></script>
+
 
 </body>
 

@@ -104,13 +104,3 @@ function renderChart() {
         eloChart = new Chart(ctx, { type: "line", data: { datasets: datasets }, options: chartOptions });
     }
 }
-function toggleFullscreen() {
-    const container = document.getElementById("chartContainer");
-    if (!document.fullscreenElement) {
-        container.requestFullscreen().catch(err => {
-            alert(`Error attempting fullscreen: ${err.message}`);
-        });
-    } else {
-        document.exitFullscreen();
-    }
-}
