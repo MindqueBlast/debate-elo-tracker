@@ -18,18 +18,24 @@
 
 <body>
     <div id="vanta-bg"></div>
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <h2>Loading Syosset Debate Elo Tracker...</h2>
+      </div>
+      
+      
     <!-- LOGIN SCREEN -->
     <div id="loginScreen">
         <h2>Login to Access Elo Tracker</h2>
         <button id="loginBtn">Sign in with Google</button>
     </div>
     <div id="authBar" style="display: none; justify-content: flex-end; margin-bottom: 20px;">
-        <button id="logoutBtn" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer;">
+        <button id="logoutBtn" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; position: fixed;">
             Logout
         </button>
     </div>
     <!-- MAIN APP CONTENT -->
-    <div class="container">
+    <div class="container" >
         <h1>Syosset Debate Elo Tracker</h1>
 
         <!-- Manage Debaters: Full Width -->
@@ -84,6 +90,10 @@
                         <label for="tournamentMaxGain">Max Gain</label>
                         <input type="number" id="tournamentMaxGain" value="300" />
                     </div>
+                    <div style="flex-basis: 25%;">
+                        <label for="tournamentMaxRounds">Max Rounds</label>
+                        <input type="number" id="tournamentMaxRounds" placeholder = "n" min="0" />
+                    </div>
                 </div>
                 <label for="tournamentAddDebater">Add Participant</label>
                 <select id="tournamentAddDebater" style="margin-bottom: 0;"></select>
@@ -129,15 +139,16 @@
                             <label for="showAnnotations">Show Important Dates</label>
                         </div>
                     </div>
-                    <div>
+                    <div id="chartContainer" style="position: relative;">
                         <canvas id="eloChart"></canvas>
                     </div>
+                    <button class = "button" onclick="toggleFullscreen()">🔍 Fullscreen</button>
                 </div>
                 <div>
                     <h3>Manage Important Dates</h3>
                     <input type="date" id="eventDate" />
                     <input type="text" id="eventName" placeholder="Event Name (e.g., 'Practice Tournament')" />
-                    <button class="secondary" onclick="addAnnotation()">Mark Date</button>
+                    <button class="button" onclick="addAnnotation()">Mark Date</button>
                     <h3 style="margin-top: 20px;">Marked Dates</h3>
                     <ul id="annotationsList"></ul>
                 </div>
@@ -149,6 +160,7 @@
 
 
     </div>
+        
     <script src="scripts/login.js"></script>
     <script>
         // --- SUPABASE CONNECTION ---
@@ -170,7 +182,6 @@
     <script src="scripts/updateDebaters.js"></script>
     <script src="scripts/updateElo.js"></script>
     <script src="scripts/data.js"></script>
-    <script src="scripts/leaderboard.js"></script>
     <script>
         VANTA.TOPOLOGY({
             el: "#vanta-bg",

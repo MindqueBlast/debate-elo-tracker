@@ -44,23 +44,33 @@ if (isLocalFile) {
     document.body.appendChild(testModeBadge);
 }
  else {
-    firebase.auth().onAuthStateChanged(user => {
-        if (user) {
-            const email = user.email;
-            if (allowedEmails.includes(email)) {
+firebase.auth().onAuthStateChanged(user => {
+    const showAfterLoading = () => {
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        loadingOverlay.style.opacity = '0';
+        loadingOverlay.style.transition = 'opacity 0.6s ease';
+        setTimeout(() => {
+            loadingOverlay.remove();
+            if (user && allowedEmails.includes(user.email)) {
                 loginScreen.style.display = "none";
                 document.querySelector(".container").style.display = "block";
                 authBar.style.display = "flex";
             } else {
-                alert("Access denied. Your account is not authorized.");
-                firebase.auth().signOut();
+                loginScreen.style.display = "flex";
+                document.querySelector(".container").style.display = "none";
+                authBar.style.display = "none";
             }
-        } else {
-            loginScreen.style.display = "flex";
-            document.querySelector(".container").style.display = "none";
-            authBar.style.display = "none";
-        }
-    });
+        }, 600);
+    };
+
+    if (appData?.debaters && appData?.tournaments) {
+        // If data is already loaded, show immediately
+        showAfterLoading();
+    } else {
+        // Wait until loadData() finishes to reveal login or container
+        window.revealAfterDataLoad = showAfterLoading;
+    }
+});
 
     loginBtn.onclick = () => {
         const provider = new firebase.auth.GoogleAuthProvider();

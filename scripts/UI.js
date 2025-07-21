@@ -35,6 +35,21 @@ async function loadData() {
 
         console.log('Data fetched successfully.');
         refreshAllUI();
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const mainContainer = document.querySelector('.container'); // or your main section
+        console.log({loadingOverlay, mainContainer});
+
+        if (loadingOverlay && mainContainer) {
+            loadingOverlay.style.opacity = '0';
+            loadingOverlay.style.transition = 'opacity 0.6s ease';
+        
+            setTimeout(() => {
+                loadingOverlay.remove();
+                mainContainer.style.display = 'block';
+            }, 600);
+        }
+        
+        
     } catch (error) {
         console.error('Error fetching data:', error);
         alert(
@@ -432,17 +447,18 @@ function renderTournamentParticipants() {
         li.classList.add('list-item');
 
         li.innerHTML = `
-        <div class="item-info">
+        <div class="item-info" style="align-self: center;">
           ${p.name} (${p.division})
         </div>
-        <div class="item-controls">
-          <input type="number" min="0" value="${p.W_raw}" 
-                 onchange="updateRawWins('${p.id}', this.value)" 
-                 style="width: 60px; margin-right: 10px;" />
-          <button class="danger" onclick="removeParticipant('${p.id}')">Remove</button>
+        <div class="item-controls" style="display: flex; align-items: center;">
+          <input type="number" min="0" value="${p.W_raw}"
+                 onchange="updateRawWins('${p.id}', this.value)"
+                 style="width: 60px; height: 16px; margin-right: 10px; margin-top:10px;vertical-align: middle; padding: 6px 8px; border-radius: 6px; border: 1px solid #444; background: #1e1e1e; color: #eee;" />
+          <button class="danger">Remove</button>
         </div>
-      `;
+        `;
 
+        li.querySelector("button").addEventListener("click", () => removeParticipant(p.id));
         list.appendChild(li);
     });
 }

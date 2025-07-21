@@ -81,7 +81,20 @@ async function recordTournament() {
     const k = parseFloat(document.getElementById('tournamentAffectValue').value);
     const maxGain = parseFloat(document.getElementById('tournamentMaxGain').value);
     const tournamentName = document.getElementById('tournamentName').value.trim();
+    const maxRoundsInput = document.getElementById('tournamentMaxRounds').value.trim();
+    const maxRounds = maxRoundsInput === '' ? null : parseInt(maxRoundsInput, 10);
 
+    // Validation only if not null
+    if (maxRounds !== null && (isNaN(maxRounds) || maxRounds < 0)) {
+        alert('Please enter a valid Max Rounds value or leave it empty.');
+        return;
+    }
+
+
+    if (isNaN(maxRounds) || maxRounds < 0) {
+        alert('Please enter a valid Max Rounds value.');
+        return;
+    }
     if (isNaN(n) || n <= 0) {
         alert('Please enter a valid number of rounds (n).');
         return;
@@ -139,9 +152,16 @@ async function recordTournament() {
     participants.forEach(p => {
         const p_prop = Math.pow((p.elo / e_avg), 2);
         let C = k * ((p.W_adjusted / p_prop) - E_tourney) + b;
+    
+        // Only apply maxRounds no-loss rule if maxRounds is valid
+        if (maxRounds !== null && p.W_raw === maxRounds && C < 0) {
+            C = 0;
+        }
+    
         if (C > maxGain) {
             C = maxGain;
         }
+    
         results.push({
             id: p.id,
             name: p.name,
@@ -154,6 +174,7 @@ async function recordTournament() {
             division: p.division
         });
     });
+    
 
     const today = getLocalDateString();
 
@@ -268,30 +289,62 @@ async function deleteTournament(tournamentId) {
         .select("*")
         .eq("tournament_id", tournamentId);
 
-    if (error || !participants.length) {
-        return alert("Could not find tournament participants.");
+    if (error) {
+        alert("Error fetching tournament participants: " + error.message);
+        return;
+    }
+    if (!participants.length) {
+        alert("No participants found for this tournament.");
+        return;
     }
 
-    if (!confirm("Are you sure you want to delete this tournament and revert Elo changes for all participants?")) return;
+    if (!confirm("Are you sure you want to delete this tournament and revert Elo changes for all participants?")) {
+        return;
+    }
 
-    const updates = participants.map((p) => {
-        const debater = appData.debaters.find((d) => d.id === p.debater_id);
-        if (!debater) return null;
+    // 1. Undo Elo changes for all participants
+    for (const p of participants) {
+        const debater = appData.debaters.find(d => d.id === p.debater_id);
+        if (!debater) {
+            alert(`Could not find debater with id ${p.debater_id}`);
+            return;
+        }
         const newElo = debater.elo - p.elo_change;
-        return supabaseClient.from("debaters").update({ elo: newElo }).eq("id", debater.id);
-    }).filter(Boolean);
+        const { error: eloError } = await supabaseClient
+            .from("debaters")
+            .update({ elo: newElo })
+            .eq("id", debater.id);
 
-    try {
-        await Promise.all([
-            ...updates,
-            supabaseClient.from("tournaments").delete().eq("id", tournamentId),
-            supabaseClient.from("tournament_participants").delete().eq("tournament_id", tournamentId),
-        ]);
-        alert("Tournament deleted and ELO changes reverted.");
-        await loadData();
-        renderTournaments();
-    } catch (err) {
-        console.error("Failed to delete tournament:", err);
-        alert("Error while deleting tournament.");
+        if (eloError) {
+            alert("Failed to revert Elo for a debater: " + eloError.message);
+            return;
+        }
     }
+
+    // 2. Delete tournament participants
+    const { error: participantsDeleteError } = await supabaseClient
+        .from("tournament_participants")
+        .delete()
+        .eq("tournament_id", tournamentId);
+
+    if (participantsDeleteError) {
+        alert("Failed to delete tournament participants: " + participantsDeleteError.message);
+        return;
+    }
+
+    // 3. Delete the tournament itself
+    const { error: tournamentDeleteError } = await supabaseClient
+        .from("tournaments")
+        .delete()
+        .eq("id", tournamentId);
+
+    if (tournamentDeleteError) {
+        alert("Failed to delete tournament: " + tournamentDeleteError.message);
+        return;
+    }
+
+    alert("Tournament deleted and ELO changes reverted.");
+    await loadData();
+    renderTournaments();
 }
+
