@@ -178,7 +178,7 @@ async function recordTournament() {
 
     let results = [];
     participants.forEach((p) => {
-        const p_prop = Math.pow(p.elo / e_avg, 2);
+        const p_prop = Math.pow(p.elo / e_avg, 1.5);
         let C = k * (p.W_adjusted / p_prop - E_tourney) + b;
 
         // Only apply maxRounds no-loss rule if maxRounds is valid

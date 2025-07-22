@@ -423,8 +423,6 @@ function addParticipant() {
         division: divisionSelect.value,
         W_raw: 0, // default raw wins
     });
-
-    renderTournamentParticipants();
 }
 
 function renderTournamentParticipants() {
