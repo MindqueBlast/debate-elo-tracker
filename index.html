@@ -77,6 +77,8 @@
                     <select id="player1" required></select>
                     <label for="player2">Loser</label>
                     <select id="player2" required></select>
+                    <label for="practiceRoundDate">Date</label>
+                    <input type="date" id="practiceRoundDate" />
                     <div id="expectedScoreDisplay" style="margin-top: 10px; font-weight: bold; color: #ff5252;">
                         Expected score: —
                     </div>
@@ -89,6 +91,8 @@
                 <h2>Record Tournament Results</h2>
                 <label for="tournamentName">Tournament Name (for graph)</label>
                 <input type="text" id="tournamentName" placeholder="Optional, e.g., 'State Qualifiers'" />
+                <label for="tournamentDate">Date</label>
+                <input type="date" id="tournamentDate" />
                 <div style="display: flex; gap: 10px;">
                     <div style="flex-basis: 25%;">
                         <label for="tournamentRounds">Rounds</label>
@@ -199,10 +203,15 @@
             <div class="card">
                 <h2>Analytics</h2>
                 <label for="viewerAnalyticsDebater">Select Debater</label>
-                <select id="viewerAnalyticsDebater" onchange="renderChart(true)"></select>
+                <select id="viewerAnalyticsDebater" onchange="renderViewerChart()"></select>
+                <div>
+                    <input type="checkbox" id="viewerShowAnnotations" checked onchange="renderViewerChart()" />
+                    <label for="viewerShowAnnotations">Show Important Dates</label>
+                </div>
                 <div style="position: relative; height: 400px;">
                     <canvas id="viewerEloChart"></canvas>
                 </div>
+                <button id="viewerFullscreenBtn" class="button" onclick="viewerToggleFullscreen()">🔍 Fullscreen</button>
             </div>
         </div>
     

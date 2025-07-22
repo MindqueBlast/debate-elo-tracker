@@ -137,7 +137,8 @@ function renderViewerChart() {
     const selectedDebaterId = document.getElementById(
         'viewerAnalyticsDebater'
     ).value;
-    // No showAnnotations for viewer for now, or add if you have a checkbox
+    const showAnnotations =
+        document.getElementById('viewerShowAnnotations')?.checked ?? false;
     const ctx = document.getElementById('viewerEloChart').getContext('2d');
     if (viewerEloChart) {
         viewerEloChart.destroy();
@@ -180,7 +181,6 @@ function renderViewerChart() {
 
     if (selectedDebaterId === 'ALL') {
         chartOptions.scales.y.min = 0;
-        // For viewer, show all debaters (active only)
         const debatersToGraph = appData.debaters.filter(
             (d) => d.status === 'active'
         );
@@ -203,7 +203,14 @@ function renderViewerChart() {
                 tension: 0.1,
             };
         });
-        // No annotations for viewer for now
+        if (showAnnotations) {
+            const annotationsData = (appData.annotations || []).map((a) => ({
+                x: a.date,
+                y: 0,
+                label: a.name,
+            }));
+            datasets.push({ ...annotationPointStyle, data: annotationsData });
+        }
         viewerEloChart = new Chart(ctx, {
             type: 'line',
             data: { datasets: datasets },
@@ -232,11 +239,29 @@ function renderViewerChart() {
                 tension: 0.1,
             },
         ];
-        // No annotations for viewer for now
+        if (showAnnotations && historyData.length > 0) {
+            const minElo = Math.min(...historyData.map((h) => h.elo));
+            const annotationsData = (appData.annotations || []).map((a) => ({
+                x: a.date,
+                y: minElo,
+                label: a.name,
+            }));
+            datasets.push({ ...annotationPointStyle, data: annotationsData });
+        }
         viewerEloChart = new Chart(ctx, {
             type: 'line',
             data: { datasets: datasets },
             options: chartOptions,
         });
+    }
+}
+
+function viewerToggleFullscreen() {
+    const chartContainer =
+        document.getElementById('viewerEloChart').parentElement;
+    if (!document.fullscreenElement) {
+        chartContainer.requestFullscreen?.();
+    } else {
+        document.exitFullscreen?.();
     }
 }
