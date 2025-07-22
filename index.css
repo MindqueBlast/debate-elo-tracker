@@ -448,3 +448,27 @@ ul {
 .toast-info {
     background-color: #3498db;
 }
+.container {
+    display: none;
+}
+
+.viewer-container {
+    display: none;
+        max-width: 1200px;
+            margin: auto;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(14px);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 0 40px rgba(255, 0, 0, 0.1);
+            border: 1px solid rgba(255, 0, 0, 0.05);
+            display: none;
+            animation: fadeInScale 0.7s ease-in-out;
+            transition: all 0.3s ease-in-out;
+}
+
+#loadingOverlay {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}

@@ -497,3 +497,15 @@ document
 document
     .getElementById('player2')
     .addEventListener('change', updateExpectedScore);
+function renderViewerDebaters() {
+    const list = document.getElementById('viewerDebatersList');
+    list.innerHTML = '';
+
+    const sorted = [...appData.debaters].sort((a, b) => b.elo - a.elo);
+    sorted.forEach((d, i) => {
+        if (d.status === 'graduated') return;
+        const li = document.createElement('li');
+        li.innerHTML = `#${i + 1} — ${d.name} (${Math.round(d.elo)})`;
+        list.appendChild(li);
+    });
+}

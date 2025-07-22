@@ -13,21 +13,26 @@ const allowedEmails = [
     'zile.zhao@gmail.com',
 ];
 
+const viewerOnlyEmails = ['viewer1@example.com', 'viewer2@example.com'];
+
 const loginBtn = document.getElementById('loginBtn');
 const loginScreen = document.getElementById('loginScreen');
-const logoutBtn = document.getElementById('logoutBtn');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const mainContainer = document.querySelector('.container');
+const viewerContainer = document.querySelector('.viewer-container');
 const authBar = document.getElementById('authBar');
+const logoutBtn = document.getElementById('logoutBtn');
 
-// Bypass login completely if opened via file://
+// Local dev bypass
 const isLocalFile = window.location.protocol === 'file:';
-
 if (isLocalFile) {
     console.warn('Local file mode detected. Bypassing Firebase login.');
     loginScreen.style.display = 'none';
-    document.querySelector('.container').style.display = 'block';
+    loadingOverlay.style.display = 'none';
+    mainContainer.style.display = 'block';
     authBar.style.display = 'flex';
 
-    // Create a test mode badge
+    // Add TEST MODE badge
     const testModeBadge = document.createElement('div');
     testModeBadge.textContent = 'TEST MODE – Not Signed In';
     testModeBadge.style.position = 'fixed';
@@ -45,36 +50,54 @@ if (isLocalFile) {
 } else {
     document.addEventListener('DOMContentLoaded', () => {
         firebase.auth().onAuthStateChanged(async (user) => {
-            const loginScreen = document.getElementById('loginScreen');
-            const loadingOverlay = document.getElementById('loadingOverlay');
-            const mainContainer = document.querySelector('.container');
-            const authBar = document.getElementById('authBar');
-
             if (user) {
                 const email = user.email;
+
+                loginScreen.style.display = 'none';
+                loadingOverlay.style.display = 'flex';
+                loadingOverlay.style.opacity = '1';
+
                 if (allowedEmails.includes(email)) {
-                    // Step 1: Hide login screen and show loading screen
-                    loginScreen.style.display = 'none';
-                    loadingOverlay.style.display = 'flex';
-                    loadingOverlay.style.opacity = '1';
-
+                    // Admin
                     try {
-                        await loadData(); // Step 2: Load all Supabase data
+                        await loadData();
 
-                        // Step 3: Animate in the main container
                         loadingOverlay.style.transition = 'opacity 0.6s ease';
                         loadingOverlay.style.opacity = '0';
 
                         setTimeout(() => {
-                            loadingOverlay.remove(); // Done loading
+                            loadingOverlay.remove();
                             mainContainer.style.display = 'block';
                             authBar.style.display = 'flex';
+                            logoutBtn.style.display = 'inline-block';
                         }, 600);
                     } catch (err) {
-                        console.error('❌ Failed to load app data:', err);
+                        console.error('❌ Failed to load admin data:', err);
+                        alert('Something went wrong while loading admin data.');
+                        loadingOverlay.style.display = 'none';
+                        loginScreen.style.display = 'flex';
+                    }
+                } else if (viewerOnlyEmails.includes(email)) {
+                    // Viewer
+                    try {
+                        await loadData();
+
+                        loadingOverlay.style.transition = 'opacity 0.6s ease';
+                        loadingOverlay.style.opacity = '0';
+
+                        setTimeout(() => {
+                            loadingOverlay.remove();
+                            viewerContainer.style.display = 'block';
+                            logoutBtn.style.display = 'inline-block';
+                            renderViewerDebaters();
+                        }, 600);
+                    } catch (err) {
+                        console.error('❌ Failed to load viewer data:', err);
                         alert(
-                            'Something went wrong while loading. Try refreshing.'
+                            'Something went wrong while loading viewer data.'
                         );
+                        loadingOverlay.style.display = 'none';
+                        loginScreen.style.display = 'flex';
                     }
                 } else {
                     alert('Access denied. Your account is not authorized.');
@@ -85,7 +108,9 @@ if (isLocalFile) {
                 loginScreen.style.display = 'flex';
                 loadingOverlay.style.display = 'none';
                 mainContainer.style.display = 'none';
+                viewerContainer.style.display = 'none';
                 authBar.style.display = 'none';
+                logoutBtn.style.display = 'none';
             }
         });
     });
