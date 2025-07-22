@@ -56,7 +56,23 @@ function renderDebaters(readOnly = false, targetId = 'debatersList') {
     const showGraduated =
         document.getElementById('showGraduated')?.checked ?? true;
     list.innerHTML = '';
+    // 👉 STEP 1: Calculate Average Elo of active debaters
+    const activeDebaters = appData.debaters.filter(
+        (d) => d.status === 'active'
+    );
+    const avgElo =
+        activeDebaters.length === 0
+            ? 0
+            : activeDebaters.reduce((sum, d) => sum + d.elo, 0) /
+              activeDebaters.length;
 
+    // 👉 STEP 2: Add a banner at the top
+    const avgEloBanner = document.createElement('div');
+    avgEloBanner.className = 'avg-elo-banner';
+    avgEloBanner.textContent = `Average Elo (Active Debaters): ${Math.round(
+        avgElo
+    )}`;
+    list.appendChild(avgEloBanner);
     const sortedDebaters = [...appData.debaters].sort((a, b) => b.elo - a.elo);
 
     sortedDebaters.forEach((debater, index) => {

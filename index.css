@@ -472,3 +472,12 @@ ul {
     opacity: 0;
     transition: opacity 0.6s ease;
 }
+.avg-elo-banner {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #ff4c4c;
+    text-align: center;
+    margin-bottom: 16px;
+    text-shadow: 0 0 8px rgba(255, 76, 76, 0.4);
+    animation: fadeInSlide 0.4s ease-out;
+}

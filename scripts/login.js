@@ -22,7 +22,7 @@ const viewerEmails = [
 
 const isLocalFile = window.location.protocol === 'file:';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const loginBtn = document.getElementById('loginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
 
@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const authBar = document.getElementById('authBar');
 
     if (isLocalFile) {
+        await loadData(false);
         console.warn('Local file mode detected. Bypassing Firebase login.');
         loginScreen.style.display = 'none';
         loadingOverlay.style.display = 'none';
