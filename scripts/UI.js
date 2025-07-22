@@ -28,19 +28,17 @@ async function loadData() {
         refreshAllUI();
         const loadingOverlay = document.getElementById('loadingOverlay');
         const mainContainer = document.querySelector('.container'); // or your main section
-        console.log({loadingOverlay, mainContainer});
+        console.log({ loadingOverlay, mainContainer });
 
         if (loadingOverlay && mainContainer) {
             loadingOverlay.style.opacity = '0';
             loadingOverlay.style.transition = 'opacity 0.6s ease';
-        
+
             setTimeout(() => {
                 loadingOverlay.remove();
                 mainContainer.style.display = 'block';
             }, 600);
         }
-        
-        
     } catch (error) {
         console.error('Error fetching data:', error);
         alert(
@@ -449,7 +447,9 @@ function renderTournamentParticipants() {
         </div>
         `;
 
-        li.querySelector("button").addEventListener("click", () => removeParticipant(p.id));
+        li.querySelector('button').addEventListener('click', () =>
+            removeParticipant(p.id)
+        );
         list.appendChild(li);
     });
 }
@@ -466,3 +466,41 @@ function removeParticipant(id) {
     tournamentParticipants.delete(id);
     renderTournamentParticipants();
 }
+
+function updateExpectedScore() {
+    const winnerId = document.getElementById('player1').value;
+    const loserId = document.getElementById('player2').value;
+
+    if (!winnerId || !loserId || winnerId === loserId) {
+        document.getElementById('expectedScoreDisplay').textContent =
+            'Expected score: —';
+        return;
+    }
+
+    const a = appData.debaters.find((d) => d.id === winnerId);
+    const b = appData.debaters.find((d) => d.id === loserId);
+
+    if (!a || !b) {
+        document.getElementById('expectedScoreDisplay').textContent =
+            'Expected score: —';
+        return;
+    }
+
+    const elo_a = a.elo;
+    const elo_b = b.elo;
+
+    const E = 1 / (1 + Math.pow(10, (elo_b - elo_a) / 400));
+
+    // Show as percentage with 1 decimal place
+    document.getElementById(
+        'expectedScoreDisplay'
+    ).textContent = `Win Probability for ${a.name}: ${(E * 100).toFixed(1)}%`;
+}
+
+// Add event listeners on the selects to update live
+document
+    .getElementById('player1')
+    .addEventListener('change', updateExpectedScore);
+document
+    .getElementById('player2')
+    .addEventListener('change', updateExpectedScore);
