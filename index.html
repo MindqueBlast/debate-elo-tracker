@@ -193,10 +193,21 @@
                     </button>
                 </div>
         <h1>Syosset Debate Elo Tracker - Viewer</h1>
+        <div class="grid-pair"></div>
         <div class="card">
             <h2>Debater Leaderboard</h2>
             <ul id="viewerDebatersList"></ul>
         </div>
+                <div class="card">
+                    <h2>Analytics</h2>
+                    <label for="viewerAnalyticsDebater">Select Debater</label>
+                    <select id="viewerAnalyticsDebater" onchange="renderChart(true)"></select>
+                    <div style="position: relative; height: 400px;">
+                        <canvas id="viewerEloChart"></canvas>
+                    </div>
+                </div>
+        </div>
+        <div class="grid-pair">
         <div class="card">
             <h2>Practice Rounds</h2>
             <ul id="viewerPracticeRoundsList"></ul>
@@ -208,15 +219,9 @@
             <ul id="viewerTournamentsList"></ul>
             <div id="viewerTournamentsPagination" style="margin-top: 12px; display: flex; gap: 10px;"></div>
         </div>
-        
-        <div class="card">
-            <h2>Analytics</h2>
-            <label for="viewerAnalyticsDebater">Select Debater</label>
-            <select id="viewerAnalyticsDebater" onchange="renderChart(true)"></select>
-            <div style="position: relative; height: 400px;">
-                <canvas id="viewerEloChart"></canvas>
-            </div>
         </div>
+        
+
 
                 <div class="card credits-card glow-on-hover animate-fade-in">
                     <h2>© 2025 Syosset PF — Aaditya Sahu & Jiayi Meng</h2>

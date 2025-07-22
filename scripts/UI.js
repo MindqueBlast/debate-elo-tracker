@@ -36,9 +36,31 @@ async function loadData(isViewer = false) {
             populateTournamentDebaterSelect();
         } else {
             renderDebaters(true, 'viewerDebatersList');
-            renderChart();
-            renderPracticeRounds(practiceRoundsPage);
-            renderTournaments(tournamentsPage);
+            renderPracticeRounds(
+                practiceRoundsPage,
+                'viewerPracticeRoundsList',
+                'viewerPracticeRoundsPagination'
+            );
+            renderTournaments(
+                tournamentsPage,
+                'viewerTournamentsList',
+                'viewerTournamentsPagination'
+            );
+            updateViewerAnalyticsDebaterSelect();
+            renderViewerChart();
+            const viewerAnalyticsDebater = document.getElementById(
+                'viewerAnalyticsDebater'
+            );
+            if (
+                viewerAnalyticsDebater &&
+                !viewerAnalyticsDebater._listenerAdded
+            ) {
+                viewerAnalyticsDebater.addEventListener(
+                    'change',
+                    renderViewerChart
+                );
+                viewerAnalyticsDebater._listenerAdded = true;
+            }
         }
     } catch (error) {
         console.error('Error fetching data:', error);
@@ -145,8 +167,12 @@ function renderDebaters(readOnly = false, targetId = 'debatersList') {
     list.appendChild(avgEloBanner);
 }
 
-async function renderPracticeRounds(page = 1) {
-    const list = document.getElementById('practiceRoundsList');
+async function renderPracticeRounds(
+    page = 1,
+    targetId = 'practiceRoundsList',
+    paginationId = 'practiceRoundsPagination'
+) {
+    const list = document.getElementById(targetId);
     list.innerHTML = '';
 
     const offset = (page - 1) * practiceRoundsPerPage;
@@ -192,7 +218,7 @@ async function renderPracticeRounds(page = 1) {
 
         li.appendChild(infoDiv);
 
-        if (!appData.isViewer) {
+        if (!appData.isViewer && targetId === 'practiceRoundsList') {
             const controlsDiv = document.createElement('div');
             controlsDiv.className = 'item-controls';
 
@@ -208,11 +234,21 @@ async function renderPracticeRounds(page = 1) {
         list.appendChild(li);
     });
 
-    renderPracticeRoundsPaginationControls(page, rounds.length);
+    renderPracticeRoundsPaginationControls(
+        page,
+        rounds.length,
+        paginationId,
+        targetId
+    );
 }
 
-function renderPracticeRoundsPaginationControls(currentPage, itemsCount) {
-    const container = document.getElementById('practiceRoundsPagination');
+function renderPracticeRoundsPaginationControls(
+    currentPage,
+    itemsCount,
+    paginationId = 'practiceRoundsPagination',
+    targetId = 'practiceRoundsList'
+) {
+    const container = document.getElementById(paginationId);
     container.innerHTML = '';
 
     const prevBtn = document.createElement('button');
@@ -221,7 +257,7 @@ function renderPracticeRoundsPaginationControls(currentPage, itemsCount) {
     prevBtn.onclick = () => {
         if (practiceRoundsPage > 1) {
             practiceRoundsPage--;
-            renderPracticeRounds(practiceRoundsPage);
+            renderPracticeRounds(practiceRoundsPage, targetId, paginationId);
         }
     };
 
@@ -230,15 +266,19 @@ function renderPracticeRoundsPaginationControls(currentPage, itemsCount) {
     nextBtn.disabled = itemsCount < practiceRoundsPerPage;
     nextBtn.onclick = () => {
         practiceRoundsPage++;
-        renderPracticeRounds(practiceRoundsPage);
+        renderPracticeRounds(practiceRoundsPage, targetId, paginationId);
     };
 
     container.appendChild(prevBtn);
     container.appendChild(nextBtn);
 }
 
-async function renderTournaments(page = 1) {
-    const list = document.getElementById('tournamentsList');
+async function renderTournaments(
+    page = 1,
+    targetId = 'tournamentsList',
+    paginationId = 'tournamentsPagination'
+) {
+    const list = document.getElementById(targetId);
     list.innerHTML = '';
 
     const offset = (page - 1) * tournamentsPerPage;
@@ -295,7 +335,7 @@ async function renderTournaments(page = 1) {
                     ${participantList}
                 </div>
                 ${
-                    appData.isViewer
+                    appData.isViewer && targetId !== 'tournamentsList'
                         ? ''
                         : `<div class="item-controls">
                             <button class="danger" onclick="deleteTournament('${tournament.id}')">Delete</button>
@@ -306,10 +346,21 @@ async function renderTournaments(page = 1) {
         list.innerHTML += tournamentCard;
     }
 
-    renderTournamentsPaginationControls(page, tournaments.length);
+    renderTournamentsPaginationControls(
+        page,
+        tournaments.length,
+        paginationId,
+        targetId
+    );
 }
-function renderTournamentsPaginationControls(currentPage, itemsCount) {
-    const container = document.getElementById('tournamentsPagination');
+
+function renderTournamentsPaginationControls(
+    currentPage,
+    itemsCount,
+    paginationId = 'tournamentsPagination',
+    targetId = 'tournamentsList'
+) {
+    const container = document.getElementById(paginationId);
     container.innerHTML = '';
 
     const prevBtn = document.createElement('button');
@@ -318,7 +369,7 @@ function renderTournamentsPaginationControls(currentPage, itemsCount) {
     prevBtn.onclick = () => {
         if (tournamentsPage > 1) {
             tournamentsPage--;
-            renderTournaments(tournamentsPage);
+            renderTournaments(tournamentsPage, targetId, paginationId);
         }
     };
 
@@ -327,7 +378,7 @@ function renderTournamentsPaginationControls(currentPage, itemsCount) {
     nextBtn.disabled = itemsCount < tournamentsPerPage;
     nextBtn.onclick = () => {
         tournamentsPage++;
-        renderTournaments(tournamentsPage);
+        renderTournaments(tournamentsPage, targetId, paginationId);
     };
 
     container.appendChild(prevBtn);
@@ -604,4 +655,23 @@ function renderViewerDebaters() {
         li.innerHTML = `#${i + 1} — ${d.name} (${Math.round(d.elo)})`;
         list.appendChild(li);
     });
+}
+
+function updateViewerAnalyticsDebaterSelect() {
+    const select = document.getElementById('viewerAnalyticsDebater');
+    if (!select) return;
+    select.innerHTML = '';
+    const allOption = document.createElement('option');
+    allOption.value = 'ALL';
+    allOption.textContent = '-- All Debaters --';
+    select.appendChild(allOption);
+    appData.debaters
+        .filter((d) => d.status === 'active')
+        .forEach((debater) => {
+            const option = document.createElement('option');
+            option.value = debater.id;
+            option.textContent = `${debater.name} (${Math.round(debater.elo)})`;
+            select.appendChild(option);
+        });
+    select.value = 'ALL';
 }
