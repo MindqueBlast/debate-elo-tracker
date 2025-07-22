@@ -54,21 +54,23 @@ if (isLocalFile) {
 
             if (user) {
                 const email = user.email;
-                if (allowedEmails.includes(email)) {
-                    // Step 1: Hide login screen and show loading screen
+                const mainContainer = document.querySelector('.container');
+                const viewerContainer =
+                    document.querySelector('.viewer-container');
+
+                if (fullAccessEmails.includes(email)) {
+                    // Full access
                     loginScreen.style.display = 'none';
                     loadingOverlay.style.display = 'flex';
                     loadingOverlay.style.opacity = '1';
 
                     try {
-                        await loadData(); // Step 2: Load all Supabase data
-
-                        // Step 3: Animate in the main container
+                        await loadData();
                         loadingOverlay.style.transition = 'opacity 0.6s ease';
                         loadingOverlay.style.opacity = '0';
 
                         setTimeout(() => {
-                            loadingOverlay.remove(); // Done loading
+                            loadingOverlay.remove();
                             mainContainer.style.display = 'block';
                             authBar.style.display = 'flex';
                         }, 600);
@@ -78,16 +80,15 @@ if (isLocalFile) {
                             'Something went wrong while loading. Try refreshing.'
                         );
                     }
+                } else if (viewerOnlyEmails.includes(email)) {
+                    // Viewer-only mode
+                    loginScreen.style.display = 'none';
+                    viewerContainer.style.display = 'block';
+                    renderViewerDebaters(); // ⬅️ render viewer version
                 } else {
                     alert('Access denied. Your account is not authorized.');
                     firebase.auth().signOut();
                 }
-            } else {
-                // Not logged in
-                loginScreen.style.display = 'flex';
-                loadingOverlay.style.display = 'none';
-                mainContainer.style.display = 'none';
-                authBar.style.display = 'none';
             }
         });
     });
