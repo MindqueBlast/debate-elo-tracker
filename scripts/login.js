@@ -13,30 +13,26 @@ const allowedEmails = [
     'zile.zhao@gmail.com',
 ];
 
-const viewerOnlyEmails = [
-    'altjiayi@gmail.com',
-    'mindqueblast@gmail.com',
-    'example@gmail.com',
-];
+const viewerOnlyEmails = ['mindqueblast@gmail.com', 'viewer2@gmail.com'];
+
+let isViewer = false;
 
 const loginBtn = document.getElementById('loginBtn');
 const loginScreen = document.getElementById('loginScreen');
-const loadingOverlay = document.getElementById('loadingOverlay');
-const mainContainer = document.querySelector('.container');
-const viewerContainer = document.querySelector('.viewer-container');
-const authBar = document.getElementById('authBar');
 const logoutBtn = document.getElementById('logoutBtn');
+const authBar = document.getElementById('authBar');
+const viewerContainer = document.getElementById('viewer-container');
+const mainContainer = document.querySelector('.container');
 
-// Local dev bypass
+// Bypass login if using file://
 const isLocalFile = window.location.protocol === 'file:';
+
 if (isLocalFile) {
     console.warn('Local file mode detected. Bypassing Firebase login.');
     loginScreen.style.display = 'none';
-    loadingOverlay.style.display = 'none';
     mainContainer.style.display = 'block';
     authBar.style.display = 'flex';
 
-    // Add TEST MODE badge
     const testModeBadge = document.createElement('div');
     testModeBadge.textContent = 'TEST MODE – Not Signed In';
     testModeBadge.style.position = 'fixed';
@@ -53,67 +49,56 @@ if (isLocalFile) {
     document.body.appendChild(testModeBadge);
 } else {
     document.addEventListener('DOMContentLoaded', () => {
-        // Hide everything by default
-        loginScreen.style.display = 'none';
-        loadingOverlay.style.display = 'none';
-        mainContainer.style.display = 'none';
-        viewerContainer.style.display = 'none';
-        authBar.style.display = 'none';
-        logoutBtn.style.display = 'none';
-
         firebase.auth().onAuthStateChanged(async (user) => {
-            if (user) {
-                const email = user.email;
-
-                loginScreen.style.display = 'none';
-                loadingOverlay.style.display = 'flex';
-                loadingOverlay.style.opacity = '1';
-
-                if (allowedEmails.includes(email)) {
-                    try {
-                        await loadData();
-                        loadingOverlay.style.transition = 'opacity 0.6s ease';
-                        loadingOverlay.style.opacity = '0';
-
-                        setTimeout(() => {
-                            loadingOverlay.remove();
-                            mainContainer.style.display = 'block';
-                            authBar.style.display = 'flex';
-                            logoutBtn.style.display = 'inline-block';
-                        }, 600);
-                    } catch (err) {
-                        console.error('❌ Failed to load admin data:', err);
-                        alert('Something went wrong while loading admin data.');
-                        loadingOverlay.style.display = 'none';
-                        loginScreen.style.display = 'flex';
-                    }
-                } else if (viewerOnlyEmails.includes(email)) {
-                    try {
-                        await loadData();
-                        loadingOverlay.style.transition = 'opacity 0.6s ease';
-                        loadingOverlay.style.opacity = '0';
-
-                        setTimeout(() => {
-                            loadingOverlay.remove();
-                            viewerContainer.style.display = 'block';
-                            logoutBtn.style.display = 'inline-block';
-                            renderViewerDebaters();
-                        }, 600);
-                    } catch (err) {
-                        console.error('❌ Failed to load viewer data:', err);
-                        alert(
-                            'Something went wrong while loading viewer data.'
-                        );
-                        loadingOverlay.style.display = 'none';
-                        loginScreen.style.display = 'flex';
-                    }
-                } else {
-                    alert('Access denied. Your account is not authorized.');
-                    firebase.auth().signOut();
-                }
-            } else {
-                // Not logged in
+            if (!user) {
                 loginScreen.style.display = 'flex';
+                document.getElementById('loadingOverlay').style.display =
+                    'none';
+                mainContainer.style.display = 'none';
+                authBar.style.display = 'none';
+                viewerContainer.style.display = 'none';
+                return;
+            }
+
+            const email = user.email;
+            if (allowedEmails.includes(email)) {
+                isViewer = false;
+            } else if (viewerOnlyEmails.includes(email)) {
+                isViewer = true;
+            } else {
+                alert('Access denied. Your account is not authorized.');
+                firebase.auth().signOut();
+                return;
+            }
+
+            // Step 1: Hide login screen, show loading
+            loginScreen.style.display = 'none';
+            document.getElementById('loadingOverlay').style.display = 'flex';
+
+            try {
+                await loadData();
+
+                // Animate out the loading screen
+                const loadingOverlay =
+                    document.getElementById('loadingOverlay');
+                loadingOverlay.style.transition = 'opacity 0.6s ease';
+                loadingOverlay.style.opacity = '0';
+
+                setTimeout(() => {
+                    loadingOverlay.remove();
+                    if (isViewer) {
+                        viewerContainer.style.display = 'block';
+                        mainContainer.style.display = 'none';
+                        authBar.style.display = 'none';
+                    } else {
+                        mainContainer.style.display = 'block';
+                        authBar.style.display = 'flex';
+                        viewerContainer.style.display = 'none';
+                    }
+                }, 600);
+            } catch (err) {
+                console.error('❌ Failed to load app data:', err);
+                alert('Something went wrong while loading. Try refreshing.');
             }
         });
     });
@@ -134,6 +119,7 @@ if (isLocalFile) {
             .signOut()
             .then(() => {
                 alert('Logged out successfully.');
+                location.reload(); // Force reset everything
             });
     };
 }

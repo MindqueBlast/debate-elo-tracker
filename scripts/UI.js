@@ -8,39 +8,32 @@ async function loadData() {
         const { data: annotationsData, error: annotationsError } =
             await supabaseClient.from('annotations').select('*');
         if (annotationsError) throw annotationsError;
+
         const { data: practiceRounds } = await supabaseClient
             .from('practice_rounds')
             .select('*');
+
         const { data: tournaments } = await supabaseClient
             .from('tournaments')
             .select('*, tournament_participants(*)');
+
         appData.practiceRounds = practiceRounds;
         appData.tournaments = tournaments;
         appData.debaters = debatersData;
         appData.annotations = annotationsData;
 
         console.log('Data fetched successfully.');
-        refreshAllUI();
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const mainContainer = document.querySelector('.container'); // or your main section
-        console.log({ loadingOverlay, mainContainer });
 
-        if (loadingOverlay && mainContainer) {
-            loadingOverlay.style.opacity = '0';
-            loadingOverlay.style.transition = 'opacity 0.6s ease';
-
-            setTimeout(() => {
-                loadingOverlay.remove();
-                mainContainer.style.display = 'block';
-            }, 600);
+        if (!isViewer) {
+            refreshAllUI();
+            populateTournamentDebaterSelect();
+        } else {
+            renderDebaters(); // only for viewer UI
         }
     } catch (error) {
         console.error('Error fetching data:', error);
-        alert(
-            'Could not load data from the database. Check the console (F12) for errors and ensure your Supabase URL and Key are correct.'
-        );
+        alert('Could not load data from the database.');
     }
-    populateTournamentDebaterSelect();
 }
 
 function handleShowGraduatedChange() {
