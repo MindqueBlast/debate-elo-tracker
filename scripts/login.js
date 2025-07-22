@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const viewerContainer =
         document.getElementsByClassName('viewer-container')[0]; // FIX: get first element
     const authBar = document.getElementById('authBar');
+    const viewerAuthBar = document.getElementById('viewerAuthBar');
 
     if (isLocalFile) {
         await loadData(false);
@@ -97,7 +98,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         authBar.style.display = 'flex';
                     } else if (isViewer && viewerContainer) {
                         viewerContainer.style.display = 'block';
-                        authBar.style.display = 'flex';
+                        viewerAuthBar.style.display = 'flex';
                         renderDebaters?.(true, 'viewerDebatersList'); // call viewer UI render if defined
                     }
                 }, 600);
