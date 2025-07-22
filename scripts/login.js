@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingOverlay.style.opacity = '1';
 
             try {
-                await loadData();
+                await loadData(isViewer);
 
                 loadingOverlay.style.transition = 'opacity 0.6s ease';
                 loadingOverlay.style.opacity = '0';

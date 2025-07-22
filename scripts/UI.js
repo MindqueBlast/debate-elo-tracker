@@ -1,4 +1,5 @@
-async function loadData() {
+async function loadData(isViewer = false) {
+    appData.isViewer = isViewer;
     console.log('Fetching data from database...');
     try {
         const { data: debatersData, error: debatersError } =
