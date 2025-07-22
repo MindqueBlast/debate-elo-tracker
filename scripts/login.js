@@ -159,37 +159,41 @@ if (isLocalFile) {
         });
     });
 
-    loginBtn.onclick = () => {
-        const provider = new firebase.auth.GoogleAuthProvider();
-
-        // Show loading overlay right away to prevent UI flash
+    document.addEventListener('DOMContentLoaded', () => {
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
         const loadingOverlay = document.getElementById('loadingOverlay');
-        loadingOverlay.style.display = 'flex';
-        loadingOverlay.style.opacity = '1';
 
-        firebase
-            .auth()
-            .signInWithPopup(provider)
-            .catch((error) => {
-                loadingOverlay.style.display = 'none';
-                alert('Login failed: ' + error.message);
-            });
-    };
+        loginBtn.onclick = () => {
+            loadingOverlay.style.display = 'flex';
+            loadingOverlay.style.opacity = '1';
 
-    logoutBtn.onclick = () => {
-        firebase
-            .auth()
-            .signOut()
-            .then(() => {
-                document.querySelector('.container').style.display = 'none';
-                document.querySelector('.viewer-container').style.display =
-                    'none';
-                document.getElementById('authBar').style.display = 'none';
-                document.getElementById('loginScreen').style.display = 'flex';
-                showToast('Logged out successfully.', 'success');
-            })
-            .catch((error) => {
-                showToast('Logout failed: ' + error.message, 'error');
-            });
-    };
+            const provider = new firebase.auth.GoogleAuthProvider();
+            firebase
+                .auth()
+                .signInWithPopup(provider)
+                .catch((error) => {
+                    loadingOverlay.style.display = 'none';
+                    alert('Login failed: ' + error.message);
+                });
+        };
+
+        logoutBtn.onclick = () => {
+            firebase
+                .auth()
+                .signOut()
+                .then(() => {
+                    document.querySelector('.container').style.display = 'none';
+                    document.querySelector('.viewer-container').style.display =
+                        'none';
+                    document.getElementById('authBar').style.display = 'none';
+                    document.getElementById('loginScreen').style.display =
+                        'flex';
+                    showToast('Logged out successfully.', 'success');
+                })
+                .catch((error) => {
+                    showToast('Logout failed: ' + error.message, 'error');
+                });
+        };
+    });
 }
