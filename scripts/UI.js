@@ -87,8 +87,13 @@ function refreshAllUI() {
 // --- UI RENDERING ---
 function renderDebaters(readOnly = false, targetId = 'debatersList') {
     const list = document.getElementById(targetId);
-    // Only clear the list, not the parent container
     list.innerHTML = '';
+
+    let showGraduated = false;
+    if (!readOnly) {
+        const checkbox = document.getElementById('showGraduated');
+        showGraduated = checkbox ? checkbox.checked : false;
+    }
 
     // Add search bar if not present
     let searchId = targetId + 'Search';
