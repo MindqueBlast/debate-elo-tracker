@@ -54,47 +54,71 @@ if (isLocalFile) {
             const loginScreen = document.getElementById('loginScreen');
             const loadingOverlay = document.getElementById('loadingOverlay');
             const mainContainer = document.querySelector('.container');
+            const viewerContainer = document.querySelector('.viewer-container');
             const authBar = document.getElementById('authBar');
+            const logoutBtn = document.getElementById('logoutBtn');
 
             if (user) {
                 const email = user.email;
-                const mainContainer = document.querySelector('.container');
-                const viewerContainer =
-                    document.querySelector('.viewer-container');
+
+                loginScreen.style.display = 'none'; // hide login screen
 
                 if (fullAccessEmails.includes(email)) {
-                    // Full access
-                    loginScreen.style.display = 'none';
+                    // Show loading overlay while fetching data
                     loadingOverlay.style.display = 'flex';
                     loadingOverlay.style.opacity = '1';
 
                     try {
                         await loadData();
+
+                        // Fade out loading overlay
                         loadingOverlay.style.transition = 'opacity 0.6s ease';
                         loadingOverlay.style.opacity = '0';
 
                         setTimeout(() => {
                             loadingOverlay.remove();
-                            mainContainer.style.display = 'block';
-                            authBar.style.display = 'flex';
-                            document.getElementById('logoutBtn').style.display =
-                                'inline-block';
+                            mainContainer.style.display = 'block'; // show admin container
+                            authBar.style.display = 'flex'; // show auth bar
+                            logoutBtn.style.display = 'inline-block'; // show logout button
                         }, 600);
                     } catch (err) {
                         console.error('❌ Failed to load app data:', err);
                         alert(
                             'Something went wrong while loading. Try refreshing.'
                         );
+                        loadingOverlay.style.display = 'none';
+                        loginScreen.style.display = 'flex';
                     }
+
+                    // Hide viewer container if it was visible
+                    viewerContainer.style.display = 'none';
                 } else if (viewerOnlyEmails.includes(email)) {
-                    // Viewer-only mode
-                    loginScreen.style.display = 'none';
-                    viewerContainer.style.display = 'block';
-                    renderViewerDebaters(); // ⬅️ render viewer version
+                    // Viewer-only mode: no loading animation, just show viewer container
+                    loadingOverlay.style.display = 'none';
+                    mainContainer.style.display = 'none';
+                    authBar.style.display = 'none';
+                    logoutBtn.style.display = 'none';
+
+                    viewerContainer.style.display = 'block'; // show viewer container
+                    renderViewerDebaters();
                 } else {
                     alert('Access denied. Your account is not authorized.');
                     firebase.auth().signOut();
+                    // Reset UI
+                    mainContainer.style.display = 'none';
+                    viewerContainer.style.display = 'none';
+                    authBar.style.display = 'none';
+                    logoutBtn.style.display = 'none';
+                    loginScreen.style.display = 'flex';
                 }
+            } else {
+                // No user logged in, show login screen, hide everything else
+                loginScreen.style.display = 'flex';
+                mainContainer.style.display = 'none';
+                viewerContainer.style.display = 'none';
+                authBar.style.display = 'none';
+                logoutBtn.style.display = 'none';
+                if (loadingOverlay) loadingOverlay.style.display = 'none';
             }
         });
     });

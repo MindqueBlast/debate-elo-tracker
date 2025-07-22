@@ -30,13 +30,11 @@ async function loadData() {
         const mainContainer = document.querySelector('.container'); // or your main section
         console.log({ loadingOverlay, mainContainer });
 
-        if (loadingOverlay && mainContainer) {
+        if (loadingOverlay) {
             loadingOverlay.style.opacity = '0';
             loadingOverlay.style.transition = 'opacity 0.6s ease';
-
             setTimeout(() => {
                 loadingOverlay.remove();
-                mainContainer.style.display = 'block';
             }, 600);
         }
     } catch (error) {
