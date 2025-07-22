@@ -77,6 +77,8 @@ if (isLocalFile) {
                             loadingOverlay.remove();
                             mainContainer.style.display = 'block';
                             authBar.style.display = 'flex';
+                            document.getElementById('logoutBtn').style.display =
+                                'inline-block';
                         }, 600);
                     } catch (err) {
                         console.error('❌ Failed to load app data:', err);
@@ -112,7 +114,15 @@ if (isLocalFile) {
             .auth()
             .signOut()
             .then(() => {
-                alert('Logged out successfully.');
+                document.querySelector('.container').style.display = 'none';
+                document.querySelector('.viewer-container').style.display =
+                    'none';
+                document.getElementById('authBar').style.display = 'none';
+                document.getElementById('loginScreen').style.display = 'flex';
+                showToast('Logged out successfully.', 'success');
+            })
+            .catch((error) => {
+                showToast('Logout failed: ' + error.message, 'error');
             });
     };
 }

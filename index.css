@@ -450,3 +450,7 @@ ul {
     text-shadow: 0 0 8px rgba(255, 76, 76, 0.4);
     animation: fadeInSlide 0.4s ease-out;
 }
+.container,
+.viewer-container {
+    display: none;
+}
