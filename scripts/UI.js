@@ -163,7 +163,7 @@ function renderDebaters(readOnly = false, targetId = 'debatersList') {
         li.innerHTML = `
             <div class="item-info">
                 <span class="rank-number">#${currentRank}</span> ${rankDiffHTML}
-                <span class="debater-link" style="color:#4e9cff;cursor:pointer;text-decoration:underline;" onclick="showDebaterProfile('${
+                <span class="debater-link" style="cursor:pointer;" onclick="showDebaterProfile('${
                     debater.id
                 }')">${
             debater.name
