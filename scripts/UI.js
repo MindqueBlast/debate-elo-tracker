@@ -25,11 +25,11 @@ async function loadData(isViewer = false) {
 
         console.log('Data fetched successfully.');
 
-        if (!isViewer) {
+        if (!appData.isViewer) {
             refreshAllUI();
             populateTournamentDebaterSelect();
         } else {
-            renderDebaters(true); // only for viewer UI
+            renderDebaters(true, 'viewerDebatersList'); // 🔁 Use the viewer container
         }
     } catch (error) {
         console.error('Error fetching data:', error);
@@ -42,7 +42,7 @@ function handleShowGraduatedChange() {
 }
 
 function refreshAllUI() {
-    renderDebaters(false);
+    renderDebaters(false, 'debatersList');
     updateSelects();
     renderChart();
     renderAnnotationsList();
@@ -51,10 +51,10 @@ function refreshAllUI() {
 }
 
 // --- UI RENDERING ---
-function renderDebaters(readOnly = false) {
-    const list = document.getElementById('debatersList');
+function renderDebaters(readOnly = false, targetId = 'debatersList') {
+    const list = document.getElementById(targetId);
     const showGraduated =
-        document.getElementById('showGraduated')?.checked ?? false;
+        document.getElementById('showGraduated')?.checked ?? true;
     list.innerHTML = '';
 
     const sortedDebaters = [...appData.debaters].sort((a, b) => b.elo - a.elo);
@@ -94,21 +94,23 @@ function renderDebaters(readOnly = false) {
         `;
 
         if (!readOnly) {
-            li.innerHTML += `
-                <div class="item-controls">
-                    <button class="secondary" onclick="setElo('${
-                        debater.id
-                    }')">Set Elo</button>
-                    <button class="secondary" onclick="toggleGraduate('${
-                        debater.id
-                    }')">
-                        ${debater.status === 'active' ? 'Graduate' : 'Activate'}
-                    </button>
-                    <button class="danger" onclick="removeDebater('${
-                        debater.id
-                    }')">Remove</button>
-                </div>
+            const controls = document.createElement('div');
+            controls.className = 'item-controls';
+
+            controls.innerHTML = `
+                <button class="secondary" onclick="setElo('${
+                    debater.id
+                }')">Set Elo</button>
+                <button class="secondary" onclick="toggleGraduate('${
+                    debater.id
+                }')">
+                    ${debater.status === 'active' ? 'Graduate' : 'Activate'}
+                </button>
+                <button class="danger" onclick="removeDebater('${
+                    debater.id
+                }')">Remove</button>
             `;
+            li.appendChild(controls);
         }
 
         list.appendChild(li);
