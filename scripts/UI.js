@@ -502,6 +502,8 @@ function addParticipant() {
         division: divisionSelect.value,
         W_raw: 0, // default raw wins
     });
+
+    renderTournamentParticipants();
 }
 
 function renderTournamentParticipants() {
@@ -519,7 +521,7 @@ function renderTournamentParticipants() {
         <div class="item-controls" style="display: flex; align-items: center;">
           <input type="number" min="0" value="${p.W_raw}"
                  onchange="updateRawWins('${p.id}', this.value)"
-                 style="width: 60px; height: 16px; margin-right: 10px; margin-top:10px;vertical-align: middle; padding: 6px 8px; border-radius: 6px; border: 1px solid #444; background: #1e1e1e; color: #eee;" />
+                 style="width: 60px; height: 20px; margin-right: 10px; margin-top:10px;vertical-align: middle; padding: 6px 8px; border-radius: 6px; border: 1px solid #444; background: #1e1e1e; color: #eee;" />
           <button class="danger">Remove</button>
         </div>
         `;
