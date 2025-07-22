@@ -13,7 +13,11 @@ const allowedEmails = [
     'zile.zhao@gmail.com',
 ];
 
-const viewerOnlyEmails = ['viewer1@example.com', 'viewer2@example.com'];
+const viewerOnlyEmails = [
+    'altjiayi@gmail.com',
+    'mindqueblast@gmail.com',
+    'example@gmail.com',
+];
 
 const loginBtn = document.getElementById('loginBtn');
 const loginScreen = document.getElementById('loginScreen');
