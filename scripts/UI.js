@@ -1,8 +1,3 @@
-// --- LIFECYCLE & DATA ---
-document.addEventListener('DOMContentLoaded', () => {
-    loadData();
-});
-
 async function loadData() {
     console.log('Fetching data from database...');
     try {
