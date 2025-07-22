@@ -53,6 +53,14 @@ if (isLocalFile) {
     document.body.appendChild(testModeBadge);
 } else {
     document.addEventListener('DOMContentLoaded', () => {
+        // Hide everything by default
+        loginScreen.style.display = 'none';
+        loadingOverlay.style.display = 'none';
+        mainContainer.style.display = 'none';
+        viewerContainer.style.display = 'none';
+        authBar.style.display = 'none';
+        logoutBtn.style.display = 'none';
+
         firebase.auth().onAuthStateChanged(async (user) => {
             if (user) {
                 const email = user.email;
@@ -62,10 +70,8 @@ if (isLocalFile) {
                 loadingOverlay.style.opacity = '1';
 
                 if (allowedEmails.includes(email)) {
-                    // Admin
                     try {
                         await loadData();
-
                         loadingOverlay.style.transition = 'opacity 0.6s ease';
                         loadingOverlay.style.opacity = '0';
 
@@ -82,10 +88,8 @@ if (isLocalFile) {
                         loginScreen.style.display = 'flex';
                     }
                 } else if (viewerOnlyEmails.includes(email)) {
-                    // Viewer
                     try {
                         await loadData();
-
                         loadingOverlay.style.transition = 'opacity 0.6s ease';
                         loadingOverlay.style.opacity = '0';
 
@@ -110,11 +114,6 @@ if (isLocalFile) {
             } else {
                 // Not logged in
                 loginScreen.style.display = 'flex';
-                loadingOverlay.style.display = 'none';
-                mainContainer.style.display = 'none';
-                viewerContainer.style.display = 'none';
-                authBar.style.display = 'none';
-                logoutBtn.style.display = 'none';
             }
         });
     });
