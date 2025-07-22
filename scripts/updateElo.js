@@ -2,6 +2,9 @@
 async function recordPracticeRound() {
     const winnerId = document.getElementById('player1').value;
     const loserId = document.getElementById('player2').value;
+    const dateInput = document.getElementById('practiceRoundDate');
+    const today = getLocalDateString();
+    const roundDate = dateInput && dateInput.value ? dateInput.value : today;
     if (!winnerId || !loserId || winnerId === loserId) {
         showToast('Please select two different debaters.', 'warning');
         return;
@@ -23,19 +26,18 @@ async function recordPracticeRound() {
     const C_b = -C_a;
     const new_elo_a = elo_a + C_a + B_a;
     const new_elo_b = elo_b + C_b + B_b;
-    const today = getLocalDateString();
 
     const newHistoryA = [
         ...(a.history || []),
         {
-            date: today,
+            date: roundDate,
             elo: new_elo_a,
         },
     ];
     const newHistoryB = [
         ...(b.history || []),
         {
-            date: today,
+            date: roundDate,
             elo: new_elo_b,
         },
     ];
@@ -62,7 +64,7 @@ async function recordPracticeRound() {
             .from('practice_rounds')
             .insert([
                 {
-                    date: getLocalDateString(),
+                    date: roundDate,
                     winner_id: a.id,
                     loser_id: b.id,
                     winner_change: new_elo_a - elo_a,
@@ -71,7 +73,18 @@ async function recordPracticeRound() {
             ]);
         if (insertError) throw insertError;
 
-        showToast('Practice round recorded successfully!', 'success');
+        showToast(
+            `Practice Round Recorded Successfully!:\n\n${
+                a.name
+            } (Winner):\nOld Elo: ${Math.round(elo_a)}\nNew Elo: ${Math.round(
+                new_elo_a
+            )} (Total: +${(new_elo_a - elo_a).toFixed(2)})\n\n${
+                b.name
+            } (Loser):\nOld Elo: ${Math.round(elo_b)}\nNew Elo: ${Math.round(
+                new_elo_b
+            )} (Total: ${(new_elo_b - elo_b).toFixed(2)})`,
+            'success'
+        );
 
         document.getElementById('matchForm').reset();
         await loadData();
@@ -203,18 +216,30 @@ async function recordTournament() {
         });
     });
 
+    const tournamentDateInput = document.getElementById('tournamentDate');
     const today = getLocalDateString();
+    const tournamentDate =
+        tournamentDateInput && tournamentDateInput.value
+            ? tournamentDateInput.value
+            : today;
 
     try {
         // Insert tournament info and get its ID
         const { data: insertedTournament, error: insertTournamentError } =
             await supabaseClient
                 .from('tournaments')
-                .insert([{ date: today, name: tournamentName }])
+                .insert([{ date: tournamentDate, name: tournamentName }])
                 .select()
                 .single();
 
         if (insertTournamentError) throw insertTournamentError;
+
+        // After inserting tournament, also add as annotation (important date)
+        if (tournamentName && tournamentDate) {
+            await supabaseClient
+                .from('annotations')
+                .insert({ date: tournamentDate, name: tournamentName });
+        }
 
         // Update debaters Elo and histories, and prepare participants rows
         const participantInserts = [];
@@ -225,7 +250,7 @@ async function recordTournament() {
             const newHistory = [
                 ...(debater.history || []),
                 {
-                    date: today,
+                    date: tournamentDate,
                     elo: res.newElo,
                     event: 'Tournament',
                 },
