@@ -2,7 +2,7 @@ let practiceRoundsPage = 1;
 const practiceRoundsPerPage = 10;
 
 let tournamentsPage = 1;
-const tournamentsPerPage = 5;
+const tournamentsPerPage = 3;
 
 async function loadData(isViewer = false) {
     appData.isViewer = isViewer;
@@ -87,9 +87,26 @@ function refreshAllUI() {
 // --- UI RENDERING ---
 function renderDebaters(readOnly = false, targetId = 'debatersList') {
     const list = document.getElementById(targetId);
-    const showGraduated =
-        document.getElementById('showGraduated')?.checked ?? true;
+    // Only clear the list, not the parent container
     list.innerHTML = '';
+
+    // Add search bar if not present
+    let searchId = targetId + 'Search';
+    let searchBar = document.getElementById(searchId);
+    if (!searchBar) {
+        searchBar = document.createElement('input');
+        searchBar.type = 'text';
+        searchBar.id = searchId;
+        searchBar.placeholder = 'Search debaters...';
+        searchBar.style =
+            'width: 100%; margin-bottom: 10px; padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1e1e1e; color: #eee;';
+        // Insert before the list (ul)
+        list.parentNode.insertBefore(searchBar, list);
+        searchBar.addEventListener('input', () =>
+            renderDebaters(readOnly, targetId)
+        );
+    }
+    const searchValue = searchBar.value.trim().toLowerCase();
 
     const activeDebaters = appData.debaters.filter(
         (d) => d.status === 'active'
@@ -106,7 +123,12 @@ function renderDebaters(readOnly = false, targetId = 'debatersList') {
         avgElo
     )}`;
 
-    const sortedDebaters = [...appData.debaters].sort((a, b) => b.elo - a.elo);
+    let sortedDebaters = [...appData.debaters].sort((a, b) => b.elo - a.elo);
+    if (searchValue) {
+        sortedDebaters = sortedDebaters.filter((d) =>
+            d.name.toLowerCase().includes(searchValue)
+        );
+    }
 
     sortedDebaters.forEach((debater, index) => {
         if (debater.status === 'graduated' && !showGraduated) return;
@@ -136,9 +158,11 @@ function renderDebaters(readOnly = false, targetId = 'debatersList') {
         li.innerHTML = `
             <div class="item-info">
                 <span class="rank-number">#${currentRank}</span> ${rankDiffHTML}
-                ${debater.name} - <span class="elo-rating">${Math.round(
-            debater.elo
-        )}</span>
+                <span class="debater-link" style="color:#4e9cff;cursor:pointer;text-decoration:underline;" onclick="showDebaterProfile('${
+                    debater.id
+                }')">${
+            debater.name
+        }</span> - <span class="elo-rating">${Math.round(debater.elo)}</span>
             </div>
         `;
 
@@ -280,7 +304,22 @@ async function renderTournaments(
 ) {
     const list = document.getElementById(targetId);
     list.innerHTML = '';
-
+    // Add search bar if not present
+    let searchId = targetId + 'Search';
+    let searchBar = document.getElementById(searchId);
+    if (!searchBar) {
+        searchBar = document.createElement('input');
+        searchBar.type = 'text';
+        searchBar.id = searchId;
+        searchBar.placeholder = 'Search tournaments (name or date)...';
+        searchBar.style =
+            'width: 100%; margin-bottom: 10px; padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1e1e1e; color: #eee;';
+        list.parentNode.insertBefore(searchBar, list);
+        searchBar.addEventListener('input', () =>
+            renderTournaments(page, targetId, paginationId)
+        );
+    }
+    const searchValue = searchBar.value.trim().toLowerCase();
     const offset = (page - 1) * tournamentsPerPage;
 
     const { data: tournaments, error: tournamentError } = await supabaseClient
@@ -294,7 +333,16 @@ async function renderTournaments(
         return;
     }
 
-    for (const tournament of tournaments) {
+    let filteredTournaments = tournaments;
+    if (searchValue) {
+        filteredTournaments = tournaments.filter(
+            (t) =>
+                (t.name && t.name.toLowerCase().includes(searchValue)) ||
+                (t.date && t.date.toLowerCase().includes(searchValue))
+        );
+    }
+
+    for (const tournament of filteredTournaments) {
         const { data: participants, error: partError } = await supabaseClient
             .from('tournament_participants')
             .select('*, debaters(name)')
@@ -332,6 +380,9 @@ async function renderTournaments(
                     <strong>${tournament.name || 'Unnamed Tournament'} — ${
             tournament.date
         }</strong>
+                    <div class="tourney-expected-wins" style="margin-bottom: 4px; font-style: italic; color: #888;">E_tourney: ${(
+                        tournament.e_tourney ?? 0
+                    ).toFixed(2)}</div>
                     ${participantList}
                 </div>
                 ${
@@ -348,7 +399,7 @@ async function renderTournaments(
 
     renderTournamentsPaginationControls(
         page,
-        tournaments.length,
+        filteredTournaments.length,
         paginationId,
         targetId
     );
@@ -647,12 +698,35 @@ document
 function renderViewerDebaters() {
     const list = document.getElementById('viewerDebatersList');
     list.innerHTML = '';
-
+    // Add search bar if not present
+    let searchId = 'viewerDebatersListSearch';
+    let searchBar = document.getElementById(searchId);
+    if (!searchBar) {
+        searchBar = document.createElement('input');
+        searchBar.type = 'text';
+        searchBar.id = searchId;
+        searchBar.placeholder = 'Search debaters...';
+        searchBar.style =
+            'width: 100%; margin-bottom: 10px; padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1e1e1e; color: #eee;';
+        list.parentNode.insertBefore(searchBar, list);
+        searchBar.addEventListener('input', renderViewerDebaters);
+    }
+    const searchValue = searchBar.value.trim().toLowerCase();
     const sorted = [...appData.debaters].sort((a, b) => b.elo - a.elo);
-    sorted.forEach((d, i) => {
+    let filtered = sorted.filter((d) => d.status === 'active');
+    if (searchValue) {
+        filtered = filtered.filter((d) =>
+            d.name.toLowerCase().includes(searchValue)
+        );
+    }
+    filtered.forEach((d, i) => {
         if (d.status === 'graduated') return;
         const li = document.createElement('li');
-        li.innerHTML = `#${i + 1} — ${d.name} (${Math.round(d.elo)})`;
+        li.innerHTML = `#${
+            i + 1
+        } — <span class="debater-link" style="color:#4e9cff;cursor:pointer;text-decoration:underline;" onclick="showDebaterProfile('${
+            d.id
+        }')">${d.name}</span> (${Math.round(d.elo)})`;
         list.appendChild(li);
     });
 }
@@ -674,4 +748,102 @@ function updateViewerAnalyticsDebaterSelect() {
             select.appendChild(option);
         });
     select.value = 'ALL';
+}
+
+// --- MODAL LOGIC ---
+function showDebaterProfile(debaterId) {
+    const debater = appData.debaters.find((d) => d.id === debaterId);
+    if (!debater) return;
+    let modal = document.getElementById('debaterProfileModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'debaterProfileModal';
+        modal.style.position = 'fixed';
+        modal.style.top = '0';
+        modal.style.left = '0';
+        modal.style.width = '100vw';
+        modal.style.height = '100vh';
+        modal.style.background = 'rgba(0,0,0,0.5)';
+        modal.style.display = 'flex';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.zIndex = '99999';
+        modal.innerHTML = `
+            <div id="debaterProfileContent" style="background:#222;padding:32px 24px 24px 24px;border-radius:16px;min-width:320px;max-width:90vw;max-height:90vh;overflow:auto;box-shadow:0 8px 32px #000a;position:relative;">
+                <button id="closeDebaterProfile" style="position:absolute;top:12px;right:12px;font-size:20px;background:none;border:none;color:#fff;cursor:pointer;">&times;</button>
+                <h2 id="debaterProfileName"></h2>
+                <div id="debaterProfileElo" style="font-size:1.2em;margin-bottom:16px;"></div>
+                <div id="debaterProfileStatus" style="margin-bottom:8px;"></div>
+                <canvas id="debaterProfileChart" width="320" height="160"></canvas>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.style.display = 'none';
+        });
+        document.getElementById('closeDebaterProfile').onclick = () => {
+            modal.style.display = 'none';
+        };
+    } else {
+        modal.style.display = 'flex';
+    }
+    document.getElementById('debaterProfileName').textContent = debater.name;
+    document.getElementById(
+        'debaterProfileStatus'
+    ).textContent = `Status: ${debater.status}`;
+    document.getElementById(
+        'debaterProfileElo'
+    ).textContent = `Current Elo: ${Math.round(debater.elo)}`;
+    // Calculate winrate (practice rounds only)
+    const practiceRounds = appData.practiceRounds || [];
+    const wins = practiceRounds.filter(
+        (r) => r.winner_id === debater.id
+    ).length;
+    const played = practiceRounds.filter(
+        (r) => r.winner_id === debater.id || r.loser_id === debater.id
+    ).length;
+    let winrateText = '';
+    if (played > 0) {
+        const winrate = (wins / played) * 100;
+        winrateText = `Winrate: ${wins} / ${played} (${winrate.toFixed(1)}%)`;
+    } else {
+        winrateText = 'Winrate: N/A';
+    }
+    // Insert winrate below Elo
+    document
+        .getElementById('debaterProfileElo')
+        .insertAdjacentHTML(
+            'afterend',
+            `<div id="debaterProfileWinrate" style="margin-bottom:16px;">${winrateText}</div>`
+        );
+    // Mini Elo chart
+    const ctx = document.getElementById('debaterProfileChart').getContext('2d');
+    if (window.debaterProfileChartInstance)
+        window.debaterProfileChartInstance.destroy();
+    const history = debater.history || [];
+    window.debaterProfileChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: history.map((h) => h.date),
+            datasets: [
+                {
+                    label: 'Elo',
+                    data: history.map((h) => h.elo),
+                    borderColor: '#4e9cff',
+                    backgroundColor: 'rgba(78,156,255,0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    borderWidth: 2,
+                    pointRadius: 2.5,
+                },
+            ],
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { display: false },
+                y: { display: true, title: { display: false } },
+            },
+        },
+    });
 }

@@ -69,6 +69,7 @@ function renderChart() {
                 backgroundColor: `${color}1A`,
                 fill: false,
                 tension: 0.1,
+                borderWidth: 1.5,
             };
         });
 
@@ -110,6 +111,7 @@ function renderChart() {
                 backgroundColor: 'rgba(52, 152, 219, 0.1)',
                 fill: true,
                 tension: 0.1,
+                borderWidth: 1.5,
             },
         ];
 
@@ -201,6 +203,7 @@ function renderViewerChart() {
                 backgroundColor: `${color}1A`,
                 fill: false,
                 tension: 0.1,
+                borderWidth: 1.5,
             };
         });
         if (showAnnotations) {
@@ -237,6 +240,7 @@ function renderViewerChart() {
                 backgroundColor: 'rgba(52, 152, 219, 0.1)',
                 fill: true,
                 tension: 0.1,
+                borderWidth: 1.5,
             },
         ];
         if (showAnnotations && historyData.length > 0) {

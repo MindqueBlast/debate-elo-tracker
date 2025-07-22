@@ -17,6 +17,10 @@ const adminEmails = [
 const viewerEmails = [
     'mindqueblast@gmail.com',
     'altjiayi@gmail.com',
+    'chuang11791@gmail.com',
+    'forensicsclubforschool@gmail.com',
+    'huangdenny65@gmail.com',
+    'vihaan.bhatnagar04@gmail.com',
     // Add more viewer-only emails here
 ];
 

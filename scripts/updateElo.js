@@ -228,7 +228,13 @@ async function recordTournament() {
         const { data: insertedTournament, error: insertTournamentError } =
             await supabaseClient
                 .from('tournaments')
-                .insert([{ date: tournamentDate, name: tournamentName }])
+                .insert([
+                    {
+                        date: tournamentDate,
+                        name: tournamentName,
+                        e_tourney: E_tourney,
+                    },
+                ])
                 .select()
                 .single();
 
@@ -281,6 +287,42 @@ async function recordTournament() {
             if (response.error) throw response.error;
         }
 
+        // --- NEW: Add flat history point for non-participants ---
+        const participantIds = new Set(results.map((r) => r.id));
+        const nonParticipants = activeDebaters.filter(
+            (d) => !participantIds.has(d.id)
+        );
+        const nonParticipantUpdates = [];
+        for (const debater of nonParticipants) {
+            // Only add if last history point is not already for this date
+            const history = debater.history || [];
+            const lastEntry =
+                history.length > 0 ? history[history.length - 1] : null;
+            if (!lastEntry || lastEntry.date !== tournamentDate) {
+                const newHistory = [
+                    ...history,
+                    {
+                        date: tournamentDate,
+                        elo: debater.elo,
+                        event: 'Tournament',
+                    },
+                ];
+                nonParticipantUpdates.push(
+                    supabaseClient
+                        .from('debaters')
+                        .update({ history: newHistory })
+                        .eq('id', debater.id)
+                );
+            }
+        }
+        if (nonParticipantUpdates.length > 0) {
+            const nonPartResponses = await Promise.all(nonParticipantUpdates);
+            for (const response of nonPartResponses) {
+                if (response.error) throw response.error;
+            }
+        }
+        // --- END NEW ---
+
         // Insert tournament participants
         const { error: participantsInsertError } = await supabaseClient
             .from('tournament_participants')
@@ -308,6 +350,7 @@ async function recordTournament() {
         showToast(resultsText, 'success', 8000);
 
         tournamentParticipants.clear();
+        renderTournamentParticipants();
         document.getElementById('tournamentRounds').value = '';
         document.getElementById('tournamentBonus').value = '';
         document.getElementById('tournamentName').value = '';
