@@ -96,7 +96,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         authBar.style.display = 'flex';
                     } else if (isViewer && viewerContainer) {
                         viewerContainer.style.display = 'block';
-                        renderDebaters?.(); // call viewer UI render if defined
+                        authBar.style.display = 'flex';
+                        renderDebaters?.(true, 'viewerDebatersList'); // call viewer UI render if defined
                     }
                 }, 600);
             } catch (err) {
