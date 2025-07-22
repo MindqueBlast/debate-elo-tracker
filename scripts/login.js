@@ -16,7 +16,7 @@ const adminEmails = [
 
 const viewerEmails = [
     'mindqueblast@gmail.com',
-    'viewer2@gmail.com',
+    'altjiayi@gmail.com',
     // Add more viewer-only emails here
 ];
 
