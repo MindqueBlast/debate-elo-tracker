@@ -1,3 +1,9 @@
+let practiceRoundsPage = 1;
+const practiceRoundsPerPage = 10;
+
+let tournamentsPage = 1;
+const tournamentsPerPage = 5;
+
 async function loadData(isViewer = false) {
     appData.isViewer = isViewer;
     console.log('Fetching data from database...');
@@ -46,8 +52,11 @@ function refreshAllUI() {
     updateSelects();
     renderChart();
     renderAnnotationsList();
-    renderTournaments();
-    renderPracticeRounds();
+    practiceRoundsPage = 1;
+    tournamentsPage = 1;
+
+    renderPracticeRounds(practiceRoundsPage);
+    renderTournaments(tournamentsPage);
 }
 
 // --- UI RENDERING ---
@@ -72,7 +81,7 @@ function renderDebaters(readOnly = false, targetId = 'debatersList') {
     avgEloBanner.textContent = `Average Elo (Active Debaters): ${Math.round(
         avgElo
     )}`;
-    list.appendChild(avgEloBanner);
+
     const sortedDebaters = [...appData.debaters].sort((a, b) => b.elo - a.elo);
 
     sortedDebaters.forEach((debater, index) => {
@@ -131,16 +140,20 @@ function renderDebaters(readOnly = false, targetId = 'debatersList') {
 
         list.appendChild(li);
     });
+    list.appendChild(avgEloBanner);
 }
 
-async function renderPracticeRounds() {
+async function renderPracticeRounds(page = 1) {
     const list = document.getElementById('practiceRoundsList');
     list.innerHTML = '';
+
+    const offset = (page - 1) * practiceRoundsPerPage;
 
     const { data: rounds, error } = await supabaseClient
         .from('practice_rounds')
         .select('*')
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .range(offset, offset + practiceRoundsPerPage - 1);
 
     if (error) {
         console.error('Error fetching practice rounds:', error);
@@ -159,11 +172,9 @@ async function renderPracticeRounds() {
         const infoDiv = document.createElement('div');
         infoDiv.className = 'item-info';
 
-        // Winner's Elo change styled green (+)
         const winnerChange = `<span style="color: #4caf50;">+${round.winner_change.toFixed(
             1
         )}</span>`;
-        // Loser's Elo change styled red (-)
         const loserChange = `<span style="color: #e74c3c;">${round.loser_change.toFixed(
             1
         )}</span>`;
@@ -192,16 +203,46 @@ async function renderPracticeRounds() {
 
         list.appendChild(li);
     });
+
+    renderPracticeRoundsPaginationControls(page, rounds.length);
+}
+function renderPracticeRoundsPaginationControls(currentPage, itemsCount) {
+    const container = document.getElementById('practiceRoundsPagination');
+    container.innerHTML = '';
+
+    const prevBtn = document.createElement('button');
+    prevBtn.textContent = '← Previous';
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = () => {
+        if (practiceRoundsPage > 1) {
+            practiceRoundsPage--;
+            renderPracticeRounds(practiceRoundsPage);
+        }
+    };
+
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = 'Next →';
+    nextBtn.disabled = itemsCount < practiceRoundsPerPage;
+    nextBtn.onclick = () => {
+        practiceRoundsPage++;
+        renderPracticeRounds(practiceRoundsPage);
+    };
+
+    container.appendChild(prevBtn);
+    container.appendChild(nextBtn);
 }
 
-async function renderTournaments() {
+async function renderTournaments(page = 1) {
     const list = document.getElementById('tournamentsList');
     list.innerHTML = '';
+
+    const offset = (page - 1) * tournamentsPerPage;
 
     const { data: tournaments, error: tournamentError } = await supabaseClient
         .from('tournaments')
         .select('*')
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .range(offset, offset + tournamentsPerPage - 1);
 
     if (tournamentError) {
         console.error('Failed to fetch tournaments:', tournamentError);
@@ -209,7 +250,6 @@ async function renderTournaments() {
     }
 
     for (const tournament of tournaments) {
-        // Get participants for this tournament
         const { data: participants, error: partError } = await supabaseClient
             .from('tournament_participants')
             .select('*, debaters(name)')
@@ -237,8 +277,6 @@ async function renderTournaments() {
                         (Raw Wins: ${
                             p.raw_wins
                         }, Adj: ${p.adjusted_wins.toFixed(2)})
-
-
                     </div>`;
             })
             .join('');
@@ -260,6 +298,34 @@ async function renderTournaments() {
         `;
         list.innerHTML += tournamentCard;
     }
+
+    renderTournamentsPaginationControls(page, tournaments.length);
+}
+
+function renderTournamentsPaginationControls(currentPage, itemsCount) {
+    const container = document.getElementById('tournamentsPagination');
+    container.innerHTML = '';
+
+    const prevBtn = document.createElement('button');
+    prevBtn.textContent = '← Previous';
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = () => {
+        if (tournamentsPage > 1) {
+            tournamentsPage--;
+            renderTournaments(tournamentsPage);
+        }
+    };
+
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = 'Next →';
+    nextBtn.disabled = itemsCount < tournamentsPerPage;
+    nextBtn.onclick = () => {
+        tournamentsPage++;
+        renderTournaments(tournamentsPage);
+    };
+
+    container.appendChild(prevBtn);
+    container.appendChild(nextBtn);
 }
 
 function updateSelects() {

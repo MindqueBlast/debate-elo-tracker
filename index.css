@@ -481,3 +481,38 @@ ul {
     text-shadow: 0 0 8px rgba(255, 76, 76, 0.4);
     animation: fadeInSlide 0.4s ease-out;
 }
+.card input,
+.card select,
+.card textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+.card input[type="checkbox"] {
+    width: auto;
+    /* optionally set height to normal checkbox height */
+    height: auto;
+    margin-right: 8px;
+    /* add some space before label */
+}
+#practiceRoundsPagination button,
+#tournamentsPagination button {
+    background: #f04545;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+#practiceRoundsPagination button:disabled,
+#tournamentsPagination button:disabled {
+    background: #555;
+    cursor: not-allowed;
+}
+
+#practiceRoundsPagination button:hover:not(:disabled),
+#tournamentsPagination button:hover:not(:disabled) {
+    background: #d63031;
+}
