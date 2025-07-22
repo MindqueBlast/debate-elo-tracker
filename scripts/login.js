@@ -110,14 +110,32 @@ if (isLocalFile) {
                     // Hide viewer container if it was visible
                     viewerContainer.style.display = 'none';
                 } else if (viewerOnlyEmails.includes(email)) {
-                    // Viewer-only mode: no loading animation, just show viewer container
-                    loadingOverlay.style.display = 'none';
-                    mainContainer.style.display = 'none';
-                    authBar.style.display = 'none';
-                    logoutBtn.style.display = 'none';
+                    loadingOverlay.style.display = 'flex';
+                    loadingOverlay.style.opacity = '1';
 
-                    viewerContainer.style.display = 'block'; // show viewer container
-                    renderViewerDebaters();
+                    try {
+                        await loadData();
+
+                        loadingOverlay.style.transition = 'opacity 0.6s ease';
+                        loadingOverlay.style.opacity = '0';
+
+                        setTimeout(() => {
+                            loadingOverlay.remove();
+                            loginScreen.style.display = 'none';
+                            mainContainer.style.display = 'none';
+                            authBar.style.display = 'none';
+
+                            logoutBtn.style.display = 'inline-block'; // <-- Step 3 here!
+
+                            viewerContainer.style.display = 'block';
+                            renderViewerDebaters();
+                        }, 600);
+                    } catch (err) {
+                        console.error('Failed to load data for viewer:', err);
+                        alert('Failed to load viewer data, try refreshing.');
+                        loadingOverlay.style.display = 'none';
+                        loginScreen.style.display = 'flex';
+                    }
                 } else {
                     alert('Access denied. Your account is not authorized.');
                     firebase.auth().signOut();
@@ -143,10 +161,17 @@ if (isLocalFile) {
 
     loginBtn.onclick = () => {
         const provider = new firebase.auth.GoogleAuthProvider();
+
+        // Show loading overlay right away to prevent UI flash
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        loadingOverlay.style.display = 'flex';
+        loadingOverlay.style.opacity = '1';
+
         firebase
             .auth()
             .signInWithPopup(provider)
             .catch((error) => {
+                loadingOverlay.style.display = 'none';
                 alert('Login failed: ' + error.message);
             });
     };
