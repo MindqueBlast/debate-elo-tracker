@@ -6,7 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Syosset Debate Elo Tracker</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -18,7 +19,7 @@
 </head>
 
 <body>
-    
+
     <div id="vanta-bg"></div>
     <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 99999;"></div>
     <div id="loginScreen">
@@ -28,27 +29,27 @@
     <div id="loadingOverlay">
         <div class="spinner"></div>
         <h2>Loading Syosset Debate Elo Tracker...</h2>
-      </div>
-      
-      
+    </div>
+
+
     <!-- LOGIN SCREEN -->
 
 
     <!-- MAIN APP CONTENT -->
-    <div class="container" >
-            <div id="authBar" style="
+    <div class="container">
+        <div id="authBar" style="
                     display: none; 
                     position: absolute;
                     top: 20px;
                     right: 20px;
                     z-index: 1000;
                 ">
-                <button id="logoutBtn"
-                    style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer;">
-                    Logout
-                </button>
-            </div>
-        <h1>Syosset Debate Elo Tracker - Admin</h1>
+            <button id="logoutBtn"
+                style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer;">
+                Logout
+            </button>
+        </div>
+        <h1>Syosset Debate Elo Tracker</h1>
 
         <!-- Manage Debaters: Full Width -->
         <div class="card">
@@ -62,7 +63,7 @@
                 <input type="checkbox" id="showGraduated" onchange="handleShowGraduatedChange()" />
                 <label for="showGraduated">Show Graduated Debaters</label>
             </div>
-            <h2>Debater List</h2>
+            <h3>Debater List</h3>
             <ul id="debatersList"></ul>
         </div>
 
@@ -107,7 +108,7 @@
                     </div>
                     <div style="flex-basis: 25%;">
                         <label for="tournamentMaxRounds">Max Rounds</label>
-                        <input type="number" id="tournamentMaxRounds" placeholder = "n" min="0" />
+                        <input type="number" id="tournamentMaxRounds" placeholder="n" min="0" />
                     </div>
                 </div>
                 <label for="tournamentAddDebater">Add Participant</label>
@@ -157,7 +158,7 @@
                     <div id="chartContainer" style="position: relative;">
                         <canvas id="eloChart"></canvas>
                     </div>
-                    <button class = "button" onclick="toggleFullscreen()">🔍 Fullscreen</button>
+                    <button class="button" onclick="toggleFullscreen()">🔍 Fullscreen</button>
                 </div>
                 <div>
                     <h3>Manage Important Dates</h3>
@@ -173,12 +174,6 @@
             <h2>© 2025 Syosset PF — Aaditya Sahu & Jiayi Meng</h2>
         </div>
 
-    <div class="viewer-container" style="display: none;">
-        <div class="card animate-fade-in">
-            <h2>Debater Rankings</h2>
-            <ul id="viewerDebatersList"></ul>
-        </div>
-    </div>
 
     </div>
     <script>
@@ -202,7 +197,7 @@
 
     </script>
     <script src="scripts/login.js"></script>
-    <script src= "scripts/utilities.js"></script>
+    <script src="scripts/utilities.js"></script>
     <script src="scripts/UI.js"></script>
     <script src="scripts/updateDebaters.js"></script>
     <script src="scripts/updateElo.js"></script>

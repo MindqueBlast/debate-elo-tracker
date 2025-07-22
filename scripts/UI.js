@@ -30,11 +30,13 @@ async function loadData() {
         const mainContainer = document.querySelector('.container'); // or your main section
         console.log({ loadingOverlay, mainContainer });
 
-        if (loadingOverlay) {
+        if (loadingOverlay && mainContainer) {
             loadingOverlay.style.opacity = '0';
             loadingOverlay.style.transition = 'opacity 0.6s ease';
+
             setTimeout(() => {
                 loadingOverlay.remove();
+                mainContainer.style.display = 'block';
             }, 600);
         }
     } catch (error) {
@@ -65,25 +67,6 @@ function renderDebaters() {
     const showGraduated = document.getElementById('showGraduated').checked;
     list.innerHTML = '';
 
-    // 👉 STEP 1: Calculate Average Elo of active debaters
-    const activeDebaters = appData.debaters.filter(
-        (d) => d.status === 'active'
-    );
-    const avgElo =
-        activeDebaters.length === 0
-            ? 0
-            : activeDebaters.reduce((sum, d) => sum + d.elo, 0) /
-              activeDebaters.length;
-
-    // 👉 STEP 2: Add a banner at the top
-    const avgEloBanner = document.createElement('div');
-    avgEloBanner.className = 'avg-elo-banner';
-    avgEloBanner.textContent = `Average Elo (Active Debaters): ${Math.round(
-        avgElo
-    )}`;
-    list.appendChild(avgEloBanner);
-
-    // 👉 STEP 3: Sort and render debaters
     const sortedDebaters = [...appData.debaters].sort((a, b) => b.elo - a.elo);
 
     sortedDebaters.forEach((debater, index) => {
@@ -105,6 +88,7 @@ function renderDebaters() {
             }${diff})</span>`;
         }
 
+        // Store new rank
         appData.previousRanks[debater.id] = currentRank;
 
         const li = document.createElement('li');
@@ -518,36 +502,3 @@ document
 document
     .getElementById('player2')
     .addEventListener('change', updateExpectedScore);
-function renderViewerDebaters() {
-    const list = document.getElementById('viewerDebatersList');
-    list.innerHTML = '';
-
-    const sortedDebaters = [...appData.debaters]
-        .filter((d) => d.status === 'active')
-        .sort((a, b) => b.elo - a.elo);
-
-    const avgElo =
-        sortedDebaters.reduce((sum, d) => sum + d.elo, 0) /
-        sortedDebaters.length;
-
-    const avgEloCard = document.createElement('li');
-    avgEloCard.className = 'list-item';
-    avgEloCard.innerHTML = `<strong>Average Elo:</strong> <span class="elo-rating">${Math.round(
-        avgElo
-    )}</span>`;
-    list.appendChild(avgEloCard);
-
-    sortedDebaters.forEach((debater, index) => {
-        const li = document.createElement('li');
-        li.className = 'list-item';
-        li.innerHTML = `
-            <div class="item-info">
-                <span class="rank-number">#${index + 1}</span>
-                ${debater.name} - <span class="elo-rating">${Math.round(
-            debater.elo
-        )}</span>
-            </div>
-        `;
-        list.appendChild(li);
-    });
-}

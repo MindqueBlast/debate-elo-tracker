@@ -7,16 +7,10 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 
-const fullAccessEmails = [
+const allowedEmails = [
     'jiayimeng12@gmail.com',
     'aadityasahu26@gmail.com',
     'zile.zhao@gmail.com',
-];
-
-const viewerOnlyEmails = [
-    'altjiayi@gmail.com',
-    'mindqueblast@gmail.com',
-    'example@gmail.com',
 ];
 
 const loginBtn = document.getElementById('loginBtn');
@@ -54,146 +48,64 @@ if (isLocalFile) {
             const loginScreen = document.getElementById('loginScreen');
             const loadingOverlay = document.getElementById('loadingOverlay');
             const mainContainer = document.querySelector('.container');
-            const viewerContainer = document.querySelector('.viewer-container');
             const authBar = document.getElementById('authBar');
-            const logoutBtn = document.getElementById('logoutBtn');
-
-            // Defensive check for essential elements
-            if (
-                !loginScreen ||
-                !loadingOverlay ||
-                !mainContainer ||
-                !viewerContainer ||
-                !authBar ||
-                !logoutBtn
-            ) {
-                console.error(
-                    'One or more essential DOM elements are missing.'
-                );
-                return;
-            }
-
-            console.log('loadingOverlay:', loadingOverlay);
 
             if (user) {
                 const email = user.email;
-
-                loginScreen.style.display = 'none'; // hide login screen
-
-                if (fullAccessEmails.includes(email)) {
-                    // Show loading overlay while fetching data
+                if (allowedEmails.includes(email)) {
+                    // Step 1: Hide login screen and show loading screen
+                    loginScreen.style.display = 'none';
                     loadingOverlay.style.display = 'flex';
                     loadingOverlay.style.opacity = '1';
 
                     try {
-                        await loadData();
+                        await loadData(); // Step 2: Load all Supabase data
 
-                        // Fade out loading overlay
+                        // Step 3: Animate in the main container
                         loadingOverlay.style.transition = 'opacity 0.6s ease';
                         loadingOverlay.style.opacity = '0';
 
                         setTimeout(() => {
-                            loadingOverlay.style.display = 'none'; // Hide instead of remove
-                            mainContainer.style.display = 'block'; // show admin container
-                            authBar.style.display = 'flex'; // show auth bar
-                            logoutBtn.style.display = 'inline-block'; // show logout button
+                            loadingOverlay.remove(); // Done loading
+                            mainContainer.style.display = 'block';
+                            authBar.style.display = 'flex';
                         }, 600);
                     } catch (err) {
                         console.error('❌ Failed to load app data:', err);
                         alert(
                             'Something went wrong while loading. Try refreshing.'
                         );
-                        loadingOverlay.style.display = 'none';
-                        loginScreen.style.display = 'flex';
-                    }
-
-                    // Hide viewer container if it was visible
-                    viewerContainer.style.display = 'none';
-                } else if (viewerOnlyEmails.includes(email)) {
-                    loadingOverlay.style.display = 'flex';
-                    loadingOverlay.style.opacity = '1';
-
-                    try {
-                        await loadData();
-
-                        loadingOverlay.style.transition = 'opacity 0.6s ease';
-                        loadingOverlay.style.opacity = '0';
-
-                        setTimeout(() => {
-                            loadingOverlay.remove();
-                            loginScreen.style.display = 'none';
-                            mainContainer.style.display = 'none';
-                            authBar.style.display = 'none';
-
-                            logoutBtn.style.display = 'inline-block'; // <-- Step 3 here!
-
-                            viewerContainer.style.display = 'block';
-                            renderViewerDebaters();
-                        }, 600);
-                    } catch (err) {
-                        console.error('Failed to load data for viewer:', err);
-                        alert('Failed to load viewer data, try refreshing.');
-                        loadingOverlay.style.display = 'none';
-                        loginScreen.style.display = 'flex';
                     }
                 } else {
                     alert('Access denied. Your account is not authorized.');
                     firebase.auth().signOut();
-
-                    // Reset UI
-                    mainContainer.style.display = 'none';
-                    viewerContainer.style.display = 'none';
-                    authBar.style.display = 'none';
-                    logoutBtn.style.display = 'none';
-                    loginScreen.style.display = 'flex';
                 }
             } else {
-                // No user logged in, show login screen, hide everything else
+                // Not logged in
                 loginScreen.style.display = 'flex';
-                mainContainer.style.display = 'none';
-                viewerContainer.style.display = 'none';
-                authBar.style.display = 'none';
-                logoutBtn.style.display = 'none';
                 loadingOverlay.style.display = 'none';
+                mainContainer.style.display = 'none';
+                authBar.style.display = 'none';
             }
         });
     });
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const loginBtn = document.getElementById('loginBtn');
-        const logoutBtn = document.getElementById('logoutBtn');
-        const loadingOverlay = document.getElementById('loadingOverlay');
+    loginBtn.onclick = () => {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        firebase
+            .auth()
+            .signInWithPopup(provider)
+            .catch((error) => {
+                alert('Login failed: ' + error.message);
+            });
+    };
 
-        loginBtn.onclick = () => {
-            loadingOverlay.style.display = 'flex';
-            loadingOverlay.style.opacity = '1';
-
-            const provider = new firebase.auth.GoogleAuthProvider();
-            firebase
-                .auth()
-                .signInWithPopup(provider)
-                .catch((error) => {
-                    loadingOverlay.style.display = 'none';
-                    alert('Login failed: ' + error.message);
-                });
-        };
-
-        logoutBtn.onclick = () => {
-            firebase
-                .auth()
-                .signOut()
-                .then(() => {
-                    document.querySelector('.container').style.display = 'none';
-                    document.querySelector('.viewer-container').style.display =
-                        'none';
-                    document.getElementById('authBar').style.display = 'none';
-                    document.getElementById('loginScreen').style.display =
-                        'flex';
-                    showToast('Logged out successfully.', 'success');
-                })
-                .catch((error) => {
-                    showToast('Logout failed: ' + error.message, 'error');
-                });
-        };
-    });
+    logoutBtn.onclick = () => {
+        firebase
+            .auth()
+            .signOut()
+            .then(() => {
+                alert('Logged out successfully.');
+            });
+    };
 }

@@ -401,6 +401,7 @@ ul {
     transform: scale(1.1);
     transition: all 0.2s ease;
 }
+
 #toast {
     visibility: hidden;
     min-width: 280px;
@@ -440,17 +441,4 @@ ul {
 
 .toast-info {
     background-color: #3498db;
-}
-.avg-elo-banner {
-    font-size: 1.2rem;
-    font-weight: bold;
-    color: #ff4c4c;
-    text-align: center;
-    margin-bottom: 16px;
-    text-shadow: 0 0 8px rgba(255, 76, 76, 0.4);
-    animation: fadeInSlide 0.4s ease-out;
-}
-.container,
-.viewer-container {
-    display: none;
 }
