@@ -48,7 +48,7 @@
                     Logout
                 </button>
             </div>
-        <h1>Syosset Debate Elo Tracker</h1>
+        <h1>Syosset Debate Elo Tracker - Admin</h1>
 
         <!-- Manage Debaters: Full Width -->
         <div class="card">
@@ -62,7 +62,7 @@
                 <input type="checkbox" id="showGraduated" onchange="handleShowGraduatedChange()" />
                 <label for="showGraduated">Show Graduated Debaters</label>
             </div>
-            <h3>Debater List</h3>
+            <h2>Debater List</h2>
             <ul id="debatersList"></ul>
         </div>
 
@@ -173,6 +173,12 @@
             <h2>© 2025 Syosset PF — Aaditya Sahu & Jiayi Meng</h2>
         </div>
 
+    <div class="viewer-container" style="display: none;">
+        <div class="card animate-fade-in">
+            <h2>Debater Rankings</h2>
+            <ul id="viewerDebatersList"></ul>
+        </div>
+    </div>
 
     </div>
     <script>
