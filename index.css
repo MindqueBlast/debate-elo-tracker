@@ -453,7 +453,6 @@ ul {
 }
 
 .viewer-container {
-    display: none;
         max-width: 1200px;
             margin: auto;
             background: rgba(0, 0, 0, 0.75);

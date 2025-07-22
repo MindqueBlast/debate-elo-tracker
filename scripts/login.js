@@ -29,7 +29,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loginScreen = document.getElementById('loginScreen');
     const loadingOverlay = document.getElementById('loadingOverlay');
     const mainContainer = document.querySelector('.container');
-    const viewerContainer = document.getElementsByClassName('viewer-container');
+    const viewerContainer =
+        document.getElementsByClassName('viewer-container')[0]; // FIX: get first element
     const authBar = document.getElementById('authBar');
 
     if (isLocalFile) {
