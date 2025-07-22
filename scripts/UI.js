@@ -1,3 +1,4 @@
+// Full UI.js with viewer-aware logic
 let practiceRoundsPage = 1;
 const practiceRoundsPerPage = 10;
 
@@ -35,7 +36,10 @@ async function loadData(isViewer = false) {
             refreshAllUI();
             populateTournamentDebaterSelect();
         } else {
-            renderDebaters(true, 'viewerDebatersList'); // 🔁 Use the viewer container
+            renderDebaters(true, 'viewerDebatersList');
+            renderChart();
+            renderPracticeRounds(practiceRoundsPage);
+            renderTournaments(tournamentsPage);
         }
     } catch (error) {
         console.error('Error fetching data:', error);
@@ -59,13 +63,12 @@ function refreshAllUI() {
     renderTournaments(tournamentsPage);
 }
 
-// --- UI RENDERING ---
 function renderDebaters(readOnly = false, targetId = 'debatersList') {
     const list = document.getElementById(targetId);
     const showGraduated =
         document.getElementById('showGraduated')?.checked ?? true;
     list.innerHTML = '';
-    // 👉 STEP 1: Calculate Average Elo of active debaters
+
     const activeDebaters = appData.debaters.filter(
         (d) => d.status === 'active'
     );
@@ -75,7 +78,6 @@ function renderDebaters(readOnly = false, targetId = 'debatersList') {
             : activeDebaters.reduce((sum, d) => sum + d.elo, 0) /
               activeDebaters.length;
 
-    // 👉 STEP 2: Add a banner at the top
     const avgEloBanner = document.createElement('div');
     avgEloBanner.className = 'avg-elo-banner';
     avgEloBanner.textContent = `Average Elo (Active Debaters): ${Math.round(
@@ -121,7 +123,6 @@ function renderDebaters(readOnly = false, targetId = 'debatersList') {
         if (!readOnly) {
             const controls = document.createElement('div');
             controls.className = 'item-controls';
-
             controls.innerHTML = `
                 <button class="secondary" onclick="setElo('${
                     debater.id
@@ -140,6 +141,7 @@ function renderDebaters(readOnly = false, targetId = 'debatersList') {
 
         list.appendChild(li);
     });
+
     list.appendChild(avgEloBanner);
 }
 
@@ -188,48 +190,25 @@ async function renderPracticeRounds(page = 1) {
             </span>
         `;
 
-        const controlsDiv = document.createElement('div');
-        controlsDiv.className = 'item-controls';
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'danger';
-        deleteBtn.textContent = 'Delete';
-        deleteBtn.onclick = () => deletePracticeRound(round.id);
-
-        controlsDiv.appendChild(deleteBtn);
-
         li.appendChild(infoDiv);
-        li.appendChild(controlsDiv);
+
+        if (!appData.isViewer) {
+            const controlsDiv = document.createElement('div');
+            controlsDiv.className = 'item-controls';
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'danger';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.onclick = () => deletePracticeRound(round.id);
+
+            controlsDiv.appendChild(deleteBtn);
+            li.appendChild(controlsDiv);
+        }
 
         list.appendChild(li);
     });
 
     renderPracticeRoundsPaginationControls(page, rounds.length);
-}
-function renderPracticeRoundsPaginationControls(currentPage, itemsCount) {
-    const container = document.getElementById('practiceRoundsPagination');
-    container.innerHTML = '';
-
-    const prevBtn = document.createElement('button');
-    prevBtn.textContent = '← Previous';
-    prevBtn.disabled = currentPage === 1;
-    prevBtn.onclick = () => {
-        if (practiceRoundsPage > 1) {
-            practiceRoundsPage--;
-            renderPracticeRounds(practiceRoundsPage);
-        }
-    };
-
-    const nextBtn = document.createElement('button');
-    nextBtn.textContent = 'Next →';
-    nextBtn.disabled = itemsCount < practiceRoundsPerPage;
-    nextBtn.onclick = () => {
-        practiceRoundsPage++;
-        renderPracticeRounds(practiceRoundsPage);
-    };
-
-    container.appendChild(prevBtn);
-    container.appendChild(nextBtn);
 }
 
 async function renderTournaments(page = 1) {
@@ -289,159 +268,19 @@ async function renderTournaments(page = 1) {
         }</strong>
                     ${participantList}
                 </div>
-                <div class="item-controls">
-                    <button class="danger" onclick="deleteTournament('${
-                        tournament.id
-                    }')">Delete</button>
-                </div>
+                ${
+                    appData.isViewer
+                        ? ''
+                        : `<div class="item-controls">
+                            <button class="danger" onclick="deleteTournament('${tournament.id}')">Delete</button>
+                           </div>`
+                }
             </li>
         `;
         list.innerHTML += tournamentCard;
     }
 
     renderTournamentsPaginationControls(page, tournaments.length);
-}
-
-function renderTournamentsPaginationControls(currentPage, itemsCount) {
-    const container = document.getElementById('tournamentsPagination');
-    container.innerHTML = '';
-
-    const prevBtn = document.createElement('button');
-    prevBtn.textContent = '← Previous';
-    prevBtn.disabled = currentPage === 1;
-    prevBtn.onclick = () => {
-        if (tournamentsPage > 1) {
-            tournamentsPage--;
-            renderTournaments(tournamentsPage);
-        }
-    };
-
-    const nextBtn = document.createElement('button');
-    nextBtn.textContent = 'Next →';
-    nextBtn.disabled = itemsCount < tournamentsPerPage;
-    nextBtn.onclick = () => {
-        tournamentsPage++;
-        renderTournaments(tournamentsPage);
-    };
-
-    container.appendChild(prevBtn);
-    container.appendChild(nextBtn);
-}
-
-function updateSelects() {
-    const showGraduated = document.getElementById('showGraduated').checked;
-
-    const selects = {
-        player1: document.getElementById('player1'),
-        player2: document.getElementById('player2'),
-        analyticsDebater: document.getElementById('analyticsDebater'),
-        tournamentAddDebater: document.getElementById('tournamentAddDebater'),
-    };
-
-    for (const key in selects) {
-        const select = selects[key];
-        const currentVal = select.value;
-        select.innerHTML = '<option value="">Select a debater...</option>';
-
-        if (key === 'analyticsDebater') {
-            const allOption = document.createElement('option');
-            allOption.value = 'ALL';
-            allOption.textContent = '-- All Debaters --';
-            select.appendChild(allOption);
-        }
-
-        let sourceList;
-        if (key === 'analyticsDebater') {
-            sourceList = showGraduated
-                ? appData.debaters
-                : appData.debaters.filter((d) => d.status === 'active');
-        } else {
-            sourceList = appData.debaters.filter((d) => d.status === 'active');
-        }
-
-        sourceList.forEach((debater) => {
-            if (
-                key === 'tournamentAddDebater' &&
-                tournamentParticipants.has(debater.id)
-            )
-                return;
-            const option = document.createElement('option');
-            option.value = debater.id;
-            option.textContent = `${debater.name} (${Math.round(debater.elo)})`;
-            select.appendChild(option);
-        });
-        select.value = currentVal;
-    }
-}
-
-// --- ANNOTATION MANAGEMENT ---
-async function addAnnotation() {
-    const eventDate = document.getElementById('eventDate').value;
-    const eventName = document.getElementById('eventName').value.trim();
-
-    if (!eventDate || !eventName) {
-        alert('Please pick a date and enter an event name.');
-        return;
-    }
-
-    try {
-        const { error } = await supabaseClient
-            .from('annotations')
-            .insert({ date: eventDate, name: eventName });
-        if (error) throw error;
-        document.getElementById('eventName').value = '';
-        document.getElementById('eventDate').value = '';
-        await loadData();
-    } catch (error) {
-        console.error('Error adding annotation:', error);
-        alert('Failed to add annotation.');
-    }
-}
-
-async function removeAnnotation(id) {
-    if (confirm('Are you sure you want to remove this important date?')) {
-        try {
-            const { error } = await supabaseClient
-                .from('annotations')
-                .delete()
-                .eq('id', id);
-            if (error) throw error;
-            await loadData();
-        } catch (error) {
-            console.error('Error removing annotation:', error);
-            alert('Failed to remove annotation.');
-        }
-    }
-}
-
-async function editAnnotationDate(id) {
-    const annotation = appData.annotations.find((a) => a.id === id);
-    if (!annotation) return;
-
-    const newDateStr = prompt(
-        `Enter new date for "${annotation.name}":`,
-        annotation.date
-    );
-    if (newDateStr === null) return;
-    if (
-        !/^\d{4}-\d{2}-\d{2}$/.test(newDateStr) ||
-        isNaN(new Date(newDateStr).getTime())
-    ) {
-        alert('Invalid date format. Please use YYYY-MM-DD.');
-        return;
-    }
-
-    try {
-        const { error } = await supabaseClient
-            .from('annotations')
-            .update({ date: newDateStr })
-            .eq('id', id);
-        if (error) throw error;
-        await loadData();
-    } catch (error) {
-        console.error('Error editing date:', error);
-        alert('Failed to edit date.');
-    }
 }
 
 function renderAnnotationsList() {
@@ -460,138 +299,15 @@ function renderAnnotationsList() {
         const li = document.createElement('li');
         li.innerHTML = `
             <span>${annotation.name} (${annotation.date})</span>
-            <div class="item-controls" style="gap: 10px;">
-                <button class="secondary" style="padding: 2px 8px;" onclick="editAnnotationDate('${annotation.id}')">Edit Date</button>
-                <button class="danger" style="padding: 2px 8px;" onclick="removeAnnotation('${annotation.id}')">Remove</button>
-            </div>
+            ${
+                appData.isViewer
+                    ? ''
+                    : `<div class="item-controls" style="gap: 10px;">
+                        <button class="secondary" style="padding: 2px 8px;" onclick="editAnnotationDate('${annotation.id}')">Edit Date</button>
+                        <button class="danger" style="padding: 2px 8px;" onclick="removeAnnotation('${annotation.id}')">Remove</button>
+                    </div>`
+            }
         `;
-        list.appendChild(li);
-    });
-}
-
-function populateTournamentDebaterSelect() {
-    const select = document.getElementById('tournamentAddDebater');
-    select.innerHTML = `<option value="">-- Select Debater --</option>`;
-    appData.debaters.forEach((d) => {
-        select.innerHTML += `<option value="${d.id}">${d.name}</option>`;
-    });
-}
-
-function addParticipant() {
-    const select = document.getElementById('tournamentAddDebater');
-    const divisionSelect = document.getElementById('tournamentDivision');
-    const debaterId = select.value;
-
-    if (!debaterId) {
-        alert('Please select a debater to add.');
-        return;
-    }
-    if (tournamentParticipants.has(debaterId)) {
-        alert('This participant is already added.');
-        return;
-    }
-
-    const debater = appData.debaters.find((d) => d.id === debaterId);
-    if (!debater) {
-        alert('Selected debater not found.');
-        return;
-    }
-
-    tournamentParticipants.set(debaterId, {
-        ...debater,
-        division: divisionSelect.value,
-        W_raw: 0, // default raw wins
-    });
-
-    renderTournamentParticipants();
-}
-
-function renderTournamentParticipants() {
-    const list = document.getElementById('tournamentParticipantsList');
-    list.innerHTML = '';
-
-    tournamentParticipants.forEach((p) => {
-        const li = document.createElement('li');
-        li.classList.add('list-item');
-
-        li.innerHTML = `
-        <div class="item-info" style="align-self: center;">
-          ${p.name} (${p.division})
-        </div>
-        <div class="item-controls" style="display: flex; align-items: center;">
-          <input type="number" min="0" value="${p.W_raw}"
-                 onchange="updateRawWins('${p.id}', this.value)"
-                 style="width: 60px; height: 20px; margin-right: 10px; margin-top:10px;vertical-align: middle; padding: 6px 8px; border-radius: 6px; border: 1px solid #444; background: #1e1e1e; color: #eee;" />
-          <button class="danger">Remove</button>
-        </div>
-        `;
-
-        li.querySelector('button').addEventListener('click', () =>
-            removeParticipant(p.id)
-        );
-        list.appendChild(li);
-    });
-}
-
-function updateRawWins(id, value) {
-    if (tournamentParticipants.has(id)) {
-        const participant = tournamentParticipants.get(id);
-        participant.W_raw = Number(value);
-        tournamentParticipants.set(id, participant);
-    }
-}
-
-function removeParticipant(id) {
-    tournamentParticipants.delete(id);
-    renderTournamentParticipants();
-}
-
-function updateExpectedScore() {
-    const winnerId = document.getElementById('player1').value;
-    const loserId = document.getElementById('player2').value;
-
-    if (!winnerId || !loserId || winnerId === loserId) {
-        document.getElementById('expectedScoreDisplay').textContent =
-            'Expected score: —';
-        return;
-    }
-
-    const a = appData.debaters.find((d) => d.id === winnerId);
-    const b = appData.debaters.find((d) => d.id === loserId);
-
-    if (!a || !b) {
-        document.getElementById('expectedScoreDisplay').textContent =
-            'Expected score: —';
-        return;
-    }
-
-    const elo_a = a.elo;
-    const elo_b = b.elo;
-
-    const E = 1 / (1 + Math.pow(10, (elo_b - elo_a) / 400));
-
-    // Show as percentage with 1 decimal place
-    document.getElementById(
-        'expectedScoreDisplay'
-    ).textContent = `Win Probability for ${a.name}: ${(E * 100).toFixed(1)}%`;
-}
-
-// Add event listeners on the selects to update live
-document
-    .getElementById('player1')
-    .addEventListener('change', updateExpectedScore);
-document
-    .getElementById('player2')
-    .addEventListener('change', updateExpectedScore);
-function renderViewerDebaters() {
-    const list = document.getElementById('viewerDebatersList');
-    list.innerHTML = '';
-
-    const sorted = [...appData.debaters].sort((a, b) => b.elo - a.elo);
-    sorted.forEach((d, i) => {
-        if (d.status === 'graduated') return;
-        const li = document.createElement('li');
-        li.innerHTML = `#${i + 1} — ${d.name} (${Math.round(d.elo)})`;
         list.appendChild(li);
     });
 }
