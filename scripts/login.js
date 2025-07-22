@@ -58,6 +58,23 @@ if (isLocalFile) {
             const authBar = document.getElementById('authBar');
             const logoutBtn = document.getElementById('logoutBtn');
 
+            // Defensive check for essential elements
+            if (
+                !loginScreen ||
+                !loadingOverlay ||
+                !mainContainer ||
+                !viewerContainer ||
+                !authBar ||
+                !logoutBtn
+            ) {
+                console.error(
+                    'One or more essential DOM elements are missing.'
+                );
+                return;
+            }
+
+            console.log('loadingOverlay:', loadingOverlay);
+
             if (user) {
                 const email = user.email;
 
@@ -76,7 +93,7 @@ if (isLocalFile) {
                         loadingOverlay.style.opacity = '0';
 
                         setTimeout(() => {
-                            loadingOverlay.remove();
+                            loadingOverlay.style.display = 'none'; // Hide instead of remove
                             mainContainer.style.display = 'block'; // show admin container
                             authBar.style.display = 'flex'; // show auth bar
                             logoutBtn.style.display = 'inline-block'; // show logout button
@@ -104,6 +121,7 @@ if (isLocalFile) {
                 } else {
                     alert('Access denied. Your account is not authorized.');
                     firebase.auth().signOut();
+
                     // Reset UI
                     mainContainer.style.display = 'none';
                     viewerContainer.style.display = 'none';
@@ -118,7 +136,7 @@ if (isLocalFile) {
                 viewerContainer.style.display = 'none';
                 authBar.style.display = 'none';
                 logoutBtn.style.display = 'none';
-                if (loadingOverlay) loadingOverlay.style.display = 'none';
+                loadingOverlay.style.display = 'none';
             }
         });
     });
