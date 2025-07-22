@@ -180,52 +180,52 @@
     </div>
     <!-- VIEWER-ONLY UI -->
     <div class="viewer-container">
-                <div id="viewerAuthBar" style="
-                                    display: none; 
-                                    position: absolute;
-                                    top: 20px;
-                                    right: 20px;
-                                    z-index: 1000;
-                                ">
-                    <button id="viewerLogoutBtn"
-                        style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer;">
-                        Logout
-                    </button>
-                </div>
         <h1>Syosset Debate Elo Tracker - Viewer</h1>
-        <div class="grid-pair"></div>
-        <div class="card">
-            <h2>Debater Leaderboard</h2>
-            <ul id="viewerDebatersList"></ul>
+    
+        <div id="viewerAuthBar" style="position: absolute; top: 20px; right: 20px; z-index: 1000;">
+            <button id="viewerLogoutBtn"
+                style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer;">
+                Logout
+            </button>
         </div>
-                <div class="card">
-                    <h2>Analytics</h2>
-                    <label for="viewerAnalyticsDebater">Select Debater</label>
-                    <select id="viewerAnalyticsDebater" onchange="renderChart(true)"></select>
-                    <div style="position: relative; height: 400px;">
-                        <canvas id="viewerEloChart"></canvas>
-                    </div>
-                </div>
-        </div>
+    
+        <!-- Grid Pair: Debater List + Analytics -->
         <div class="grid-pair">
-        <div class="card">
-            <h2>Practice Rounds</h2>
-            <ul id="viewerPracticeRoundsList"></ul>
-            <div id="viewerPracticeRoundsPagination" style="margin-top: 12px; display: flex; gap: 10px;"></div>
-        </div>
-        
-        <div class="card">
-            <h2>Tournaments</h2>
-            <ul id="viewerTournamentsList"></ul>
-            <div id="viewerTournamentsPagination" style="margin-top: 12px; display: flex; gap: 10px;"></div>
-        </div>
-        </div>
-        
-
-
-                <div class="card credits-card glow-on-hover animate-fade-in">
-                    <h2>© 2025 Syosset PF — Aaditya Sahu & Jiayi Meng</h2>
+            <div class="card">
+                <h2>Debater Leaderboard</h2>
+                <ul id="viewerDebatersList"></ul>
+            </div>
+    
+            <div class="card">
+                <h2>Analytics</h2>
+                <label for="viewerAnalyticsDebater">Select Debater</label>
+                <select id="viewerAnalyticsDebater" onchange="renderChart(true)"></select>
+                <div style="position: relative; height: 400px;">
+                    <canvas id="viewerEloChart"></canvas>
                 </div>
+            </div>
+        </div>
+    
+        <!-- Grid Pair: Practice + Tournaments -->
+        <div class="grid-pair">
+            <div class="card">
+                <h2>Practice Rounds</h2>
+                <ul id="viewerPracticeRoundsList"></ul>
+                <div id="viewerPracticeRoundsPagination" style="margin-top: 12px; display: flex; gap: 10px;"></div>
+            </div>
+    
+            <div class="card">
+                <h2>Tournaments</h2>
+                <ul id="viewerTournamentsList"></ul>
+                <div id="viewerTournamentsPagination" style="margin-top: 12px; display: flex; gap: 10px;"></div>
+            </div>
+        </div>
+    
+        <!-- Footer -->
+        <div class="card credits-card glow-on-hover animate-fade-in">
+            <h2>© 2025 Syosset PF — Aaditya Sahu & Jiayi Meng</h2>
+        </div>
+    </div>
     </div>
 
     <script>
