@@ -52,3 +52,136 @@ function showToast(message, type = 'info', duration = 3000) {
         close: true,
     }).showToast();
 }
+
+function downloadChartJSON() {
+    if (!eloChart || !eloChart.data || !eloChart.data.datasets) {
+        alert('Chart data not available.');
+        return;
+    }
+
+    const exportData = eloChart.data.datasets.map((dataset) => ({
+        id: dataset.id || dataset.label,
+        name: dataset.label,
+        history: dataset.data.map((point) => ({
+            date: new Date(point.x).toISOString(),
+            elo: Math.round(point.y),
+        })),
+    }));
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json',
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'chart_export.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function downloadChartPNG() {
+    const canvas = document.getElementById('eloChart');
+    if (!canvas) return;
+
+    const link = document.createElement('a');
+    const selectedDebaterId = document.getElementById('analyticsDebater').value;
+    const filename =
+        selectedDebaterId === 'ALL'
+            ? 'all_debaters_elo_graph.png'
+            : `${getName(selectedDebaterId)}_elo_graph.png`;
+
+    link.download = filename;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+
+function loadUploadedChart() {
+    const fileInput = document.getElementById('uploadChartJSON');
+    if (!fileInput.files.length) {
+        alert('Please select a .json file.');
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+        try {
+            const parsedData = JSON.parse(event.target.result);
+            const dataArray = Array.isArray(parsedData)
+                ? parsedData
+                : [parsedData];
+
+            const ctx = document
+                .getElementById('uploadedChart')
+                .getContext('2d');
+
+            if (window.tempUploadedChart) {
+                window.tempUploadedChart.destroy();
+            }
+
+            const datasets = dataArray.map((entry, index) => {
+                const color = `hsl(${
+                    (index * 360) / dataArray.length
+                }, 70%, 50%)`;
+                return {
+                    label: entry.name || `Debater ${index + 1}`,
+                    data: (entry.history || []).map((point) => ({
+                        x: point.date,
+                        y: point.elo,
+                    })),
+                    borderColor: color,
+                    backgroundColor: `${color}1A`,
+                    fill: false,
+                    tension: 0.1,
+                    borderWidth: 1.5,
+                };
+            });
+
+            window.tempUploadedChart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: true },
+                        title: {
+                            display: true,
+                            text: 'Temporary Uploaded Elo Graph',
+                            color: '#ddd',
+                            font: { size: 16 },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'day' },
+                            title: {
+                                display: true,
+                                text: 'Date',
+                                color: '#aaa',
+                            },
+                            ticks: { color: '#aaa' },
+                            grid: { color: '#444' },
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Elo Rating',
+                                color: '#aaa',
+                            },
+                            ticks: { color: '#aaa' },
+                            grid: { color: '#444' },
+                        },
+                    },
+                },
+            });
+        } catch (err) {
+            alert('Invalid JSON file.');
+            console.error('Failed to load uploaded chart:', err);
+        }
+    };
+
+    reader.readAsText(file);
+}

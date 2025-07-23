@@ -400,6 +400,9 @@ async function deletePracticeRound(roundId) {
                 .eq('id', loser.id),
             supabaseClient.from('practice_rounds').delete().eq('id', roundId),
         ]);
+        removeChartPoint(round.winner_id, round.date);
+        removeChartPoint(round.loser_id, round.date);
+
         showToast(
             'Practice round deleted and ELO changes reverted.',
             'success'
@@ -509,6 +512,7 @@ async function deleteTournament(tournamentId) {
         );
         return;
     }
+    removeChartPoint(p.debater_id, p.date);
 
     showToast('Tournament deleted and ELO changes reverted.', 'success');
     await loadData();

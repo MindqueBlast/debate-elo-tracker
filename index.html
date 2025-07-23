@@ -134,6 +134,7 @@
             <!-- MANAGE PRACTICE ROUNDS -->
             <div class="card" style="margin-top: 20px;">
                 <h2>Manage Practice Rounds</h2>
+                <select id="practiceRoundsDebaterFilter" ></select>
                 <ul id="practiceRoundsList"></ul>
                 <div id="practiceRoundsPagination" style="margin-top: 12px; display: flex; gap: 10px;"></div>
             </div>
@@ -148,13 +149,27 @@
         <!-- ANALYTICS CARD: Full Width -->
         <div class="card" style="margin-top: 20px;">
             <h2>Analytics & Data</h2>
+
             <div class="grid-container">
+                <!-- LEFT: Chart and Controls -->
                 <div>
                     <h3>Elo History Graph</h3>
                     <div class="chart-controls">
                         <div>
                             <label for="analyticsDebater">Select Debater</label>
                             <select id="analyticsDebater" onchange="renderChart()"></select>
+                        </div>
+                        <div>
+                            <label for="compareDebater">Compare With</label>
+                            <select id="compareDebater" onchange="renderChart()">
+                                <option value="">-- None --</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <label for="analyticsStartDate">From</label>
+                            <input type="date" id="analyticsStartDate" onchange="renderChart()" />
+                            <label for="analyticsEndDate">To</label>
+                            <input type="date" id="analyticsEndDate" onchange="renderChart()" />
                         </div>
                         <div>
                             <input type="checkbox" id="showAnnotations" checked onchange="renderChart()" />
@@ -164,8 +179,15 @@
                     <div id="chartContainer" style="position: relative;">
                         <canvas id="eloChart"></canvas>
                     </div>
-                    <button class="button" onclick="toggleFullscreen()">🔍 Fullscreen</button>
+
+                    <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                        <button class="button" onclick="toggleFullscreen()">🔍 Fullscreen</button>
+                        <button class="button" onclick="downloadChartPNG()">🖼️ Export as PNG</button>
+                        <button class="button" onclick="downloadChartJSON()">💾 Export as JSON</button>
+                    </div>
                 </div>
+
+                <!-- RIGHT: Annotations & Snapshot Upload -->
                 <div>
                     <h3>Manage Important Dates</h3>
                     <input type="date" id="eventDate" />
@@ -173,9 +195,22 @@
                     <button class="button" onclick="addAnnotation()">Mark Date</button>
                     <h3 style="margin-top: 20px;">Marked Dates</h3>
                     <ul id="annotationsList"></ul>
+
+                    <hr style="margin: 20px 0; border-color: #444;" />
+
+                    <h3>📤 Load a Saved Snapshot</h3>
+                    <input type="file" id="uploadChartJSON" accept=".json" />
+                    <button class="button" style="margin-top: 6px;" onclick="loadUploadedChart()">Upload & View</button>
+
+                    <div style="margin-top: 15px;">
+                        <canvas id="uploadedChart" height="300"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
+
+
+
         <div class="card credits-card glow-on-hover animate-fade-in">
             <h2>© 2025 Syosset PF — Aaditya Sahu & Jiayi Meng</h2>
         </div>
@@ -205,10 +240,22 @@
                 <label for="viewerAnalyticsDebater">Select Debater</label>
                 <select id="viewerAnalyticsDebater" onchange="renderViewerChart()"></select>
                 <div>
+                    <label for="viewerCompareDebater">Compare With</label>
+                    <select id="viewerCompareDebater" onchange="renderViewerChart()">
+                        <option value="">-- None --</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
+                    <label for="viewerAnalyticsStartDate">From</label>
+                    <input type="date" id="viewerAnalyticsStartDate" onchange="renderViewerChart()" />
+                    <label for="viewerAnalyticsEndDate">To</label>
+                    <input type="date" id="viewerAnalyticsEndDate" onchange="renderViewerChart()" />
+                </div>
+                <div>
                     <input type="checkbox" id="viewerShowAnnotations" checked onchange="renderViewerChart()" />
                     <label for="viewerShowAnnotations">Show Important Dates</label>
                 </div>
-                <div style="position: relative; height: 400px;">
+                <div style="position: relative; height: 400px; margin-top: 8px;">
                     <canvas id="viewerEloChart"></canvas>
                 </div>
                 <button id="viewerFullscreenBtn" class="button" onclick="viewerToggleFullscreen()">🔍 Fullscreen</button>
@@ -219,6 +266,7 @@
         <div class="grid-pair">
             <div class="card">
                 <h2>Practice Rounds</h2>
+                <select id="viewerPracticeRoundsDebaterFilter" ></select>
                 <ul id="viewerPracticeRoundsList"></ul>
                 <div id="viewerPracticeRoundsPagination" style="margin-top: 12px; display: flex; gap: 10px;"></div>
             </div>

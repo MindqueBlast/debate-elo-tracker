@@ -9,6 +9,56 @@ function renderChart() {
     }
 
     const chartOptions = {
+        animation: {
+            duration: 800,
+            easing: 'easeInOutQuart',
+        },
+        transitions: {
+            show: {
+                animations: {
+                    x: { type: 'number', duration: 800, easing: 'easeInOutQuart' },
+                    y: { type: 'number', duration: 800, easing: 'easeInOutQuart' },
+                    borderColor: { duration: 800, easing: 'easeInOutQuart' },
+                    backgroundColor: { duration: 800, easing: 'easeInOutQuart' },
+                }
+            },
+            hide: {
+                animations: {
+                    x: { type: 'number', duration: 800, easing: 'easeInOutQuart' },
+                    y: { type: 'number', duration: 800, easing: 'easeInOutQuart' },
+                    borderColor: { duration: 800, easing: 'easeInOutQuart' },
+                    backgroundColor: { duration: 800, easing: 'easeInOutQuart' },
+                }
+            },
+            active: {
+                animations: {
+                    x: { type: 'number', duration: 800, easing: 'easeInOutQuart' },
+                    y: { type: 'number', duration: 800, easing: 'easeInOutQuart' },
+                    borderColor: { duration: 800, easing: 'easeInOutQuart' },
+                    backgroundColor: { duration: 800, easing: 'easeInOutQuart' },
+                }
+            }
+        },
+        onClick: (event, elements) => {
+            if (!elements.length) return;
+            const element = elements[0];
+            const dataset = eloChart.data.datasets[element.datasetIndex];
+            const point = dataset.data[element.index];
+
+            const debaterName = dataset.label;
+            const debaterId = dataset.id || null;
+            const date = new Date(point.x).toISOString().split('T')[0];
+
+            // Confirm deletion
+            if (confirm(`Delete Elo point for ${debaterName} on ${date}?`)) {
+                // Remove from chart
+                dataset.data.splice(element.index, 1);
+                eloChart.update();
+
+                // Optional: Also remove from Supabase (if point is tied to PR or Tournament)
+                // deletePointFromSupabase(debaterId, date); ← implement this if desired
+            }
+        },
         scales: {
             x: {
                 type: 'time',
@@ -147,6 +197,36 @@ function renderViewerChart() {
     }
 
     const chartOptions = {
+        animation: {
+            duration: 800,
+            easing: 'easeInOutQuart',
+        },
+        transitions: {
+            show: {
+                animations: {
+                    x: { type: 'number', duration: 800, easing: 'easeInOutQuart' },
+                    y: { type: 'number', duration: 800, easing: 'easeInOutQuart' },
+                    borderColor: { duration: 800, easing: 'easeInOutQuart' },
+                    backgroundColor: { duration: 800, easing: 'easeInOutQuart' },
+                }
+            },
+            hide: {
+                animations: {
+                    x: { type: 'number', duration: 800, easing: 'easeInOutQuart' },
+                    y: { type: 'number', duration: 800, easing: 'easeInOutQuart' },
+                    borderColor: { duration: 800, easing: 'easeInOutQuart' },
+                    backgroundColor: { duration: 800, easing: 'easeInOutQuart' },
+                }
+            },
+            active: {
+                animations: {
+                    x: { type: 'number', duration: 800, easing: 'easeInOutQuart' },
+                    y: { type: 'number', duration: 800, easing: 'easeInOutQuart' },
+                    borderColor: { duration: 800, easing: 'easeInOutQuart' },
+                    backgroundColor: { duration: 800, easing: 'easeInOutQuart' },
+                }
+            }
+        },
         scales: {
             x: {
                 type: 'time',
@@ -268,4 +348,131 @@ function viewerToggleFullscreen() {
     } else {
         document.exitFullscreen?.();
     }
+}
+
+function removeChartPoint(debaterId, targetDate) {
+    if (!eloChart || !eloChart.data || !eloChart.data.datasets) return;
+
+    for (const dataset of eloChart.data.datasets) {
+        if (dataset.id === debaterId || dataset.label === getName(debaterId)) {
+            dataset.data = dataset.data.filter((pt) => {
+                const ptDate = new Date(pt.x).toISOString().split('T')[0];
+                const tDate = new Date(targetDate).toISOString().split('T')[0];
+                return ptDate !== tDate;
+            });
+        }
+    }
+
+    eloChart.update();
+}
+
+function updateAnalyticsDebaterSelects() {
+    const mainSelect = document.getElementById('analyticsDebater');
+    const compareSelect = document.getElementById('compareDebater');
+    if (!mainSelect || !compareSelect) return;
+    mainSelect.innerHTML = '';
+    // Add 'ALL' option
+    const allOption = document.createElement('option');
+    allOption.value = 'ALL';
+    allOption.textContent = '-- All Debaters --';
+    mainSelect.appendChild(allOption);
+    compareSelect.innerHTML = '<option value="">-- None --</option>';
+    appData.debaters.forEach((debater) => {
+        const option = document.createElement('option');
+        option.value = debater.id;
+        option.textContent = `${debater.name} (${Math.round(debater.elo)})`;
+        mainSelect.appendChild(option.cloneNode(true));
+        compareSelect.appendChild(option.cloneNode(true));
+    });
+    if (!mainSelect.value) mainSelect.value = 'ALL';
+    // Hide compare if ALL is selected
+    function updateCompareState() {
+        if (mainSelect.value === 'ALL') {
+            compareSelect.disabled = true;
+            compareSelect.value = '';
+            compareSelect.style.opacity = 0.5;
+        } else {
+            compareSelect.disabled = false;
+            compareSelect.style.opacity = 1;
+            Array.from(compareSelect.options).forEach((opt) => {
+                if (opt.value && opt.value === mainSelect.value) {
+                    opt.style.display = 'none';
+                    if (compareSelect.value === opt.value) compareSelect.value = '';
+                } else {
+                    opt.style.display = '';
+                }
+            });
+        }
+    }
+    updateCompareState();
+    mainSelect.onchange = () => {
+        updateCompareState();
+        renderChart();
+    };
+    compareSelect.onchange = renderChart;
+    // Style
+    mainSelect.style.minWidth = '180px';
+    compareSelect.style.minWidth = '180px';
+    mainSelect.style.marginBottom = '6px';
+    compareSelect.style.marginBottom = '6px';
+}
+
+function updateViewerAnalyticsDebaterSelects() {
+    const mainSelect = document.getElementById('viewerAnalyticsDebater');
+    const compareSelect = document.getElementById('viewerCompareDebater');
+    if (!mainSelect || !compareSelect) return;
+    mainSelect.innerHTML = '';
+    // Add 'ALL' option
+    const allOption = document.createElement('option');
+    allOption.value = 'ALL';
+    allOption.textContent = '-- All Debaters --';
+    mainSelect.appendChild(allOption);
+    compareSelect.innerHTML = '<option value="">-- None --</option>';
+    appData.debaters.filter(d => d.status === 'active').forEach((debater) => {
+        const option = document.createElement('option');
+        option.value = debater.id;
+        option.textContent = `${debater.name} (${Math.round(debater.elo)})`;
+        mainSelect.appendChild(option.cloneNode(true));
+        compareSelect.appendChild(option.cloneNode(true));
+    });
+    if (!mainSelect.value) mainSelect.value = 'ALL';
+    function updateCompareState() {
+        if (mainSelect.value === 'ALL') {
+            compareSelect.disabled = true;
+            compareSelect.value = '';
+            compareSelect.style.opacity = 0.5;
+        } else {
+            compareSelect.disabled = false;
+            compareSelect.style.opacity = 1;
+            Array.from(compareSelect.options).forEach((opt) => {
+                if (opt.value && opt.value === mainSelect.value) {
+                    opt.style.display = 'none';
+                    if (compareSelect.value === opt.value) compareSelect.value = '';
+                } else {
+                    opt.style.display = '';
+                }
+            });
+        }
+    }
+    updateCompareState();
+    mainSelect.onchange = () => {
+        updateCompareState();
+        renderViewerChart();
+    };
+    compareSelect.onchange = renderViewerChart;
+    // Style
+    mainSelect.style.minWidth = '180px';
+    compareSelect.style.minWidth = '180px';
+    mainSelect.style.marginBottom = '6px';
+    compareSelect.style.marginBottom = '6px';
+}
+
+function getDateRangeFilter(history, startDate, endDate) {
+    if (!startDate && !endDate) return history;
+    return history.filter(h => {
+        const d = h.date;
+        if (startDate && d < startDate) return false;
+        if (endDate && d > endDate) return false;
+        return true;
+    });
 }
