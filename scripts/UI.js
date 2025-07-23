@@ -782,65 +782,109 @@ function showDebaterProfile(debaterId) {
         modal.style.left = '0';
         modal.style.width = '100vw';
         modal.style.height = '100vh';
-        modal.style.background = 'rgba(0,0,0,0.5)';
+        modal.style.background = 'rgba(0,0,0,0.7)';
         modal.style.display = 'flex';
         modal.style.alignItems = 'center';
         modal.style.justifyContent = 'center';
         modal.style.zIndex = '99999';
         modal.innerHTML = `
-            <div id="debaterProfileContent" style="background:#222;padding:32px 24px 24px 24px;border-radius:16px;min-width:320px;max-width:90vw;max-height:90vh;overflow:auto;box-shadow:0 8px 32px #000a;position:relative;">
-                <button id="closeDebaterProfile" style="position:absolute;top:12px;right:12px;font-size:20px;background:none;border:none;color:#fff;cursor:pointer;">&times;</button>
-                <h2 id="debaterProfileName"></h2>
-                <div id="debaterProfileElo" style="font-size:1.2em;margin-bottom:16px;"></div>
-                <div id="debaterProfileStatus" style="margin-bottom:8px;"></div>
-                <canvas id="debaterProfileChart" width="320" height="160"></canvas>
+            <div id="debaterProfileCard" class="flip-card enhanced-profile-card" style="width: 90vw; max-width: 500px; height: 80vh; max-height: 700px; display: flex; align-items: center; justify-content: center; background: none; box-shadow: none; border: none; perspective: 1200px;">
+                <div class="flip-card-inner" style="width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.7s cubic-bezier(.4,2,.6,1);">
+                    <div class="flip-card-front" id="debaterProfileContentFront" style="position: absolute; width: 100%; height: 100%; backface-visibility: hidden; background: #181818; color: #fff; border-radius: 24px; box-shadow: 0 8px 32px #000a, 0 1.5px 0 #c00 inset; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px 32px 32px; transform: rotateY(0deg);">
+                        <button id="closeDebaterProfile" style="position:absolute;top:12px;right:12px;font-size:24px;background:none;border:none;color:#fff;cursor:pointer;z-index:3;">&times;</button>
+                        <h2 id="debaterProfileName" style="margin-bottom: 8px;"></h2>
+                        <div id="debaterProfileElo" style="font-size:1.2em;margin-bottom:16px;"></div>
+                        <div id="debaterProfileStatus" style="margin-bottom:8px;"></div>
+                        <div id="debaterProfileWinrate" style="margin-bottom:16px;"></div>
+                        <canvas id="debaterProfileChart" width="320" height="160" style="margin-bottom: 12px;"></canvas>
+                        <button id="flipToBackBtn" style="margin-top:16px;font-size:18px;background:#c00;color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;">Show Extra Stats</button>
+                    </div>
+                    <div class="flip-card-back" id="debaterProfileContentBack" style="position: absolute; width: 100%; height: 100%; backface-visibility: hidden; background: #232323; color: #fff; border-radius: 24px; box-shadow: 0 8px 32px #000a, 0 1.5px 0 #c00 inset; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px 32px 32px; transform: rotateY(180deg);">
+                        <button id="flipBackBtn" style="position:absolute;top:12px;right:12px;font-size:24px;background:none;border:none;color:#fff;cursor:pointer;z-index:4;">&times;</button>
+                        <h3 style="margin-bottom: 18px;">Extra Stats</h3>
+                        <div id="debaterProfileHighestElo" style="margin-bottom: 12px;"></div>
+                        <div id="debaterProfileTournaments" style="margin-bottom: 12px;"></div>
+                        <div id="debaterProfileGraduation" style="margin-bottom: 12px;"></div>
+                        <div id="debaterProfileConsistency" style="margin-bottom: 12px;"></div>
+                        <button id="flipToFrontBtn" style="margin-top:16px;font-size:18px;background:#c00;color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;">Back to Profile</button>
+                    </div>
+                </div>
             </div>
+            <style id="debaterProfileModalStyles">
+                .flip-card-inner {
+                    width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.7s cubic-bezier(.4,2,.6,1);
+                }
+                .flip-card-inner.flipped {
+                    transform: rotateY(180deg);
+                }
+                .flip-card-front, .flip-card-back {
+                    position: absolute; width: 100%; height: 100%; top: 0; left: 0;
+                    backface-visibility: hidden;
+                    border-radius: 24px;
+                }
+                .flip-card-front {
+                    transform: rotateY(0deg);
+                }
+                .flip-card-back {
+                    transform: rotateY(180deg);
+                }
+                @media (max-width: 600px) {
+                    #debaterProfileCard { width: 98vw !important; height: 90vh !important; min-width: 0 !important; }
+                }
+            </style>
         `;
         document.body.appendChild(modal);
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) modal.style.display = 'none';
+        // Card flip logic: only flip on button click
+        const card = modal.querySelector('.flip-card');
+        const cardInner = card.querySelector('.flip-card-inner');
+        card.querySelector('#flipToBackBtn').addEventListener('click', function(e) {
+            e.stopPropagation();
+            cardInner.classList.add('flipped');
         });
-        document.getElementById('closeDebaterProfile').onclick = () => {
-            modal.style.display = 'none';
-        };
+        card.querySelector('#flipToFrontBtn').addEventListener('click', function(e) {
+            e.stopPropagation();
+            cardInner.classList.remove('flipped');
+        });
+        card.querySelector('#closeDebaterProfile').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.body.removeChild(modal);
+        });
+        card.querySelector('#flipBackBtn').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.body.removeChild(modal);
+        });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
     } else {
         modal.style.display = 'flex';
+        // Always reset flip state and content when re-opening
+        const cardInner = modal.querySelector('.flip-card-inner');
+        cardInner.classList.remove('flipped');
     }
+    // Fill front content
     document.getElementById('debaterProfileName').textContent = debater.name;
-    document.getElementById(
-        'debaterProfileStatus'
-    ).textContent = `Status: ${debater.status}`;
-    document.getElementById(
-        'debaterProfileElo'
-    ).textContent = `Current Elo: ${Math.round(debater.elo)}`;
+    document.getElementById('debaterProfileStatus').textContent = `Status: ${debater.status}`;
+    document.getElementById('debaterProfileElo').textContent = `Current Elo: ${Math.round(debater.elo)}`;
     // Calculate winrate (practice rounds only)
     const practiceRounds = appData.practiceRounds || [];
-    const wins = practiceRounds.filter(
-        (r) => r.winner_id === debater.id
-    ).length;
-    const played = practiceRounds.filter(
-        (r) => r.winner_id === debater.id || r.loser_id === debater.id
-    ).length;
+    const wins = practiceRounds.filter((r) => r.winner_id === debater.id).length;
+    const played = practiceRounds.filter((r) => r.winner_id === debater.id || r.loser_id === debater.id).length;
     let winrateText = '';
     if (played > 0) {
         const winrate = (wins / played) * 100;
-        winrateText = `PR Winrate: ${wins} / ${played} (${winrate.toFixed(
-            1
-        )}%)`;
+        winrateText = `PR Winrate: ${wins} / ${played} (${winrate.toFixed(1)}%)`;
     } else {
         winrateText = 'PR Winrate: N/A';
     }
-    // Insert winrate below Elo
-    document
-        .getElementById('debaterProfileElo')
-        .insertAdjacentHTML(
-            'afterend',
-            `<div id="debaterProfileWinrate" style="margin-bottom:16px;">${winrateText}</div>`
-        );
+    document.getElementById('debaterProfileWinrate').textContent = winrateText;
     // Mini Elo chart
     const ctx = document.getElementById('debaterProfileChart').getContext('2d');
-    if (window.debaterProfileChartInstance)
+    if (window.debaterProfileChartInstance) {
         window.debaterProfileChartInstance.destroy();
+    }
     const history = debater.history || [];
     window.debaterProfileChartInstance = new Chart(ctx, {
         type: 'line',
@@ -850,8 +894,8 @@ function showDebaterProfile(debaterId) {
                 {
                     label: 'Elo',
                     data: history.map((h) => h.elo),
-                    borderColor: '#4e9cff',
-                    backgroundColor: 'rgba(78,156,255,0.1)',
+                    borderColor: '#e53935',
+                    backgroundColor: 'rgba(229,57,53,0.08)',
                     fill: true,
                     tension: 0.2,
                     borderWidth: 2,
@@ -867,4 +911,34 @@ function showDebaterProfile(debaterId) {
             },
         },
     });
+    // Fill back content
+    // Highest Elo
+    let highestElo = 0;
+    if (debater.history && debater.history.length > 0) {
+        highestElo = Math.max(...debater.history.map(h => h.elo));
+    } else {
+        highestElo = Math.round(debater.elo);
+    }
+    // Tournaments entered
+    let tournamentsEntered = 0;
+    if (appData.tournaments && appData.tournaments.length > 0) {
+        tournamentsEntered = appData.tournaments.filter(t => {
+            if (!t.tournament_participants) return false;
+            return t.tournament_participants.some(p => p.debater_id === debater.id);
+        }).length;
+    }
+    // Graduation date
+    let gradDate = debater.graduation_date || 'N/A';
+    // Consistency (Elo standard deviation)
+    let consistency = 'N/A';
+    if (debater.history && debater.history.length > 1) {
+        const elos = debater.history.map(h => h.elo);
+        const mean = elos.reduce((a, b) => a + b, 0) / elos.length;
+        const variance = elos.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / elos.length;
+        consistency = Math.sqrt(variance).toFixed(1);
+    }
+    document.getElementById('debaterProfileHighestElo').textContent = `Highest Elo: ${highestElo}`;
+    document.getElementById('debaterProfileTournaments').textContent = `Tournaments Entered: ${tournamentsEntered}`;
+    document.getElementById('debaterProfileGraduation').textContent = `Graduation Date: ${gradDate}`;
+    document.getElementById('debaterProfileConsistency').textContent = `Consistency Score (Elo SD): ${consistency}`;
 }
