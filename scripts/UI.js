@@ -34,23 +34,19 @@ async function loadData(isViewer = false) {
         if (!appData.isViewer) {
             refreshAllUI();
             populateTournamentDebaterSelect();
-            addPracticeRoundsDebaterFilter(false); // admin filter
-            updateAnalyticsDebaterSelects(); // now from data.js
         } else {
             renderDebaters(true, 'viewerDebatersList');
-            addPracticeRoundsDebaterFilter(true); // viewer filter
             renderPracticeRounds(
                 practiceRoundsPage,
                 'viewerPracticeRoundsList',
-                'viewerPracticeRoundsPagination',
-                true
+                'viewerPracticeRoundsPagination'
             );
             renderTournaments(
                 tournamentsPage,
                 'viewerTournamentsList',
                 'viewerTournamentsPagination'
             );
-            updateViewerAnalyticsDebaterSelects(); // now from data.js
+            updateViewerAnalyticsDebaterSelect();
             renderViewerChart();
             const viewerAnalyticsDebater = document.getElementById(
                 'viewerAnalyticsDebater'
@@ -83,7 +79,7 @@ function refreshAllUI() {
     renderAnnotationsList();
     practiceRoundsPage = 1;
     tournamentsPage = 1;
-    addPracticeRoundsDebaterFilter(false); // ensure filter stays on refresh
+
     renderPracticeRounds(practiceRoundsPage);
     renderTournaments(tournamentsPage);
 }
@@ -203,43 +199,27 @@ function renderDebaters(readOnly = false, targetId = 'debatersList') {
 async function renderPracticeRounds(
     page = 1,
     targetId = 'practiceRoundsList',
-    paginationId = 'practiceRoundsPagination',
-    isViewer = false
+    paginationId = 'practiceRoundsPagination'
 ) {
     const list = document.getElementById(targetId);
     list.innerHTML = '';
 
-    // Debater filter
-    const filterId = isViewer
-        ? 'viewerPracticeRoundsDebaterFilter'
-        : 'practiceRoundsDebaterFilter';
-    const debaterFilter = document.getElementById(filterId)?.value || '';
-
     const offset = (page - 1) * practiceRoundsPerPage;
 
-    let { data: rounds, error } = await supabaseClient
+    const { data: rounds, error } = await supabaseClient
         .from('practice_rounds')
         .select('*')
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .range(offset, offset + practiceRoundsPerPage - 1);
 
     if (error) {
         console.error('Error fetching practice rounds:', error);
         return;
     }
 
-    // Filter by debater if selected
-    if (debaterFilter) {
-        rounds = rounds.filter(
-            (r) => r.winner_id === debaterFilter || r.loser_id === debaterFilter
-        );
-    }
-
-    // Pagination after filtering
-    const pagedRounds = rounds.slice(offset, offset + practiceRoundsPerPage);
-
     const debaterMap = new Map(appData.debaters.map((d) => [d.id, d.name]));
 
-    pagedRounds.forEach((round) => {
+    rounds.forEach((round) => {
         const winnerName = debaterMap.get(round.winner_id) || 'Unknown';
         const loserName = debaterMap.get(round.loser_id) || 'Unknown';
 
@@ -285,7 +265,7 @@ async function renderPracticeRounds(
 
     renderPracticeRoundsPaginationControls(
         page,
-        pagedRounds.length,
+        rounds.length,
         paginationId,
         targetId
     );
@@ -592,6 +572,7 @@ function renderAnnotationsList() {
     sortedAnnotations.forEach((annotation) => {
         const li = document.createElement('li');
         li.innerHTML = `
+            <span>${annotation.name} (${annotation.date})</span>
             ${
                 appData.isViewer
                     ? ''
@@ -633,11 +614,14 @@ function addParticipant() {
         return;
     }
 
-    tournamentParticipants.set(debaterId, {
-        ...debater,
-        division: divisionSelect.value,
-        W_raw: 0 // default raw wins
-    });
+tournamentParticipants.set(debaterId, {
+    ...debater,
+    division: divisionSelect.value,
+    prelim_wins: 0,
+    elim_wins: 0,
+    W_raw: 0,
+});
+
 
     renderTournamentParticipants();
 }
@@ -650,17 +634,24 @@ function renderTournamentParticipants() {
         const li = document.createElement('li');
         li.classList.add('list-item');
 
-        li.innerHTML = `
-        <div class="item-info" style="align-self: center;">
-          ${p.name} (${p.division})
-        </div>
-        <div class="item-controls" style="display: flex; align-items: center;">
-          <input type="number" min="0" value="${p.W_raw}"
-                 onchange="updateRawWins('${p.id}', this.value)"
-                 style="width: 60px; height: 20px; margin-right: 10px; margin-top:10px;vertical-align: middle; padding: 6px 8px; border-radius: 6px; border: 1px solid #444; background: #1e1e1e; color: #eee;" />
-          <button class="danger">Remove</button>
-        </div>
-        `;
+li.innerHTML = `
+  <div class="item-info" style="align-self: center;">
+    ${p.name} (${p.division})
+  </div>
+  <div class="item-controls" style="display: flex; align-items: center; gap: 5px;">
+    <label style="color:#ccc;">Prelim</label>
+    <input type="number" min="0" value="${p.prelim_wins}" 
+           onchange="updateWins('${p.id}', 'prelim', this.value)"
+           style="width: 50px;" />
+    <label style="color:#ccc;">Elim</label>
+    <input type="number" min="0" value="${p.elim_wins}" 
+           onchange="updateWins('${p.id}', 'elim', this.value)"
+           style="width: 50px;" />
+    <span style="margin-left: 10px; color:#9fc;">Raw: ${p.W_raw}</span>
+    <button class="danger">Remove</button>
+  </div>
+`;
+
 
         li.querySelector('button').addEventListener('click', () =>
             removeParticipant(p.id)
@@ -669,13 +660,17 @@ function renderTournamentParticipants() {
     });
 }
 
-function updateRawWins(id, value) {
-    if (tournamentParticipants.has(id)) {
-        const participant = tournamentParticipants.get(id);
-        participant.W_raw = Number(value);
-        tournamentParticipants.set(id, participant);
-    }
+function updateWins(id, type, value) {
+    if (!tournamentParticipants.has(id)) return;
+    const participant = tournamentParticipants.get(id);
+    const numericValue = Math.max(0, Number(value));
+    if (type === 'prelim') participant.prelim_wins = numericValue;
+    else if (type === 'elim') participant.elim_wins = numericValue;
+    participant.W_raw = participant.prelim_wins + 2 * participant.elim_wins;
+    tournamentParticipants.set(id, participant);
+    renderTournamentParticipants(); // re-render to update displayed raw
 }
+
 
 function removeParticipant(id) {
     tournamentParticipants.delete(id);
@@ -775,14 +770,11 @@ function updateViewerAnalyticsDebaterSelect() {
 }
 
 // --- MODAL LOGIC ---
-// --- Card Flip Effect for Debater Profile ---
 function showDebaterProfile(debaterId) {
     const debater = appData.debaters.find((d) => d.id === debaterId);
     if (!debater) return;
     let modal = document.getElementById('debaterProfileModal');
-    let isNew = false;
     if (!modal) {
-        isNew = true;
         modal = document.createElement('div');
         modal.id = 'debaterProfileModal';
         modal.style.position = 'fixed';
@@ -790,109 +782,65 @@ function showDebaterProfile(debaterId) {
         modal.style.left = '0';
         modal.style.width = '100vw';
         modal.style.height = '100vh';
-        modal.style.background = 'rgba(0,0,0,0.7)';
+        modal.style.background = 'rgba(0,0,0,0.5)';
         modal.style.display = 'flex';
         modal.style.alignItems = 'center';
         modal.style.justifyContent = 'center';
         modal.style.zIndex = '99999';
         modal.innerHTML = `
-            <div id="debaterProfileCard" class="flip-card enhanced-profile-card" style="width: 90vw; max-width: 500px; height: 80vh; max-height: 700px; display: flex; align-items: center; justify-content: center; background: none; box-shadow: none; border: none; perspective: 1200px;">
-                <div class="flip-card-inner" style="width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.7s cubic-bezier(.4,2,.6,1);">
-                    <div class="flip-card-front" id="debaterProfileContentFront" style="position: absolute; width: 100%; height: 100%; backface-visibility: hidden; background: #181818; color: #fff; border-radius: 24px; box-shadow: 0 8px 32px #000a, 0 1.5px 0 #c00 inset; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px 32px 32px; transform: rotateY(0deg);">
-                        <button id="closeDebaterProfile" style="position:absolute;top:12px;right:12px;font-size:24px;background:none;border:none;color:#fff;cursor:pointer;z-index:3;">&times;</button>
-                        <h2 id="debaterProfileName" style="margin-bottom: 8px;"></h2>
-                        <div id="debaterProfileElo" style="font-size:1.2em;margin-bottom:16px;"></div>
-                        <div id="debaterProfileStatus" style="margin-bottom:8px;"></div>
-                        <div id="debaterProfileWinrate" style="margin-bottom:16px;"></div>
-                        <canvas id="debaterProfileChart" width="320" height="160" style="margin-bottom: 12px;"></canvas>
-                        <button id="flipToBackBtn" style="margin-top:16px;font-size:18px;background:#c00;color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;">Show Extra Stats</button>
-                    </div>
-                    <div class="flip-card-back" id="debaterProfileContentBack" style="position: absolute; width: 100%; height: 100%; backface-visibility: hidden; background: #232323; color: #fff; border-radius: 24px; box-shadow: 0 8px 32px #000a, 0 1.5px 0 #c00 inset; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px 32px 32px; transform: rotateY(180deg);">
-                        <button id="flipBackBtn" style="position:absolute;top:12px;right:12px;font-size:24px;background:none;border:none;color:#fff;cursor:pointer;z-index:4;">&times;</button>
-                        <h3 style="margin-bottom: 18px;">Extra Stats</h3>
-                        <div id="debaterProfileHighestElo" style="margin-bottom: 12px;"></div>
-                        <div id="debaterProfileTournaments" style="margin-bottom: 12px;"></div>
-                        <div id="debaterProfileGraduation" style="margin-bottom: 12px;"></div>
-                        <div id="debaterProfileConsistency" style="margin-bottom: 12px;"></div>
-                        <button id="flipToFrontBtn" style="margin-top:16px;font-size:18px;background:#c00;color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;">Back to Profile</button>
-                    </div>
-                </div>
+            <div id="debaterProfileContent" style="background:#222;padding:32px 24px 24px 24px;border-radius:16px;min-width:320px;max-width:90vw;max-height:90vh;overflow:auto;box-shadow:0 8px 32px #000a;position:relative;">
+                <button id="closeDebaterProfile" style="position:absolute;top:12px;right:12px;font-size:20px;background:none;border:none;color:#fff;cursor:pointer;">&times;</button>
+                <h2 id="debaterProfileName"></h2>
+                <div id="debaterProfileElo" style="font-size:1.2em;margin-bottom:16px;"></div>
+                <div id="debaterProfileStatus" style="margin-bottom:8px;"></div>
+                <canvas id="debaterProfileChart" width="320" height="160"></canvas>
             </div>
-            <style id="debaterProfileModalStyles">
-                .flip-card-inner {
-                    width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.7s cubic-bezier(.4,2,.6,1);
-                }
-                .flip-card-inner.flipped {
-                    transform: rotateY(180deg);
-                }
-                .flip-card-front, .flip-card-back {
-                    position: absolute; width: 100%; height: 100%; top: 0; left: 0;
-                    backface-visibility: hidden;
-                    border-radius: 24px;
-                }
-                .flip-card-front {
-                    transform: rotateY(0deg);
-                }
-                .flip-card-back {
-                    transform: rotateY(180deg);
-                }
-                @media (max-width: 600px) {
-                    #debaterProfileCard { width: 98vw !important; height: 90vh !important; min-width: 0 !important; }
-                }
-            </style>
         `;
         document.body.appendChild(modal);
-        // Card flip logic: only flip on button click, not anywhere
-        const card = modal.querySelector('.flip-card');
-        const cardInner = card.querySelector('.flip-card-inner');
-        card.querySelector('#flipToBackBtn').addEventListener('click', function(e) {
-            e.stopPropagation();
-            cardInner.classList.add('flipped');
-        });
-        card.querySelector('#flipToFrontBtn').addEventListener('click', function(e) {
-            e.stopPropagation();
-            cardInner.classList.remove('flipped');
-        });
-        card.querySelector('#closeDebaterProfile').addEventListener('click', function(e) {
-            e.stopPropagation();
-            document.body.removeChild(modal);
-        });
-        card.querySelector('#flipBackBtn').addEventListener('click', function(e) {
-            e.stopPropagation();
-            document.body.removeChild(modal);
-        });
         modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                document.body.removeChild(modal);
-            }
+            if (e.target === modal) modal.style.display = 'none';
         });
+        document.getElementById('closeDebaterProfile').onclick = () => {
+            modal.style.display = 'none';
+        };
     } else {
         modal.style.display = 'flex';
-        // Always reset flip state and content when re-opening
-        const cardInner = modal.querySelector('.flip-card-inner');
-        cardInner.classList.remove('flipped');
     }
-    // Only fill content when modal is created or shown, not on every flip
     document.getElementById('debaterProfileName').textContent = debater.name;
-    document.getElementById('debaterProfileStatus').textContent = `Status: ${debater.status}`;
-    document.getElementById('debaterProfileElo').textContent = `Current Elo: ${Math.round(debater.elo)}`;
+    document.getElementById(
+        'debaterProfileStatus'
+    ).textContent = `Status: ${debater.status}`;
+    document.getElementById(
+        'debaterProfileElo'
+    ).textContent = `Current Elo: ${Math.round(debater.elo)}`;
     // Calculate winrate (practice rounds only)
     const practiceRounds = appData.practiceRounds || [];
-    const wins = practiceRounds.filter((r) => r.winner_id === debater.id).length;
-    const played = practiceRounds.filter((r) => r.winner_id === debater.id || r.loser_id === debater.id).length;
+    const wins = practiceRounds.filter(
+        (r) => r.winner_id === debater.id
+    ).length;
+    const played = practiceRounds.filter(
+        (r) => r.winner_id === debater.id || r.loser_id === debater.id
+    ).length;
     let winrateText = '';
     if (played > 0) {
         const winrate = (wins / played) * 100;
-        winrateText = `PR Winrate: ${wins} / ${played} (${winrate.toFixed(1)}%)`;
+        winrateText = `PR Winrate: ${wins} / ${played} (${winrate.toFixed(
+            1
+        )}%)`;
     } else {
         winrateText = 'PR Winrate: N/A';
     }
-    document.getElementById('debaterProfileWinrate').textContent = winrateText;
+    // Insert winrate below Elo
+    document
+        .getElementById('debaterProfileElo')
+        .insertAdjacentHTML(
+            'afterend',
+            `<div id="debaterProfileWinrate" style="margin-bottom:16px;">${winrateText}</div>`
+        );
     // Mini Elo chart
     const ctx = document.getElementById('debaterProfileChart').getContext('2d');
-    if (window.debaterProfileChartInstance) {
+    if (window.debaterProfileChartInstance)
         window.debaterProfileChartInstance.destroy();
-    }
     const history = debater.history || [];
     window.debaterProfileChartInstance = new Chart(ctx, {
         type: 'line',
@@ -902,8 +850,8 @@ function showDebaterProfile(debaterId) {
                 {
                     label: 'Elo',
                     data: history.map((h) => h.elo),
-                    borderColor: '#e53935',
-                    backgroundColor: 'rgba(229,57,53,0.08)',
+                    borderColor: '#4e9cff',
+                    backgroundColor: 'rgba(78,156,255,0.1)',
                     fill: true,
                     tension: 0.2,
                     borderWidth: 2,
@@ -919,89 +867,4 @@ function showDebaterProfile(debaterId) {
             },
         },
     });
-    // Calculate extra stats for back of card
-    // Highest Elo
-    let highestElo = 0;
-    if (debater.history && debater.history.length > 0) {
-        highestElo = Math.max(...debater.history.map(h => h.elo));
-    } else {
-        highestElo = Math.round(debater.elo);
-    }
-    // Tournaments entered
-    let tournamentsEntered = 0;
-    if (appData.tournaments && appData.tournaments.length > 0) {
-        tournamentsEntered = appData.tournaments.filter(t => {
-            if (!t.tournament_participants) return false;
-            return t.tournament_participants.some(p => p.debater_id === debater.id);
-        }).length;
-    }
-    // Graduation date
-    let gradDate = debater.graduation_date || 'N/A';
-    // Consistency (Elo standard deviation)
-    let consistency = 'N/A';
-    if (debater.history && debater.history.length > 1) {
-        const elos = debater.history.map(h => h.elo);
-        const mean = elos.reduce((a, b) => a + b, 0) / elos.length;
-        const variance = elos.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / elos.length;
-        consistency = Math.sqrt(variance).toFixed(1);
-    }
-    // Fill back (add debug log)
-    console.log('Filling back:', {
-        highestElo,
-        tournamentsEntered,
-        gradDate: debater.graduation_date,
-        consistency
-    });
-    const backHighestElo = document.getElementById('debaterProfileHighestElo');
-    const backTournaments = document.getElementById('debaterProfileTournaments');
-    const backGraduation = document.getElementById('debaterProfileGraduation');
-    const backConsistency = document.getElementById('debaterProfileConsistency');
-    if (backHighestElo) { backHighestElo.textContent = `Highest Elo: ${highestElo}`; }
-    if (backTournaments) { backTournaments.textContent = `Tournaments Entered: ${tournamentsEntered}`; }
-    if (backGraduation) { backGraduation.textContent = `Graduation Date: ${gradDate}`; }
-    if (backConsistency) { backConsistency.textContent = `Consistency Score (Elo SD): ${consistency}`; }
-}
-
-function addPracticeRoundsDebaterFilter(isViewer = false) {
-    const targetId = isViewer
-        ? 'viewerPracticeRoundsList'
-        : 'practiceRoundsList';
-    const filterId = isViewer
-        ? 'viewerPracticeRoundsDebaterFilter'
-        : 'practiceRoundsDebaterFilter';
-    let filter = document.getElementById(filterId);
-    if (!filter) {
-        filter = document.createElement('select');
-        filter.id = filterId;
-        filter.style =
-            'margin-bottom: 10px; width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1e1e1e; color: #eee;';
-        const targetList = document.getElementById(targetId);
-        if (targetList && targetList.parentNode) {
-            targetList.parentNode.insertBefore(filter, targetList);
-        }
-    }
-    filter.innerHTML = '<option value="">-- All Debaters --</option>';
-    appData.debaters.forEach((d) => {
-        const option = document.createElement('option');
-        option.value = d.id;
-        option.textContent = d.name;
-        filter.appendChild(option);
-    });
-    filter.onchange = () => {
-        if (isViewer) {
-            renderPracticeRounds(
-                practiceRoundsPage,
-                'viewerPracticeRoundsList',
-                'viewerPracticeRoundsPagination',
-                true
-            );
-        } else {
-            renderPracticeRounds(
-                practiceRoundsPage,
-                'practiceRoundsList',
-                'practiceRoundsPagination',
-                false
-            );
-        }
-    };
 }

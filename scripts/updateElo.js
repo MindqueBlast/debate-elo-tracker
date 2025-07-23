@@ -482,6 +482,8 @@ async function deleteTournament(tournamentId) {
             );
             return;
         }
+        // Remove chart point for this participant
+        removeChartPoint(p.debater_id, p.date);
     }
 
     // 2. Delete tournament participants
@@ -512,7 +514,6 @@ async function deleteTournament(tournamentId) {
         );
         return;
     }
-    removeChartPoint(p.debater_id, p.date);
 
     showToast('Tournament deleted and ELO changes reverted.', 'success');
     await loadData();
