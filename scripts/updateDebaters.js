@@ -66,8 +66,9 @@ async function toggleGraduate(id) {
     const debater = appData.debaters.find((d) => d.id === id);
     if (debater) {
         const newStatus = debater.status === 'active' ? 'graduated' : 'active';
+        // Set graduation_date to current year as string if graduating, else null
         const newGraduationDate =
-            newStatus === 'graduated' ? getLocalDateString() : null;
+            newStatus === 'graduated' ? new Date().getFullYear().toString() : null;
 
         try {
             const { error } = await supabaseClient
