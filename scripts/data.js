@@ -54,7 +54,7 @@ function renderChart() {
                 },
             },
         },
-        onClick: (event, elements) => {
+        onClick: async (event, elements) => {
             if (!elements.length) return;
             const element = elements[0];
             const dataset = eloChart.data.datasets[element.datasetIndex];
@@ -66,6 +66,9 @@ function renderChart() {
 
             if (confirm(`Delete Elo point for ${debaterName} on ${date}?`)) {
                 dataset.data.splice(element.index, 1);
+                if (debaterId) {
+                    await deletePointFromSupabase(debaterId, date);
+                }
                 eloChart.update();
             }
         },
@@ -101,7 +104,9 @@ function renderChart() {
                         if (context.dataset.label === 'Important Events') {
                             return context.raw.label;
                         }
-                        return `${context.dataset.label}: ${context.parsed.y}`;
+                        return `${context.dataset.label}: ${Math.round(
+                            context.parsed.y
+                        )}`;
                     },
                 },
             },
@@ -141,6 +146,7 @@ function renderChart() {
             }, 70%, 50%)`;
             return {
                 label: debater.name,
+                id: debater.id,
                 data: historyData.map((h) => ({ x: h.date, y: h.elo })),
                 borderColor: color,
                 backgroundColor: `${color}1A`,
@@ -290,7 +296,9 @@ function renderViewerChart() {
                     label: function (context) {
                         if (context.dataset.label === 'Important Events')
                             return context.raw.label;
-                        return `${context.dataset.label}: ${context.parsed.y}`;
+                        return `${context.dataset.label}: ${Math.round(
+                            context.parsed.y
+                        )}`;
                     },
                 },
             },

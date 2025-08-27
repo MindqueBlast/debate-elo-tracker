@@ -148,6 +148,52 @@ document.addEventListener('fullscreenchange', () => {
     }
 });
 
+async function deletePointFromSupabase(debaterId, date) {
+    if (!debaterId || !date) return;
+
+    try {
+        // 1️⃣ Get the current history
+        const { data: debater, error: fetchError } = await supabaseClient
+            .from('debaters')
+            .select('history')
+            .eq('id', debaterId)
+            .single();
+
+        if (fetchError) {
+            showToast(
+                `Failed to fetch debater history: ${fetchError.message}`,
+                'error'
+            );
+            return;
+        }
+
+        // 2️⃣ Remove the point with the matching date
+        const newHistory = (debater.history || []).filter(
+            (pt) => pt.date !== date
+        );
+
+        // 3️⃣ Update the debater's history in Supabase
+        const { error: updateError } = await supabaseClient
+            .from('debaters')
+            .update({ history: newHistory })
+            .eq('id', debaterId);
+
+        if (updateError) {
+            showToast(
+                `Failed to update debater history: ${updateError.message}`,
+                'error'
+            );
+        } else {
+            showToast(
+                `Deleted Elo point for debater ${debaterId} on ${date}`,
+                'success'
+            );
+        }
+    } catch (err) {
+        showToast(`⚠️ Unexpected error: ${err.message}`, 'warning');
+    }
+}
+
 // --- DATE HELPER ---
 function getLocalDateString() {
     const today = new Date();
