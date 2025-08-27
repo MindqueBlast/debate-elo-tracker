@@ -210,15 +210,11 @@ function renderViewerChart() {
     const showAnnotations =
         document.getElementById('viewerShowAnnotations')?.checked ?? false;
     const ctx = document.getElementById('viewerEloChart').getContext('2d');
-    if (viewerEloChart) {
-        viewerEloChart.destroy();
-    }
+
+    if (viewerEloChart) viewerEloChart.destroy();
 
     const chartOptions = {
-        animation: {
-            duration: 800,
-            easing: 'easeInOutQuart',
-        },
+        animation: { duration: 800, easing: 'easeInOutQuart' },
         transitions: {
             show: {
                 animations: {
@@ -229,11 +225,6 @@ function renderViewerChart() {
                     },
                     y: {
                         type: 'number',
-                        duration: 800,
-                        easing: 'easeInOutQuart',
-                    },
-                    borderColor: { duration: 800, easing: 'easeInOutQuart' },
-                    backgroundColor: {
                         duration: 800,
                         easing: 'easeInOutQuart',
                     },
@@ -251,11 +242,6 @@ function renderViewerChart() {
                         duration: 800,
                         easing: 'easeInOutQuart',
                     },
-                    borderColor: { duration: 800, easing: 'easeInOutQuart' },
-                    backgroundColor: {
-                        duration: 800,
-                        easing: 'easeInOutQuart',
-                    },
                 },
             },
             active: {
@@ -270,11 +256,6 @@ function renderViewerChart() {
                         duration: 800,
                         easing: 'easeInOutQuart',
                     },
-                    borderColor: { duration: 800, easing: 'easeInOutQuart' },
-                    backgroundColor: {
-                        duration: 800,
-                        easing: 'easeInOutQuart',
-                    },
                 },
             },
         },
@@ -284,9 +265,7 @@ function renderViewerChart() {
                 time: { unit: 'day', tooltipFormat: 'MMM d, yyyy' },
                 title: { display: true, text: 'Date' },
             },
-            y: {
-                title: { display: true, text: 'Elo Rating' },
-            },
+            y: { title: { display: true, text: 'Elo Rating' } },
         },
         plugins: {
             tooltip: {
@@ -301,11 +280,17 @@ function renderViewerChart() {
                 cornerRadius: 6,
                 displayColors: true,
                 callbacks: {
+                    title: function (context) {
+                        if (!context.length) return '';
+                        const xValue = context[0].parsed.x;
+                        return xValue
+                            ? new Date(xValue).toLocaleDateString()
+                            : '';
+                    },
                     label: function (context) {
-                        if (context.dataset.label === 'Important Events') {
+                        if (context.dataset.label === 'Important Events')
                             return context.raw.label;
-                        }
-                        return `${context.dataset.label}: ${context.formattedValue}`;
+                        return `${context.dataset.label}: ${context.parsed.y}`;
                     },
                 },
             },
@@ -320,14 +305,19 @@ function renderViewerChart() {
         pointBackgroundColor: '#c0392b',
         pointBorderColor: '#a93226',
         showLine: false,
+        hoverRadius: 0,
+        pointHitRadius: 5,
     };
+
+    let datasets = [];
 
     if (selectedDebaterId === 'ALL') {
         chartOptions.scales.y.min = 0;
         const debatersToGraph = appData.debaters.filter(
             (d) => d.status === 'active'
         );
-        let datasets = debatersToGraph.map((debater, index) => {
+
+        datasets = debatersToGraph.map((debater, index) => {
             let historyData = debater.history || [];
             if (debater.status === 'graduated' && debater.graduation_date) {
                 historyData = historyData.filter(
@@ -347,6 +337,7 @@ function renderViewerChart() {
                 borderWidth: 1.5,
             };
         });
+
         if (showAnnotations) {
             const annotationsData = (appData.annotations || []).map((a) => ({
                 x: a.date,
@@ -355,11 +346,6 @@ function renderViewerChart() {
             }));
             datasets.push({ ...annotationPointStyle, data: annotationsData });
         }
-        viewerEloChart = new Chart(ctx, {
-            type: 'line',
-            data: { datasets: datasets },
-            options: chartOptions,
-        });
     } else {
         chartOptions.scales.y.min = undefined;
         const debater = appData.debaters.find(
@@ -367,24 +353,25 @@ function renderViewerChart() {
         );
         if (!debater || !debater.history || debater.history.length === 0)
             return;
+
         let historyData = debater.history;
         if (debater.status === 'graduated' && debater.graduation_date) {
             historyData = historyData.filter(
                 (h) => h.date <= debater.graduation_date
             );
         }
-        const datasets = [
-            {
-                label: `${debater.name}'s Elo`,
-                data: historyData.map((h) => ({ x: h.date, y: h.elo })),
-                borderColor: '#3498db',
-                backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                fill: true,
-                tension: 0.1,
-                borderWidth: 1.5,
-            },
-        ];
-        if (showAnnotations && historyData.length > 0) {
+
+        datasets.push({
+            label: `${debater.name}'s Elo`,
+            data: historyData.map((h) => ({ x: h.date, y: h.elo })),
+            borderColor: '#3498db',
+            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+            fill: true,
+            tension: 0.1,
+            borderWidth: 1.5,
+        });
+
+        if (showAnnotations) {
             const minElo = Math.min(...historyData.map((h) => h.elo));
             const annotationsData = (appData.annotations || []).map((a) => ({
                 x: a.date,
@@ -393,12 +380,13 @@ function renderViewerChart() {
             }));
             datasets.push({ ...annotationPointStyle, data: annotationsData });
         }
-        viewerEloChart = new Chart(ctx, {
-            type: 'line',
-            data: { datasets: datasets },
-            options: chartOptions,
-        });
     }
+
+    viewerEloChart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: chartOptions,
+    });
 }
 
 function viewerToggleFullscreen() {
