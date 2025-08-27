@@ -14,16 +14,139 @@ let appData = {
 let tournamentParticipants = new Map();
 let eloChart = null;
 
-function toggleFullscreen() {
-    const container = document.getElementById('chartContainer');
-    if (!document.fullscreenElement) {
-        container.requestFullscreen().catch((err) => {
-            alert(`Error attempting fullscreen: ${err.message}`);
-        });
-    } else {
-        document.exitFullscreen();
+// Put this near the top of the file (or before any fullscreen use)
+function _savePreFullscreenState(container, canvas) {
+    if (container.dataset._preFs) return; // already saved
+    const rect = container.getBoundingClientRect();
+    const saved = {
+        container: {
+            width: container.style.width || null,
+            height: container.style.height || null,
+            display: container.style.display || null,
+            alignItems: container.style.alignItems || null,
+            justifyContent: container.style.justifyContent || null,
+            backgroundColor: container.style.backgroundColor || null,
+            computedWidth: `${Math.round(rect.width)}px`,
+            computedHeight: `${Math.round(rect.height)}px`,
+        },
+        canvas: {
+            widthStyle: canvas.style.width || null,
+            heightStyle: canvas.style.height || null,
+            widthAttr: canvas.getAttribute('width') || null,
+            heightAttr: canvas.getAttribute('height') || null,
+        },
+    };
+    container.dataset._preFs = JSON.stringify(saved);
+}
+
+function _restorePreFullscreenState(container, canvas) {
+    if (!container.dataset._preFs) return;
+    try {
+        const saved = JSON.parse(container.dataset._preFs);
+
+        // Restore container inline styles (fall back to computed pixel size if necessary)
+        container.style.width =
+            saved.container.width ?? saved.container.computedWidth ?? '';
+        container.style.height =
+            saved.container.height ?? saved.container.computedHeight ?? '';
+        container.style.display = saved.container.display ?? '';
+        container.style.alignItems = saved.container.alignItems ?? '';
+        container.style.justifyContent = saved.container.justifyContent ?? '';
+        container.style.backgroundColor = saved.container.backgroundColor ?? '';
+
+        // Restore canvas inline styles / attributes
+        canvas.style.width = saved.canvas.widthStyle ?? '';
+        canvas.style.height = saved.canvas.heightStyle ?? '';
+        if (saved.canvas.widthAttr)
+            canvas.setAttribute('width', saved.canvas.widthAttr);
+        else canvas.removeAttribute('width');
+        if (saved.canvas.heightAttr)
+            canvas.setAttribute('height', saved.canvas.heightAttr);
+        else canvas.removeAttribute('height');
+
+        // Resize Chart immediately
+        setTimeout(() => {
+            if (typeof eloChart !== 'undefined' && eloChart) {
+                try {
+                    eloChart.resize();
+                } catch (e) {
+                    /* ignore */
+                }
+            }
+            // Clear pixel-locked inline sizes after the resize so layout returns to responsive behavior.
+            // We do this only if the original inline style was null (i.e., we used computedWidth as fallback).
+            if (!saved.container.width)
+                container.style.width = saved.container.width ?? '';
+            if (!saved.container.height)
+                container.style.height = saved.container.height ?? '';
+        }, 60);
+    } catch (err) {
+        console.error('Failed to restore fullscreen state:', err);
+    } finally {
+        delete container.dataset._preFs;
     }
 }
+
+// Replace your toggleFullscreen with this version:
+function toggleFullscreen() {
+    const container = document.getElementById('chartContainer');
+    const canvas = document.getElementById('eloChart');
+    if (!container || !canvas) return;
+
+    if (!document.fullscreenElement) {
+        // Save previous state (inline styles + computed size) so we can restore later
+        _savePreFullscreenState(container, canvas);
+
+        // Request fullscreen then apply styles
+        container
+            .requestFullscreen()
+            .then(() => {
+                container.style.width = '100vw';
+                container.style.height = '100vh';
+                container.style.display = 'flex';
+                container.style.alignItems = 'center';
+                container.style.justifyContent = 'center';
+                container.style.backgroundColor = '#1e1e1e';
+
+                // Ensure canvas fills the container visually
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
+
+                // Let Chart.js re-layout
+                setTimeout(() => {
+                    if (typeof eloChart !== 'undefined' && eloChart) {
+                        try {
+                            eloChart.resize();
+                        } catch (e) {
+                            /* ignore */
+                        }
+                    }
+                }, 100);
+            })
+            .catch((err) => {
+                alert(`Error attempting fullscreen: ${err.message}`);
+            });
+    } else {
+        // exit — just call exitFullscreen; actual restoration happens on fullscreenchange
+        document.exitFullscreen().catch((err) => {
+            console.warn('exitFullscreen failed:', err);
+            // attempt manual restore if exitFullscreen fails
+            _restorePreFullscreenState(container, canvas);
+        });
+    }
+}
+
+// Make sure we also restore if the user exits fullscreen by other means (Esc / X)
+document.addEventListener('fullscreenchange', () => {
+    const container = document.getElementById('chartContainer');
+    const canvas = document.getElementById('eloChart');
+    if (!container || !canvas) return;
+
+    // When fullscreen is gone, restore
+    if (!document.fullscreenElement) {
+        _restorePreFullscreenState(container, canvas);
+    }
+});
 
 // --- DATE HELPER ---
 function getLocalDateString() {
