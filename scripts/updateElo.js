@@ -20,9 +20,9 @@ async function recordPracticeRound() {
     const elo_a = a.elo;
     const elo_b = b.elo;
     const E = 1 / (1 + Math.pow(10, (elo_b - elo_a) / 400));
-    const B_a = 15 * (1 - E);
-    const B_b = 15 * E;
-    const C_a = 100 * (1 - E);
+    const B_a = 5 * (1 - E);
+    const B_b = 5 * E;
+    const C_a = 30 * (1 - E);
     const C_b = -C_a;
     const new_elo_a = elo_a + C_a + B_a;
     const new_elo_b = elo_b + C_b + B_b;
