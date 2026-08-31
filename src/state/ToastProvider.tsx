@@ -1,4 +1,11 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import {
+    DURATIONS,
+    toastVariants,
+    useReducedMotion,
+    motionTransition,
+} from '../lib/motion';
 
 type ToastKind = 'success' | 'error' | 'warning' | 'info';
 
@@ -17,6 +24,8 @@ let nextId = 1;
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const reduced = useReducedMotion();
+    const transition = motionTransition(reduced, DURATIONS.fast);
 
     const push = useCallback(
         (message: string, kind: ToastKind = 'info', duration = 3200) => {
@@ -35,11 +44,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         <ToastContext.Provider value={value}>
             {children}
             <div className="toast-stack" role="status" aria-live="polite">
-                {toasts.map((t) => (
-                    <div key={t.id} className={`toast toast-${t.kind}`}>
-                        {t.message}
-                    </div>
-                ))}
+                <AnimatePresence>
+                    {toasts.map((t) => (
+                        <motion.div
+                            key={t.id}
+                            className={`toast toast-${t.kind}`}
+                            initial={toastVariants.initial}
+                            animate={toastVariants.animate}
+                            exit={toastVariants.exit}
+                            transition={transition}
+                            layout
+                        >
+                            {t.message}
+                        </motion.div>
+                    ))}
+                </AnimatePresence>
             </div>
         </ToastContext.Provider>
     );

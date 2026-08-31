@@ -3,6 +3,11 @@ import { averageElo, buildEloSeries, rankDebaters } from '../domain';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Card, EmptyState, PageHeader, StatCard } from '../components/Card';
 import { EloChart } from '../components/EloChart';
+import {
+    EmptyMatches,
+    EloCurveMotif,
+    RankBadge,
+} from '../components/illustrations';
 import { useAppData } from '../state/AppDataProvider';
 
 export function DashboardPage() {
@@ -30,20 +35,27 @@ export function DashboardPage() {
 
     return (
         <div>
-            <PageHeader kicker="Overview" title="Dashboard" />
+            <PageHeader
+                kicker="Overview"
+                title="Dashboard"
+                illustration={<RankBadge size={56} rank={1} tone="gold" />}
+            />
             {loading && <p className="page-kicker">Refreshing…</p>}
             <div className="grid grid-4" style={{ marginBottom: 20 }}>
                 <StatCard
                     label="Active roster"
                     value={<AnimatedNumber value={active.length} />}
+                    accent={<EloCurveMotif size={36} tone="muted" />}
                 />
                 <StatCard
                     label="Average Elo"
                     value={<AnimatedNumber value={Math.round(avg)} />}
+                    accent={<RankBadge size={36} rank={1} tone="accent" />}
                 />
                 <StatCard
                     label="Practice rounds"
                     value={<AnimatedNumber value={practiceRounds.length} />}
+                    accent={<EmptyMatches size={36} />}
                 />
                 <StatCard
                     label="Tournaments"
@@ -57,6 +69,7 @@ export function DashboardPage() {
                         <EmptyState
                             title="No players yet"
                             body="Add debaters to start the board."
+                            illustration={<EmptyMatches size={80} />}
                         />
                     ) : (
                         ranked.slice(0, 5).map((d) => (
@@ -65,6 +78,19 @@ export function DashboardPage() {
                                 to={`/app/players/${d.id}`}
                                 className={`list-row ${d.rank <= 3 ? `rank-${d.rank}` : ''}`}
                             >
+                                {d.rank <= 3 && (
+                                    <RankBadge
+                                        size={28}
+                                        rank={d.rank}
+                                        tone={
+                                            d.rank === 1
+                                                ? 'gold'
+                                                : d.rank === 2
+                                                  ? 'silver'
+                                                  : 'bronze'
+                                        }
+                                    />
+                                )}
                                 <span className="num">#{d.rank}</span>
                                 <strong>{d.name}</strong>
                                 <span className="elo hide-sm">
@@ -89,6 +115,7 @@ export function DashboardPage() {
                         <EmptyState
                             title="No graph yet"
                             body="Rankings will populate a trend once players exist."
+                            illustration={<EloCurveMotif size={80} tone="muted" />}
                         />
                     )}
                 </Card>
@@ -98,6 +125,7 @@ export function DashboardPage() {
                         <EmptyState
                             title="No matches"
                             body="Record a practice round to see it here."
+                            illustration={<EmptyMatches size={80} />}
                         />
                     ) : (
                         recentRounds.map((r) => (

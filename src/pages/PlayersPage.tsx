@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AnimatePresence } from 'motion/react';
 import { parseEloInput, rankDebaters } from '../domain';
 import {
     addDebater,
@@ -12,6 +13,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { Card, EmptyState, PageHeader } from '../components/Card';
 import { Modal } from '../components/Modal';
+import { EmptyRoster } from '../components/illustrations';
 import { useAppData } from '../state/AppDataProvider';
 import { useToast } from '../state/ToastProvider';
 
@@ -53,7 +55,11 @@ export function PlayersPage() {
 
     return (
         <div>
-            <PageHeader kicker="Roster" title="Players" />
+            <PageHeader
+                kicker="Roster"
+                title="Players"
+                illustration={<EmptyRoster size={72} tone="accent" />}
+            />
             {isAdmin && (
                 <Card style={{ marginBottom: 20 }}>
                     <form onSubmit={(e) => void onAdd(e)} className="grid grid-3">
@@ -99,7 +105,11 @@ export function PlayersPage() {
             </div>
             <Card>
                 {ranked.length === 0 ? (
-                    <EmptyState title="No players" body="Add a debater to the roster." />
+                    <EmptyState
+                        title="No players"
+                        body="Add a debater to the roster."
+                        illustration={<EmptyRoster size={80} />}
+                    />
                 ) : (
                     ranked.map((d) => (
                         <div key={d.id} className="player-row">
@@ -157,8 +167,13 @@ export function PlayersPage() {
                     ))
                 )}
             </Card>
-            {eloTarget && (
-                <Modal title="Set Elo" onClose={() => setEloTarget(null)}>
+            <AnimatePresence>
+                {eloTarget && (
+                    <Modal
+                        key="set-elo"
+                        title="Set Elo"
+                        onClose={() => setEloTarget(null)}
+                    >
                     <form
                         onSubmit={async (e) => {
                             e.preventDefault();
@@ -184,8 +199,9 @@ export function PlayersPage() {
                         </div>
                         <Button type="submit">Save</Button>
                     </form>
-                </Modal>
-            )}
+                    </Modal>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

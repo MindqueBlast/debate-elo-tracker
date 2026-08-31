@@ -16,6 +16,11 @@ import {
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { Card, EmptyState, PageHeader } from '../components/Card';
+import {
+    DebatePodium,
+    EmptyMatches,
+    TournamentTrophy,
+} from '../components/illustrations';
 import { useAppData } from '../state/AppDataProvider';
 import { useToast } from '../state/ToastProvider';
 
@@ -108,11 +113,16 @@ export function MatchesPage() {
 
     return (
         <div>
-            <PageHeader kicker="Results" title="Matches" />
+            <PageHeader
+                kicker="Results"
+                title="Matches"
+                illustration={<DebatePodium size={72} tone="accent" />}
+            />
             {isAdmin && (
                 <div className="grid grid-2" style={{ marginBottom: 20 }}>
                     <Card>
-                        <h2 style={{ marginBottom: 12, fontSize: 18 }}>
+                        <h2 className="section-heading">
+                            <DebatePodium size={32} tone="accent" />
                             Record practice round
                         </h2>
                         <form onSubmit={(e) => void submitRound(e)}>
@@ -148,7 +158,8 @@ export function MatchesPage() {
                         </form>
                     </Card>
                     <Card>
-                        <h2 style={{ marginBottom: 12, fontSize: 18 }}>
+                        <h2 className="section-heading">
+                            <TournamentTrophy size={32} tone="gold" />
                             Record tournament
                         </h2>
                         <div className="field">
@@ -395,6 +406,7 @@ export function MatchesPage() {
                         <EmptyState
                             title="No practice rounds"
                             body="Recorded rounds will list here."
+                            illustration={<EmptyMatches size={80} />}
                         />
                     ) : (
                         roundSlice.map((r) => (
@@ -486,6 +498,7 @@ export function MatchesPage() {
                         <EmptyState
                             title="No tournaments"
                             body="Tournament results will appear here."
+                            illustration={<TournamentTrophy size={64} tone="gold" />}
                         />
                     ) : (
                         filteredTournaments.map((t) => (

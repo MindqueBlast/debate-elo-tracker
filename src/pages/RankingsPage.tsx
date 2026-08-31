@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { rankDebaters } from '../domain';
 import { Card, EmptyState, PageHeader } from '../components/Card';
+import { EmptyRoster, ScalesMotif } from '../components/illustrations';
 import { useAppData } from '../state/AppDataProvider';
 
 export function RankingsPage() {
@@ -18,6 +19,7 @@ export function RankingsPage() {
             <PageHeader
                 kicker="Board"
                 title="Rankings"
+                illustration={<ScalesMotif size={72} tone="accent" />}
                 actions={
                     <label className="row" style={{ alignItems: 'center' }}>
                         <input
@@ -45,6 +47,7 @@ export function RankingsPage() {
                                 ? 'Try a different name.'
                                 : 'The leaderboard fills in as the roster grows.'
                         }
+                        illustration={<EmptyRoster size={100} />}
                     />
                 ) : (
                     <>

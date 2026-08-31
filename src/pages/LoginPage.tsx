@@ -3,6 +3,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Logo } from '../components/Logo';
+import { AppBackground } from '../components/AppBackground';
+import { ScalesMotif } from '../components/illustrations';
 
 export function LoginPage() {
     const { role, loading, signIn, error, enterDevMode } = useAuth();
@@ -10,9 +12,12 @@ export function LoginPage() {
     if (!loading && role) return <Navigate to="/app" replace />;
 
     return (
-        <div>
-            <div className="app-bg" aria-hidden="true" />
+        <div className="login-page">
+            <AppBackground variant="login" />
             <Card className="login-card">
+                <div className="login-card__illus" aria-hidden="true">
+                    <ScalesMotif size={72} tone="accent" />
+                </div>
                 <div
                     className="brand"
                     style={{ justifyContent: 'center', marginBottom: 12 }}

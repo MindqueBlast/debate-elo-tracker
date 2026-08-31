@@ -11,6 +11,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { Card, EmptyState, PageHeader } from '../components/Card';
 import { EloChart } from '../components/EloChart';
+import { ScalesMotif } from '../components/illustrations';
 import { useAppData } from '../state/AppDataProvider';
 import { useToast } from '../state/ToastProvider';
 import type { ChartSeries } from '../domain';
@@ -60,7 +61,11 @@ export function AnalyticsPage() {
 
     return (
         <div>
-            <PageHeader kicker="Charts" title="Analytics" />
+            <PageHeader
+                kicker="Charts"
+                title="Analytics"
+                illustration={<ScalesMotif size={72} tone="accent" />}
+            />
             <div className="grid grid-2">
                 <Card>
                     <div className="chart-toolbar">
@@ -141,6 +146,7 @@ export function AnalyticsPage() {
                             yMin={result.yMin}
                             yMax={result.yMax}
                             isEmpty={result.isEmpty}
+                            framed
                             onPointClick={
                                 isAdmin
                                     ? async (debaterId, date) => {

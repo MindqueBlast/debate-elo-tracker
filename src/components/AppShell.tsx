@@ -1,9 +1,18 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useState } from 'react';
+import { motion } from 'motion/react';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from './Button';
 import { Logo } from './Logo';
+import { AppBackground } from './AppBackground';
+import { EloCurveMotif } from './illustrations/EloCurveMotif';
 import { useTheme } from '../state/ThemeProvider';
+import {
+    DURATIONS,
+    fadeVariants,
+    useReducedMotion,
+    motionTransition,
+} from '../lib/motion';
 
 const LINKS = [
     { to: '/app', label: 'Dashboard', end: true },
@@ -17,35 +26,41 @@ export function AppShell() {
     const { user, isAdmin, isDev, signOut } = useAuth();
     const { theme, toggle } = useTheme();
     const [open, setOpen] = useState(false);
+    const location = useLocation();
+    const reduced = useReducedMotion();
+    const transition = motionTransition(reduced, DURATIONS.fast);
 
     return (
         <div className="app-shell">
-            <div className="app-bg" aria-hidden="true" />
+            <AppBackground variant="app" />
             <a className="skip-link" href="#main">
                 Skip to content
             </a>
             <header className="topnav">
                 <NavLink to="/app" className="brand">
                     <Logo />
-                    Syosset Elo
+                    <span className="brand-text">Syosset Elo</span>
+                    <EloCurveMotif size={32} tone="muted" className="brand-motif" />
                 </NavLink>
                 <nav
                     className={`nav-links ${open ? 'open' : ''}`}
                     aria-label="Primary"
                 >
-                    {LINKS.map((l) => (
-                        <NavLink
-                            key={l.to}
-                            to={l.to}
-                            end={l.end}
-                            className={({ isActive }) =>
-                                `nav-link ${isActive ? 'active' : ''}`
-                            }
-                            onClick={() => setOpen(false)}
-                        >
-                            {l.label}
-                        </NavLink>
-                    ))}
+                    <div className="nav-links__inner">
+                        {LINKS.map((l) => (
+                            <NavLink
+                                key={l.to}
+                                to={l.to}
+                                end={l.end}
+                                className={({ isActive }) =>
+                                    `nav-link ${isActive ? 'active' : ''}`
+                                }
+                                onClick={() => setOpen(false)}
+                            >
+                                {l.label}
+                            </NavLink>
+                        ))}
+                    </div>
                 </nav>
                 <div className="nav-actions">
                     {isDev && <span className="badge">Test mode</span>}
@@ -72,9 +87,16 @@ export function AppShell() {
                     </Button>
                 </div>
             </header>
-            <main id="main" className="page page-enter">
+            <motion.main
+                id="main"
+                className="page"
+                key={location.pathname}
+                initial={fadeVariants.initial}
+                animate={fadeVariants.animate}
+                transition={transition}
+            >
                 <Outlet />
-            </main>
+            </motion.main>
         </div>
     );
 }

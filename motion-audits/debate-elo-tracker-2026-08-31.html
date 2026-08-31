@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Motion Audit — Debate Elo Tracker V2</title>
+  <style>
+    :root { --bg: #0c0e12; --text: #f4f1ea; --muted: #9aa3b5; --accent: #dc3b3b; --line: rgba(255,255,255,0.1); }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 32px 24px 64px; max-width: 900px; margin-inline: auto; }
+    h1 { font-size: 1.75rem; letter-spacing: -0.03em; }
+    h2 { font-size: 1.2rem; margin-top: 2rem; color: var(--accent); }
+    h3 { font-size: 1rem; margin-top: 1.25rem; }
+    p, li { color: var(--muted); }
+    .meta { font-size: 0.85rem; margin-bottom: 2rem; }
+    .card { border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin: 16px 0; background: rgba(255,255,255,0.03); }
+    .pass { color: #3ecf8e; }
+    .fix { color: #e8b84a; }
+    code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    ul { padding-left: 1.25rem; }
+  </style>
+</head>
+<body>
+  <h1>Motion + Visual Audit</h1>
+  <p class="meta">Debate Elo Tracker V2 · 2026-08-31 · SaaS dashboard + landing</p>
+
+  <p>Weighting: <strong>Emil</strong> (tracker interactions), <strong>Jakub</strong> (landing polish), <strong>Jhey</strong> (landing hero SVG, selective).</p>
+
+  <h2>Emil — Tracker productivity</h2>
+  <div class="card">
+    <h3 class="pass">Passes</h3>
+    <ul>
+      <li>Route transitions opacity-only ~150ms; no slide on high-frequency nav</li>
+      <li>No rank FLIP, list stagger, or table row animation on data refresh</li>
+      <li>Chart.js duration reduced to 200ms (0 when reduced motion)</li>
+      <li>Tracker background static SVG layers — no loops in <code>/app/*</code></li>
+    </ul>
+    <h3 class="fix">Addressed</h3>
+    <ul>
+      <li>Removed misleading one-time <code>page-enter</code> on static main; route-keyed fade instead</li>
+      <li>Wired <code>motion</code> for modals/toasts (was dead dependency)</li>
+    </ul>
+  </div>
+
+  <h2>Jakub — Production polish</h2>
+  <div class="card">
+    <h3 class="pass">Passes</h3>
+    <ul>
+      <li>Modal enter/exit ~180ms with restrained pop (scale 0.98)</li>
+      <li>Toast stack AnimatePresence with subtle translate</li>
+      <li>Nav active underline transition; mobile menu height transition</li>
+      <li>Layered <code>AppBackground</code> replaces flat CSS grid</li>
+      <li>Per-page SVG headers and illustrated empty states across tracker</li>
+    </ul>
+  </div>
+
+  <h2>Jhey — Landing delight</h2>
+  <div class="card">
+    <h3 class="pass">Passes</h3>
+    <ul>
+      <li>Multi-layer hero SVG with stroke-draw animation (one-shot)</li>
+      <li>Six feature cards with distinct SVG icons</li>
+      <li>Custom SVG dashboard preview mock</li>
+    </ul>
+    <h3 class="fix">Addressed</h3>
+    <ul>
+      <li>Hero SMIL gated via <code>useReducedMotion</code> / static paths when reduced</li>
+    </ul>
+  </div>
+
+  <h2>Accessibility</h2>
+  <div class="card">
+    <ul>
+      <li>Global CSS <code>prefers-reduced-motion</code> guard retained</li>
+      <li>Chart.js, landing SMIL, Motion transitions gated in JS</li>
+      <li>Decorative SVG <code>aria-hidden</code>; empty-state art with <code>role="img"</code> where meaningful</li>
+    </ul>
+  </div>
+
+  <h2>Implementation map</h2>
+  <div class="card">
+    <ul>
+      <li><code>src/lib/motion.ts</code> — shared hooks and variants</li>
+      <li><code>src/components/AppBackground.tsx</code> — cinematic / app / login variants</li>
+      <li><code>src/components/illustrations/*</code> — motif library</li>
+      <li><code>src/components/Modal.tsx</code>, <code>ToastProvider.tsx</code>, <code>AppShell.tsx</code></li>
+      <li><code>src/pages/LandingPage.tsx</code> — visual rebuild</li>
+      <li>All tracker pages — headers, empty states, analytics chart frame</li>
+    </ul>
+  </div>
+</body>
+</html>

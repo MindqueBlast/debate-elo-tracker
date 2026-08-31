@@ -13,6 +13,8 @@ import 'chartjs-adapter-date-fns';
 import { useMemo, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 import { formatCalendarDate, parseCalendarDate, type ChartSeries } from '../domain';
+import { EmptyChart } from './illustrations/EmptyChart';
+import { DURATIONS, useReducedMotion } from '../lib/motion';
 
 ChartJS.register(
     TimeScale,
@@ -43,13 +45,16 @@ export function EloChart({
     yMax,
     isEmpty,
     onPointClick,
+    framed = false,
 }: {
     series: ChartSeries[];
     yMin: number | null;
     yMax: number | null;
     isEmpty: boolean;
     onPointClick?: (debaterId: string, date: string) => void;
+    framed?: boolean;
 }) {
+    const reduced = useReducedMotion();
     const clickRef = useRef(onPointClick);
     clickRef.current = onPointClick;
 
@@ -82,12 +87,14 @@ export function EloChart({
         };
     }, [series]);
 
+    const chartDuration = reduced ? 0 : DURATIONS.chart * 1000;
+
     const options = useMemo<ChartOptions<'line'>>(
         () => ({
             responsive: true,
             maintainAspectRatio: false,
             animation: {
-                duration: 400,
+                duration: chartDuration,
                 easing: 'easeOutQuart',
             },
             interaction: { mode: 'nearest', intersect: false },
@@ -156,20 +163,23 @@ export function EloChart({
                 },
             },
         }),
-        [series, yMin, yMax]
+        [series, yMin, yMax, chartDuration]
     );
 
     if (isEmpty) {
         return (
-            <div className="empty" style={{ height: '100%' }}>
+            <div className="empty chart-empty" style={{ height: '100%' }}>
+                <EmptyChart size={120} />
                 <strong>No Elo history yet</strong>
                 <p>Record a practice round or tournament to see progression.</p>
             </div>
         );
     }
 
+    const wrapClass = framed ? 'chart-wrap chart-wrap--framed' : 'chart-wrap';
+
     return (
-        <div className="chart-wrap" role="img" aria-label="Elo history chart">
+        <div className={wrapClass} role="img" aria-label="Elo history chart">
             <Line data={data} options={options} />
         </div>
     );

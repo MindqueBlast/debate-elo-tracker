@@ -1,5 +1,12 @@
 import { useEffect } from 'react';
+import { motion } from 'motion/react';
 import { Button } from './Button';
+import {
+    DURATIONS,
+    popVariants,
+    useReducedMotion,
+    motionTransition,
+} from '../lib/motion';
 
 export function Modal({
     title,
@@ -10,6 +17,9 @@ export function Modal({
     children: React.ReactNode;
     onClose: () => void;
 }) {
+    const reduced = useReducedMotion();
+    const transition = motionTransition(reduced, DURATIONS.base);
+
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -19,29 +29,34 @@ export function Modal({
     }, [onClose]);
 
     return (
-        <div className="modal-backdrop" onClick={onClose} role="presentation">
-            <div
+        <motion.div
+            className="modal-backdrop"
+            onClick={onClose}
+            role="presentation"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={transition}
+        >
+            <motion.div
                 className="modal"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="modal-title"
                 onClick={(e) => e.stopPropagation()}
+                initial={popVariants.initial}
+                animate={popVariants.animate}
+                exit={popVariants.exit}
+                transition={transition}
             >
-                <div
-                    style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: 16,
-                    }}
-                >
+                <div className="modal-header">
                     <h2 id="modal-title">{title}</h2>
                     <Button variant="ghost" size="sm" onClick={onClose}>
                         Close
                     </Button>
                 </div>
                 {children}
-            </div>
-        </div>
+            </motion.div>
+        </motion.div>
     );
 }

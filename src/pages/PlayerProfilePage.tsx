@@ -9,6 +9,11 @@ import {
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Card, EmptyState, PageHeader } from '../components/Card';
 import { EloChart } from '../components/EloChart';
+import {
+    EloCurveMotif,
+    EmptyMatches,
+    RankBadge,
+} from '../components/illustrations';
 import { useAppData } from '../state/AppDataProvider';
 
 export function PlayerProfilePage() {
@@ -40,17 +45,27 @@ export function PlayerProfilePage() {
             <EmptyState
                 title="Player not found"
                 body="This debater is missing or the link is invalid."
+                illustration={<EmptyMatches size={80} />}
             />
         );
     }
 
     const sd = eloStdDev(debater.history);
+    const rankTone =
+        rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'accent';
 
     return (
         <div>
             <PageHeader
                 kicker="Profile"
                 title={debater.name}
+                illustration={
+                    rank && rank <= 3 ? (
+                        <RankBadge size={56} rank={rank} tone={rankTone} />
+                    ) : (
+                        <EloCurveMotif size={64} tone="accent" />
+                    )
+                }
                 actions={
                     <Link to="/app/players" className="btn btn-secondary btn-sm">
                         All players
@@ -58,7 +73,10 @@ export function PlayerProfilePage() {
                 }
             />
             <div className="grid grid-2">
-                <Card>
+                <Card className="profile-hero-card">
+                    <div className="profile-hero-motif" aria-hidden="true">
+                        <EloCurveMotif size={160} tone="muted" />
+                    </div>
                     <div className="page-kicker">Current Elo</div>
                     <div className="profile-elo">
                         <AnimatedNumber value={Math.round(debater.elo)} />
@@ -111,6 +129,7 @@ export function PlayerProfilePage() {
                     <EmptyState
                         title="No practice rounds"
                         body="This debater has not appeared in a recorded practice round."
+                        illustration={<EmptyMatches size={80} />}
                     />
                 ) : (
                     recent.map((r) => {
