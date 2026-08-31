@@ -1,7 +1,6 @@
 import { supabase } from './supabase';
 import {
     appendHistory,
-    averageElo,
     calculatePracticeElo,
     calculateTournamentElo,
     getLocalDateString,
@@ -205,11 +204,9 @@ export async function recordTournament(input: {
         return { ...p, elo: live?.elo ?? p.elo };
     });
 
-    const eAvg = averageElo(input.activeDebaters.map((d) => d.elo));
     const { eTourney, results } = calculateTournamentElo(
         liveParticipants,
-        input.params,
-        eAvg
+        input.params
     );
     const date = input.date || getLocalDateString();
 

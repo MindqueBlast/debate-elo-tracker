@@ -40,6 +40,9 @@ export {
 } from './history';
 
 export {
+    PRACTICE_BONUS_K,
+    PRACTICE_COMPETITIVE_K,
+    TOURNAMENT_FIELD_ELO,
     adjustedWins,
     averageElo,
     calculatePracticeElo,

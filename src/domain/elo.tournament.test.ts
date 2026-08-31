@@ -23,13 +23,12 @@ describe('tournament Elo', () => {
                 {
                     id: 'a',
                     name: 'A',
-                    elo: 1500,
+                    elo: 400,
                     division: 'Novice',
                     W_raw: 12,
                 },
             ],
-            { n: 6, b: 0, k: 45, maxGain: 5, maxRounds: null },
-            1500
+            { n: 6, b: 0, k: 45, maxGain: 5, maxRounds: null }
         );
         expect(results[0].change).toBe(5);
     });
@@ -52,8 +51,7 @@ describe('tournament Elo', () => {
                     W_raw: 0,
                 },
             ],
-            { n: 6, b: 0, k: 45, maxGain: 300, maxRounds: 6 },
-            1600
+            { n: 6, b: 0, k: 45, maxGain: 300, maxRounds: 6 }
         );
         const a = results.find((r) => r.id === 'a')!;
         expect(a.change).toBeGreaterThanOrEqual(0);

@@ -5,6 +5,10 @@ import type {
     TournamentResult,
 } from './types';
 
+export const PRACTICE_COMPETITIVE_K = 20;
+export const PRACTICE_BONUS_K = 5;
+export const TOURNAMENT_FIELD_ELO = 700;
+
 export function expectedScore(winnerElo: number, loserElo: number): number {
     return 1 / (1 + Math.pow(10, (loserElo - winnerElo) / 400));
 }
@@ -14,8 +18,10 @@ export function calculatePracticeElo(
     loserElo: number
 ): PracticeEloResult {
     const E = expectedScore(winnerElo, loserElo);
-    const winnerChange = 115 * (1 - E);
-    const loserChange = -100 * (1 - E) + 15 * E;
+    const winnerChange =
+        (PRACTICE_COMPETITIVE_K + PRACTICE_BONUS_K) * (1 - E);
+    const loserChange =
+        -PRACTICE_COMPETITIVE_K * (1 - E) + PRACTICE_BONUS_K * E;
     return {
         expected: E,
         winnerChange,
@@ -49,8 +55,7 @@ export function adjustedWins(
 
 export function calculateTournamentElo(
     participants: TournamentParticipantInput[],
-    params: TournamentParams,
-    activeAverageElo: number
+    params: TournamentParams
 ): { eTourney: number; results: TournamentResult[] } {
     const { n, b, k, maxGain, maxRounds } = params;
     const t = participants.length;
@@ -64,7 +69,7 @@ export function calculateTournamentElo(
     const eTourney = (s + (3 * n) / 2) / (t + 3);
 
     const results: TournamentResult[] = withAdjusted.map((p) => {
-        const p_prop = Math.pow(p.elo / activeAverageElo, 1.5);
+        const p_prop = Math.pow(p.elo / TOURNAMENT_FIELD_ELO, 1.5);
         let C = k * (p.W_adjusted / p_prop - eTourney) + b;
         if (maxRounds !== null && p.W_raw === maxRounds && C < 0) {
             C = 0;

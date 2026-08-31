@@ -10,27 +10,25 @@ describe('practice Elo', () => {
         expect(expectedScore(1500, 1500)).toBeCloseTo(0.5);
     });
 
-    it('applies the existing win/loss formula for equal ratings', () => {
+    it('applies the live win/loss formula for equal ratings', () => {
         const result = calculatePracticeElo(1500, 1500);
-        expect(result.winnerChange).toBeCloseTo(57.5);
-        expect(result.loserChange).toBeCloseTo(-42.5);
-        expect(result.newWinnerElo).toBeCloseTo(1557.5);
-        expect(result.newLoserElo).toBeCloseTo(1457.5);
+        expect(result.winnerChange).toBeCloseTo(12.5);
+        expect(result.loserChange).toBeCloseTo(-7.5);
+        expect(result.newWinnerElo).toBeCloseTo(1512.5);
+        expect(result.newLoserElo).toBeCloseTo(1492.5);
     });
 
     it('awards a small gain when a much stronger player wins', () => {
         const result = calculatePracticeElo(2000, 1000);
         expect(result.expected).toBeGreaterThan(0.99);
-        expect(result.winnerChange).toBeLessThan(2);
-        // Existing formula credits the loser a 15E bonus, which can net positive
-        // when a heavy favorite wins.
-        expect(result.loserChange).toBeGreaterThan(10);
+        expect(result.winnerChange).toBeLessThan(1);
+        expect(result.loserChange).toBeGreaterThan(4);
     });
 
     it('awards a large gain when a much weaker player wins', () => {
         const result = calculatePracticeElo(1000, 2000);
-        expect(result.winnerChange).toBeGreaterThan(100);
-        expect(result.loserChange).toBeLessThan(-80);
+        expect(result.winnerChange).toBeGreaterThan(20);
+        expect(result.loserChange).toBeLessThan(-15);
     });
 
     it('compounds correctly across repeated equal matches', () => {
@@ -43,7 +41,7 @@ describe('practice Elo', () => {
         }
         expect(a).toBeGreaterThan(1500);
         expect(b).toBeLessThan(1500);
-        expect(a + b).toBeCloseTo(3000 + 3 * 15, 5);
+        expect(a + b).toBeCloseTo(3000 + 3 * 5, 5);
     });
 
     it('rejects missing or identical players', () => {
