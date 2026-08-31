@@ -24,7 +24,7 @@ export function App() {
                         <Routes>
                             <Route path="/" element={<LandingPage />} />
                             <Route path="/login" element={<LoginPage />} />
-                            <Route path="/app" element={<ProtectedApp />}>
+                            <Route path="/app/*" element={<ProtectedApp />}>
                                 <Route index element={<DashboardPage />} />
                                 <Route path="rankings" element={<RankingsPage />} />
                                 <Route path="matches" element={<MatchesPage />} />

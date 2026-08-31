@@ -76,21 +76,8 @@ export function DashboardPage() {
                             <Link
                                 key={d.id}
                                 to={`/app/players/${d.id}`}
-                                className={`list-row ${d.rank <= 3 ? `rank-${d.rank}` : ''}`}
+                                className={`list-row list-row--compact ${d.rank <= 3 ? `rank-${d.rank}` : ''}`}
                             >
-                                {d.rank <= 3 && (
-                                    <RankBadge
-                                        size={28}
-                                        rank={d.rank}
-                                        tone={
-                                            d.rank === 1
-                                                ? 'gold'
-                                                : d.rank === 2
-                                                  ? 'silver'
-                                                  : 'bronze'
-                                        }
-                                    />
-                                )}
                                 <span className="num">#{d.rank}</span>
                                 <strong>{d.name}</strong>
                                 <span className="elo hide-sm">
