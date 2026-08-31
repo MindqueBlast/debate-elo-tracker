@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Button } from './Button';
 import {
     DURATIONS,
+    motionEnterInitial,
     popVariants,
     useReducedMotion,
     motionTransition,
@@ -33,7 +34,7 @@ export function Modal({
             className="modal-backdrop"
             onClick={onClose}
             role="presentation"
-            initial={{ opacity: 0 }}
+            initial={motionEnterInitial(reduced, { opacity: 0 })}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={transition}
@@ -44,7 +45,7 @@ export function Modal({
                 aria-modal="true"
                 aria-labelledby="modal-title"
                 onClick={(e) => e.stopPropagation()}
-                initial={popVariants.initial}
+                initial={motionEnterInitial(reduced, popVariants.initial)}
                 animate={popVariants.animate}
                 exit={popVariants.exit}
                 transition={transition}

@@ -67,7 +67,7 @@ function HeroScene({ animated }: { animated: boolean }) {
                 strokeWidth="3"
                 strokeLinecap="round"
                 strokeDasharray={animated ? 720 : undefined}
-                strokeDashoffset={animated ? 720 : undefined}
+                strokeDashoffset={animated ? 720 : 0}
             >
                 {animated && (
                     <animate
@@ -78,27 +78,8 @@ function HeroScene({ animated }: { animated: boolean }) {
                     />
                 )}
             </path>
-            <circle cx="210" cy="200" r="5" fill="var(--accent)">
-                {animated && (
-                    <animate
-                        attributeName="opacity"
-                        values="0;1"
-                        dur="0.4s"
-                        begin="0.8s"
-                        fill="freeze"
-                    />
-                )}
-            </circle>
-            <g opacity={animated ? 0 : 1}>
-                {animated && (
-                    <animate
-                        attributeName="opacity"
-                        values="0;1"
-                        dur="0.5s"
-                        begin="1.4s"
-                        fill="freeze"
-                    />
-                )}
+            <circle cx="210" cy="200" r="5" fill="var(--accent)" />
+            <g>
                 <rect
                     x="300"
                     y="86"

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 import { AnimatePresence, motion } from 'motion/react';
 import {
     DURATIONS,
+    motionEnterInitial,
     toastVariants,
     useReducedMotion,
     motionTransition,
@@ -49,11 +50,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                         <motion.div
                             key={t.id}
                             className={`toast toast-${t.kind}`}
-                            initial={toastVariants.initial}
+                            initial={motionEnterInitial(reduced, toastVariants.initial)}
                             animate={toastVariants.animate}
                             exit={toastVariants.exit}
                             transition={transition}
-                            layout
                         >
                             {t.message}
                         </motion.div>

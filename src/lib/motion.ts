@@ -43,6 +43,14 @@ export function motionTransition(
         : { duration, ease: EASE };
 }
 
+/** Skip opacity-0 enter states when motion is reduced or transitions are disabled. */
+export function motionEnterInitial<T>(
+    reduced: boolean,
+    initial: T
+): T | false {
+    return reduced ? false : initial;
+}
+
 export const fadeVariants = {
     initial: { opacity: 0 },
     animate: { opacity: 1 },
