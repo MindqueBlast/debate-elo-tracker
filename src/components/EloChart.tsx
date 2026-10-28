@@ -17,12 +17,12 @@ import 'chartjs-adapter-date-fns';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
-    adjacentAnchor,
     formatCalendarDate,
     MAX_ZOOM,
     parseCalendarDate,
+    shiftCenter,
+    ZOOM_LEVEL_NAMES,
     zoomWindow,
-    type ChartPoint,
     type ChartSeries,
     type ZoomLevel,
 } from '../domain';
@@ -55,13 +55,17 @@ const CLICK_DELAY = 250;
 
 interface Zoom {
     level: ZoomLevel;
-    anchor: string;
+    /** The day the view is centred on. */
+    center: string;
 }
 
-const ALL_TIME: Zoom = { level: 0, anchor: '' };
+const ALL_TIME: Zoom = { level: 0, center: '' };
 
 const zoomedOut = (z: Zoom): Zoom =>
-    z.level <= 1 ? ALL_TIME : { level: (z.level - 1) as ZoomLevel, anchor: z.anchor };
+    z.level <= 1 ? ALL_TIME : { level: (z.level - 1) as ZoomLevel, center: z.center };
+
+/** A series' points as timestamps, for working out what's on screen. */
+type Timed = { t: number; y: number }[];
 
 function toChartX(date: string): Date {
     return parseCalendarDate(date) ?? new Date(date);
@@ -75,24 +79,22 @@ function dateOf(ms: number): string {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Where a series' line crosses a date (null when the line doesn't reach it). */
-function valueAt(data: ChartPoint[], date: string): number | null {
-    let before: ChartPoint | null = null;
-    let after: ChartPoint | null = null;
-    for (const p of data) {
-        if (p.x <= date && (!before || p.x > before.x)) before = p;
-        if (p.x > date && (!after || p.x < after.x)) after = p;
+/** Where a series' line crosses a moment (null when the line doesn't reach it). */
+function valueAt(points: Timed, t: number): number | null {
+    let before: Timed[number] | null = null;
+    let after: Timed[number] | null = null;
+    for (const p of points) {
+        if (p.t <= t && (!before || p.t > before.t)) before = p;
+        if (p.t > t && (!after || p.t < after.t)) after = p;
     }
     if (!before) return null;
-    if (!after) return before.x === date ? before.y : null;
-    const t0 = msOf(before.x);
-    const t1 = msOf(after.x);
-    const f = t1 === t0 ? 0 : (msOf(date) - t0) / (t1 - t0);
+    if (!after) return before.t === t ? before.y : null;
+    const f = (t - before.t) / (after.t - before.t);
     return before.y + (after.y - before.y) * f;
 }
 
-/** A rounded Elo range covering everything drawn between two dates. */
-function visibleDomain(series: ChartSeries[], start: string, end: string) {
+/** A rounded Elo range covering everything drawn between two moments. */
+function visibleDomain(lines: Timed[], start: number, end: number) {
     let min = Infinity;
     let max = -Infinity;
     const take = (v: number | null) => {
@@ -100,11 +102,10 @@ function visibleDomain(series: ChartSeries[], start: string, end: string) {
         if (v < min) min = v;
         if (v > max) max = v;
     };
-    for (const s of series) {
-        if (s.id === ANNOTATIONS) continue;
-        for (const p of s.data) if (p.x >= start && p.x < end) take(p.y);
-        take(valueAt(s.data, start));
-        take(valueAt(s.data, end));
+    for (const points of lines) {
+        for (const p of points) if (p.t >= start && p.t <= end) take(p.y);
+        take(valueAt(points, start));
+        take(valueAt(points, end));
     }
     if (!Number.isFinite(min)) return null;
     const pad = Math.max(12, (max - min) * 0.08 || 24);
@@ -179,32 +180,40 @@ export function EloChart({
     };
     useEffect(() => cancelPending, []);
 
-    const win = zoom.level > 0 ? zoomWindow(zoom.level, zoom.anchor) : null;
+    const lines = useMemo(
+        () =>
+            series
+                .filter((s) => s.id !== ANNOTATIONS)
+                .map((s) => s.data.map((p) => ({ t: msOf(p.x), y: p.y }))),
+        [series]
+    );
+    // First and last moments with data (for the step arrows and tick spacing)
+    const extent = useMemo(() => {
+        let min = Infinity;
+        let max = -Infinity;
+        for (const points of lines) {
+            for (const p of points) {
+                if (p.t < min) min = p.t;
+                if (p.t > max) max = p.t;
+            }
+        }
+        return Number.isFinite(min) ? { min, max } : null;
+    }, [lines]);
+
+    const win = zoom.level > 0 ? zoomWindow(zoom.level, zoom.center) : null;
+    const viewStart = win ? msOf(win.center) - win.halfDays * DAY : null;
+    const viewEnd = win ? msOf(win.center) + win.halfDays * DAY : null;
     const domain = useMemo(
-        () => (win ? visibleDomain(series, win.start, win.end) : null),
-        [series, win?.start, win?.end]
+        () => (viewStart !== null && viewEnd !== null ? visibleDomain(lines, viewStart, viewEnd) : null),
+        [lines, viewStart, viewEnd]
     );
     const viewMin = domain ? domain.min : yMin;
     const viewMax = domain ? domain.max : yMax;
 
-    // First and last dates with data (for the step arrows and tick spacing)
-    const extent = useMemo(() => {
-        let min = '';
-        let max = '';
-        for (const s of series) {
-            if (s.id === ANNOTATIONS) continue;
-            for (const p of s.data) {
-                if (!min || p.x < min) min = p.x;
-                if (!max || p.x > max) max = p.x;
-            }
-        }
-        return min && max ? { min, max } : null;
-    }, [series]);
-
     const spanDays = win
-        ? (msOf(win.end) - msOf(win.start)) / DAY
+        ? win.halfDays * 2
         : extent
-          ? (msOf(extent.max) - msOf(extent.min)) / DAY
+          ? (extent.max - extent.min) / DAY
           : 0;
     const axis = timeAxis(spanDays);
 
@@ -267,16 +276,17 @@ export function EloChart({
                 // The second click of a double-click is left to the zoom-out handler
                 const native = event.native as MouseEvent | null;
                 if (native && native.detail > 1) return;
-                const anchor = clickedDate(event, elements, chart);
-                if (!anchor) return;
+                const center = clickedDate(event, elements, chart);
+                if (!center) return;
                 cancelPending();
                 pendingRef.current = window.setTimeout(() => {
                     pendingRef.current = null;
-                    setZoom((z) =>
-                        z.level >= MAX_ZOOM
-                            ? z
-                            : { level: (z.level + 1) as ZoomLevel, anchor }
-                    );
+                    // one step in, centred on the clicked point (at the closest
+                    // zoom it just re-centres)
+                    setZoom((z) => ({
+                        level: Math.min(z.level + 1, MAX_ZOOM) as ZoomLevel,
+                        center,
+                    }));
                 }, CLICK_DELAY);
             },
             plugins: {
@@ -317,8 +327,8 @@ export function EloChart({
             scales: {
                 x: {
                     type: 'time',
-                    min: win ? msOf(win.start) : undefined,
-                    max: win ? msOf(win.end) - 1 : undefined,
+                    min: viewStart ?? undefined,
+                    max: viewEnd ?? undefined,
                     time: {
                         unit: axis.unit,
                         isoWeekday: true,
@@ -339,7 +349,7 @@ export function EloChart({
                 },
             },
         }),
-        [series, viewMin, viewMax, chartDuration, win?.start, win?.end, axis.unit, axis.format]
+        [series, viewMin, viewMax, chartDuration, viewStart, viewEnd, axis.unit, axis.format]
     );
 
     if (isEmpty) {
@@ -353,12 +363,12 @@ export function EloChart({
     }
 
     const wrapClass = framed ? 'chart-wrap chart-wrap--framed' : 'chart-wrap';
-    const canPrev = !!(win && extent && win.start > extent.min);
-    const canNext = !!(win && extent && win.end <= extent.max);
+    const canPrev = !!(extent && viewStart !== null && viewStart > extent.min);
+    const canNext = !!(extent && viewEnd !== null && viewEnd < extent.max);
     const step = (dir: -1 | 1) => {
         if (zoom.level === 0) return;
         cancelPending();
-        setZoom({ level: zoom.level, anchor: adjacentAnchor(zoom.level, zoom.anchor, dir) });
+        setZoom({ level: zoom.level, center: shiftCenter(zoom.level, zoom.center, dir) });
     };
 
     return (
@@ -377,6 +387,9 @@ export function EloChart({
                                 ‹
                             </button>
                             <span className="chart-zoom__label" aria-live="polite">
+                                <span className="chart-zoom__level">
+                                    {ZOOM_LEVEL_NAMES[zoom.level]}
+                                </span>{' '}
                                 {win.label}
                             </span>
                             <button

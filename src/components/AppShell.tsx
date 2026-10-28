@@ -11,7 +11,8 @@ const LINKS = [
     { to: '/app', label: 'Dashboard', end: true },
     { to: '/app/rankings', label: 'Rankings' },
     { to: '/app/matches', label: 'Matches' },
-    { to: '/app/players', label: 'Players' },
+    // only people who can edit see the roster
+    { to: '/app/players', label: 'Players', editorsOnly: true },
     { to: '/app/analytics', label: 'Analytics' },
 ];
 
@@ -38,7 +39,7 @@ export function AppShell() {
                     aria-label="Primary"
                 >
                     <div className="nav-links__inner">
-                        {LINKS.map((l) => (
+                        {LINKS.filter((l) => isAdmin || !l.editorsOnly).map((l) => (
                             <NavLink
                                 key={l.to}
                                 to={l.to}

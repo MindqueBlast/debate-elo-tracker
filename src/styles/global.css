@@ -808,6 +808,12 @@ p {
     padding: 0 4px;
 }
 
+.chart-zoom__level {
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-right: 2px;
+}
+
 .chart-zoom__label--idle {
     color: var(--text-muted);
     font-weight: 500;

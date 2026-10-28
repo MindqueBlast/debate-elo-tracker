@@ -23,12 +23,14 @@ import {
     EmptyMatches,
     RankBadge,
 } from '../components/illustrations';
+import { useAuth } from '../auth/AuthProvider';
 import { useAppData } from '../state/AppDataProvider';
 
 const SHORT: Record<Division, string> = { Varsity: 'V', JV: 'JV', Novice: 'N' };
 
 export function PlayerProfilePage() {
     const { id } = useParams();
+    const { isAdmin } = useAuth();
     const { debaters, teams, practiceRounds, tournaments } = useAppData();
     const byId = useMemo(() => lookup(debaters), [debaters]);
     const debater = id ? byId.get(id) : undefined;
@@ -124,9 +126,15 @@ export function PlayerProfilePage() {
                     )
                 }
                 actions={
-                    <Link to="/app/players" className="btn btn-secondary btn-sm">
-                        All players
-                    </Link>
+                    isAdmin ? (
+                        <Link to="/app/players" className="btn btn-secondary btn-sm">
+                            All players
+                        </Link>
+                    ) : (
+                        <Link to="/app/rankings" className="btn btn-secondary btn-sm">
+                            Rankings
+                        </Link>
+                    )
                 }
             />
             <div className="grid grid-2">

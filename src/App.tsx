@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthProvider';
+import { EditorsOnly } from './auth/EditorsOnly';
 import { ThemeProvider } from './state/ThemeProvider';
 import { ToastProvider } from './state/ToastProvider';
 import { LandingPage } from './pages/LandingPage';
@@ -28,7 +29,14 @@ export function App() {
                                 <Route index element={<DashboardPage />} />
                                 <Route path="rankings" element={<RankingsPage />} />
                                 <Route path="matches" element={<MatchesPage />} />
-                                <Route path="players" element={<PlayersPage />} />
+                                <Route
+                                    path="players"
+                                    element={
+                                        <EditorsOnly>
+                                            <PlayersPage />
+                                        </EditorsOnly>
+                                    }
+                                />
                                 <Route
                                     path="players/:id"
                                     element={<PlayerProfilePage />}

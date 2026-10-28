@@ -96,9 +96,10 @@ export { ALL_TEAMS, buildEloSeries, snapshotFromSeries, teamKey } from './chartS
 export { buildEventIndex, describeDay, type EventIndex } from './describe';
 
 export {
-    adjacentAnchor,
     MAX_ZOOM,
+    shiftCenter,
     ZOOM_LEVEL_NAMES,
+    ZOOM_SPAN_DAYS,
     zoomWindow,
     type ZoomLevel,
     type ZoomWindow,

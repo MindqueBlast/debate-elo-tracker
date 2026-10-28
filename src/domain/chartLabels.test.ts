@@ -3,69 +3,51 @@ import { ALL_TEAMS, buildEloSeries, teamKey } from './chartSeries';
 import { buildEventIndex, describeDay } from './describe';
 import { lookup } from './teams';
 import type { Debater, PracticeRound, Team, Tournament } from './types';
-import { adjacentAnchor, zoomWindow } from './zoom';
+import { shiftCenter, zoomWindow } from './zoom';
 
 describe('zoom windows', () => {
-    it('zooms a February date into its season, half, quarter, month and week', () => {
-        const anchor = '2024-02-24';
-        expect(zoomWindow(0, anchor)).toBeNull();
-        expect(zoomWindow(1, anchor)).toEqual({
-            start: '2023-08-01',
-            end: '2024-08-01',
-            label: '2023–24 season',
+    it('centres each step on the clicked day', () => {
+        const day = '2024-02-24';
+        expect(zoomWindow(0, day)).toBeNull();
+        expect(zoomWindow(1, day)).toEqual({
+            center: day,
+            halfDays: 182.5,
+            first: '2023-08-26',
+            last: '2024-08-24',
+            label: 'Aug 26, 2023 – Aug 24, 2024',
         });
-        expect(zoomWindow(2, anchor)).toEqual({
-            start: '2024-02-01',
-            end: '2024-08-01',
-            label: 'Feb – Jul 2024',
+        expect(zoomWindow(2, day)).toMatchObject({
+            first: '2023-11-25',
+            last: '2024-05-25',
+            label: 'Nov 25, 2023 – May 25, 2024',
         });
-        expect(zoomWindow(3, anchor)).toEqual({
-            start: '2024-02-01',
-            end: '2024-05-01',
-            label: 'Feb – Apr 2024',
+        expect(zoomWindow(3, day)).toMatchObject({
+            first: '2024-01-10',
+            last: '2024-04-09',
+            label: 'Jan 10 – Apr 9, 2024',
         });
-        expect(zoomWindow(4, anchor)).toEqual({
-            start: '2024-02-01',
-            end: '2024-03-01',
-            label: 'February 2024',
+        expect(zoomWindow(4, day)).toMatchObject({
+            first: '2024-02-09',
+            last: '2024-03-10',
+            label: 'Feb 9 – Mar 10, 2024',
         });
-        // Feb 24, 2024 was a Saturday
-        expect(zoomWindow(5, anchor)).toEqual({
-            start: '2024-02-19',
-            end: '2024-02-26',
-            label: 'Feb 19 – 25, 2024',
-        });
-    });
-
-    it('keeps the fall half and quarters inside the season across new year', () => {
-        expect(zoomWindow(1, '2023-12-02')?.label).toBe('2023–24 season');
-        expect(zoomWindow(2, '2023-12-02')).toMatchObject({
-            start: '2023-08-01',
-            end: '2024-02-01',
-            label: 'Aug 2023 – Jan 2024',
-        });
-        expect(zoomWindow(3, '2024-01-15')).toMatchObject({
-            start: '2023-11-01',
-            end: '2024-02-01',
-            label: 'Nov 2023 – Jan 2024',
-        });
-        expect(zoomWindow(1, '2024-07-31')?.label).toBe('2023–24 season');
-        expect(zoomWindow(1, '2024-08-01')?.label).toBe('2024–25 season');
-    });
-
-    it('labels a week that crosses two months', () => {
-        expect(zoomWindow(5, '2024-03-01')).toEqual({
-            start: '2024-02-26',
-            end: '2024-03-04',
-            label: 'Feb 26 – Mar 3, 2024',
+        expect(zoomWindow(5, day)).toEqual({
+            center: day,
+            halfDays: 3.5,
+            first: '2024-02-21',
+            last: '2024-02-27',
+            label: 'Feb 21 – 27, 2024',
         });
     });
 
-    it('steps to the neighbouring window', () => {
-        expect(adjacentAnchor(1, '2024-02-24', 1)).toBe('2024-08-01');
-        expect(adjacentAnchor(1, '2024-02-24', -1)).toBe('2023-07-31');
-        expect(zoomWindow(4, adjacentAnchor(4, '2024-03-10', -1))?.label).toBe('February 2024');
-        expect(zoomWindow(5, adjacentAnchor(5, '2024-01-03', -1))?.start).toBe('2023-12-25');
+    it('labels a window that crosses new year', () => {
+        expect(zoomWindow(5, '2024-01-01')?.label).toBe('Dec 29, 2023 – Jan 4, 2024');
+    });
+
+    it('steps a whole window back or forward', () => {
+        expect(shiftCenter(5, '2024-02-24', 1)).toBe('2024-03-02');
+        expect(shiftCenter(1, '2024-02-24', -1)).toBe('2023-02-24');
+        expect(shiftCenter(0, '2024-02-24', 1)).toBe('2024-02-24');
     });
 });
 
