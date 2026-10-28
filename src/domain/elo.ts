@@ -1,4 +1,5 @@
 import type {
+    PairPracticeResult,
     PracticeEloResult,
     TournamentParams,
     TournamentParticipantInput,
@@ -31,6 +32,35 @@ export function calculatePracticeElo(
     };
 }
 
+/**
+ * A practice round between two pairs. Each person's expected score uses their
+ * own Elo against the other pair's average, so partners can move by different
+ * amounts for the same round.
+ */
+export function calculatePracticeEloForPairs(
+    winners: { id: string; elo: number }[],
+    losers: { id: string; elo: number }[]
+): PairPracticeResult {
+    const avg = (xs: { elo: number }[]) => xs.reduce((s, x) => s + x.elo, 0) / xs.length;
+    const winnerElo = avg(winners);
+    const loserElo = avg(losers);
+    return {
+        expected: expectedScore(winnerElo, loserElo),
+        winnerElo,
+        loserElo,
+        winners: winners.map((w) => {
+            const E = expectedScore(w.elo, loserElo);
+            const change = (PRACTICE_COMPETITIVE_K + PRACTICE_BONUS_K) * (1 - E);
+            return { id: w.id, oldElo: w.elo, newElo: w.elo + change, change };
+        }),
+        losers: losers.map((l) => {
+            const E = expectedScore(winnerElo, l.elo);
+            const change = -PRACTICE_COMPETITIVE_K * (1 - E) + PRACTICE_BONUS_K * E;
+            return { id: l.id, oldElo: l.elo, newElo: l.elo + change, change };
+        }),
+    };
+}
+
 export function validatePracticeMatch(
     winnerId: string,
     loserId: string
@@ -54,8 +84,12 @@ export function adjustedWins(
 }
 
 /**
- * Tournament Elo for every entry. An entry's Elo is the average of its two
- * partners; the resulting change applies to each partner.
+ * Tournament Elo for every entry.
+ *
+ * What a result is worth belongs to the entry: adjusted wins come from the
+ * entry's record, division and rounds, and E_tourney comes from all entries.
+ * Each person's change then uses their own Elo (p = (elo / 700)^1.5), so for
+ * the same result a higher-rated partner gains less than a lower-rated one.
  *
  * Entries can carry their own round count (e.g. novices had 5 prelims and
  * varsity had 6). Adjusted wins use the entry's own rounds, and the three
@@ -82,25 +116,32 @@ export function calculateTournamentElo(
     const eTourney = (s + (3 * avgRounds) / 2) / (t + 3);
 
     const results: TournamentResult[] = withAdjusted.map((p) => {
-        const p_prop = Math.pow(p.elo / TOURNAMENT_FIELD_ELO, 1.5);
-        let C = k * (p.W_adjusted / p_prop - eTourney) + b;
-        if (maxRounds !== null && p.W_raw === maxRounds && C < 0) {
-            C = 0;
-        }
-        if (C > maxGain) {
-            C = maxGain;
-        }
+        const people =
+            p.members && p.members.length > 0 ? p.members : [{ id: p.id, elo: p.elo }];
+        const members = people.map((m) => {
+            const p_value = Math.pow(m.elo / TOURNAMENT_FIELD_ELO, 1.5);
+            let C = k * (p.W_adjusted / p_value - eTourney) + b;
+            if (maxRounds !== null && p.W_raw === maxRounds && C < 0) {
+                C = 0;
+            }
+            if (C > maxGain) {
+                C = maxGain;
+            }
+            return { id: m.id, oldElo: m.elo, newElo: m.elo + C, change: C, p_value };
+        });
+        const change = members.reduce((sum, m) => sum + m.change, 0) / members.length;
         return {
             id: p.id,
             name: p.name,
             oldElo: p.elo,
-            newElo: p.elo + C,
-            change: C,
+            newElo: p.elo + change,
+            change,
             W_adjusted: p.W_adjusted,
-            p_value: p_prop,
+            p_value: Math.pow(p.elo / TOURNAMENT_FIELD_ELO, 1.5),
             W_raw: p.W_raw,
             division: p.division,
             n: p.n,
+            members,
         };
     });
 

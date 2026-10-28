@@ -3,9 +3,11 @@ import { Link, useParams } from 'react-router-dom';
 import {
     buildEloSeries,
     eloStdDev,
+    entryChangeFor,
     lookup,
     pairingLabel,
     peakElo,
+    practiceChangeFor,
     practiceRecord,
     practiceSide,
     rankDebaters,
@@ -61,7 +63,7 @@ export function PlayerProfilePage() {
                     partnerId: (p.debater_id === id ? p.partner_id : p.debater_id) ?? null,
                     division: p.division,
                     raw: p.raw_wins,
-                    change: p.elo_change,
+                    change: entryChangeFor(p, id),
                 });
             }
         }
@@ -262,7 +264,7 @@ export function PlayerProfilePage() {
                                 ? [r.loser_id, r.loser_partner_id]
                                 : [r.winner_id, r.winner_partner_id];
                             const partner = mine.find((x) => x && x !== id);
-                            const delta = won ? r.winner_change : r.loser_change;
+                            const delta = practiceChangeFor(r, id);
                             return (
                                 <div key={r.id} className="match-row">
                                     <span className="num">{r.date}</span>

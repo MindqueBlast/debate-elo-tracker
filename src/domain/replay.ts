@@ -1,4 +1,4 @@
-import { calculatePracticeElo, calculateTournamentElo, pairingElo } from './elo';
+import { calculatePracticeEloForPairs, calculateTournamentElo, pairingElo } from './elo';
 import type { Division, HistoryPoint, TournamentParams } from './types';
 
 /**
@@ -43,9 +43,13 @@ export interface ReplayPractice {
 }
 
 export interface ReplayEntryResult {
+    /** The pair's average Elo going in. */
     teamElo: number;
     adjustedWins: number;
+    /** Average of the members' changes. */
     change: number;
+    /** Each person's own change, by id. */
+    changes: Record<string, number>;
     rounds: number;
 }
 
@@ -61,8 +65,8 @@ export interface ReplayResult {
         {
             winnerElo: number;
             loserElo: number;
-            winnerChange: number;
-            loserChange: number;
+            /** Each person's own change, by id. */
+            changes: Record<string, number>;
         }
     >;
 }
@@ -115,23 +119,17 @@ export function replay(input: {
         if (ev.kind === 'practice') {
             const { p } = ev;
             [...p.winner, ...p.loser].forEach(need);
-            const w = pairingElo(p.winner.map((id) => elo[id]));
-            const l = pairingElo(p.loser.map((id) => elo[id]));
-            const r = calculatePracticeElo(w, l);
-            for (const id of p.winner) {
-                elo[id] += r.winnerChange;
-                history[id].push({ date: p.date, elo: elo[id] });
+            const r = calculatePracticeEloForPairs(
+                p.winner.map((id) => ({ id, elo: elo[id] })),
+                p.loser.map((id) => ({ id, elo: elo[id] }))
+            );
+            const changes: Record<string, number> = {};
+            for (const m of [...r.winners, ...r.losers]) {
+                elo[m.id] = m.newElo;
+                history[m.id].push({ date: p.date, elo: m.newElo });
+                changes[m.id] = m.change;
             }
-            for (const id of p.loser) {
-                elo[id] += r.loserChange;
-                history[id].push({ date: p.date, elo: elo[id] });
-            }
-            out.practice[p.id] = {
-                winnerElo: w,
-                loserElo: l,
-                winnerChange: r.winnerChange,
-                loserChange: r.loserChange,
-            };
+            out.practice[p.id] = { winnerElo: r.winnerElo, loserElo: r.loserElo, changes };
             continue;
         }
 
@@ -142,6 +140,7 @@ export function replay(input: {
                 id: e.id,
                 name: e.id,
                 elo: pairingElo(e.members.map((id) => elo[id])),
+                members: e.members.map((id) => ({ id, elo: elo[id] })),
                 division: e.division,
                 W_raw: e.rawWins,
                 n: e.rounds,
@@ -152,17 +151,20 @@ export function replay(input: {
         const played = new Set<string>();
         results.forEach((res, i) => {
             const entry = t.entries[i];
+            const changes: Record<string, number> = {};
+            for (const m of res.members) {
+                elo[m.id] = m.newElo;
+                history[m.id].push({ date: t.date, elo: m.newElo, event: 'Tournament' });
+                played.add(m.id);
+                changes[m.id] = m.change;
+            }
             entries[entry.id] = {
                 teamElo: res.oldElo,
                 adjustedWins: res.W_adjusted,
                 change: res.change,
+                changes,
                 rounds: res.n,
             };
-            for (const id of entry.members) {
-                elo[id] += res.change;
-                history[id].push({ date: t.date, elo: elo[id], event: 'Tournament' });
-                played.add(id);
-            }
         });
         // Flat point for everyone on the roster who sat this one out
         const season = seasonOf(t.date);

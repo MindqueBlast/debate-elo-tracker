@@ -1,14 +1,16 @@
 import { supabase } from './supabase';
 import {
     appendHistory,
-    calculatePracticeElo,
+    calculatePracticeEloForPairs,
     calculateTournamentElo,
+    entryChangeFor,
     findTeam,
     getLocalDateString,
     hasLaterHistory,
     lookup,
     pairingElo,
     pairingLabel,
+    practiceChangeFor,
     removeLastMatchingHistoryPoint,
     seasonOf,
     validatePlayerName,
@@ -278,22 +280,21 @@ export async function recordPracticeRound(input: {
     const winners = membersOf(input.winner, byId);
     const losers = membersOf(input.loser, byId);
     const date = input.date || getLocalDateString();
-    const winnerElo = pairingElo(winners.map((d) => d.elo));
-    const loserElo = pairingElo(losers.map((d) => d.elo));
-    const result = calculatePracticeElo(winnerElo, loserElo);
-
-    const updates: EloUpdate[] = [
-        ...winners.map((d) => ({
+    const result = calculatePracticeEloForPairs(
+        winners.map((d) => ({ id: d.id, elo: d.elo })),
+        losers.map((d) => ({ id: d.id, elo: d.elo }))
+    );
+    const people = [...result.winners, ...result.losers];
+    const updates: EloUpdate[] = people.map((m) => {
+        const d = byId.get(m.id) as Debater;
+        return {
             debater: d,
-            elo: d.elo + result.winnerChange,
-            history: appendHistory(d.history, { date, elo: d.elo + result.winnerChange }),
-        })),
-        ...losers.map((d) => ({
-            debater: d,
-            elo: d.elo + result.loserChange,
-            history: appendHistory(d.history, { date, elo: d.elo + result.loserChange }),
-        })),
-    ];
+            elo: m.newElo,
+            history: appendHistory(d.history, { date, elo: m.newElo }),
+        };
+    });
+    const changeOf = (id: string | null) =>
+        id ? people.find((m) => m.id === id)?.change ?? null : null;
     await saveResult(
         {
             practice: {
@@ -302,14 +303,16 @@ export async function recordPracticeRound(input: {
                 winner_partner_id: input.winner[1],
                 loser_id: input.loser[0],
                 loser_partner_id: input.loser[1],
-                winner_change: result.winnerChange,
-                loser_change: result.loserChange,
+                winner_change: changeOf(input.winner[0]),
+                winner_partner_change: changeOf(input.winner[1]),
+                loser_change: changeOf(input.loser[0]),
+                loser_partner_change: changeOf(input.loser[1]),
             },
             updates,
         },
         'Failed to save the round.'
     );
-    return { ...result, winnerElo, loserElo };
+    return result;
 }
 
 export async function deletePracticeRound(input: {
@@ -318,24 +321,23 @@ export async function deletePracticeRound(input: {
 }): Promise<{ approximate: boolean }> {
     const { round } = input;
     const byId = lookup(input.debaters);
-    const sides: [(string | null | undefined)[], number][] = [
-        [[round.winner_id, round.winner_partner_id], round.winner_change],
-        [[round.loser_id, round.loser_partner_id], round.loser_change],
-    ];
     let approximate = false;
     const updates: EloUpdate[] = [];
-    for (const [ids, change] of sides) {
-        for (const id of ids) {
-            if (!id) continue;
-            const d = byId.get(id);
-            if (!d) continue;
-            if (hasLaterHistory(d.history, round.date)) approximate = true;
-            updates.push({
-                debater: d,
-                elo: d.elo - change,
-                history: removeLastMatchingHistoryPoint(d.history, round.date),
-            });
-        }
+    for (const id of [
+        round.winner_id,
+        round.winner_partner_id,
+        round.loser_id,
+        round.loser_partner_id,
+    ]) {
+        if (!id) continue;
+        const d = byId.get(id);
+        if (!d) continue;
+        if (hasLaterHistory(d.history, round.date)) approximate = true;
+        updates.push({
+            debater: d,
+            elo: d.elo - practiceChangeFor(round, id),
+            history: removeLastMatchingHistoryPoint(d.history, round.date),
+        });
     }
     await saveResult(
         { delete_practice_id: round.id, updates },
@@ -365,14 +367,18 @@ export function previewTournament(input: {
 }) {
     const byId = lookup(input.debaters);
     return calculateTournamentElo(
-        input.entries.map((e) => ({
-            id: e.key,
-            name: pairingLabel(e.members, byId),
-            elo: pairingElo(membersOf(e.members, byId).map((d) => d.elo)),
-            division: e.division,
-            W_raw: rawWinsOf(e.prelimWins, e.elimWins),
-            n: input.roundsByDivision?.[e.division] ?? input.params.n,
-        })),
+        input.entries.map((e) => {
+            const members = membersOf(e.members, byId);
+            return {
+                id: e.key,
+                name: pairingLabel(e.members, byId),
+                elo: pairingElo(members.map((d) => d.elo)),
+                members: members.map((d) => ({ id: d.id, elo: d.elo })),
+                division: e.division,
+                W_raw: rawWinsOf(e.prelimWins, e.elimWins),
+                n: input.roundsByDivision?.[e.division] ?? input.params.n,
+            };
+        }),
         input.params
     );
 }
@@ -411,17 +417,17 @@ export async function recordTournament(input: {
 
     const updates: EloUpdate[] = [];
     const playing = new Set<string>();
-    results.forEach((res, i) => {
-        for (const d of membersOf(input.entries[i].members, byId)) {
+    for (const res of results) {
+        for (const m of res.members) {
+            const d = byId.get(m.id) as Debater;
             playing.add(d.id);
-            const elo = d.elo + res.change;
             updates.push({
                 debater: d,
-                elo,
-                history: appendHistory(d.history, { date, elo, event: 'Tournament' }),
+                elo: m.newElo,
+                history: appendHistory(d.history, { date, elo: m.newElo, event: 'Tournament' }),
             });
         }
-    });
+    }
     // Flat point for everyone active who sat this one out, so graphs line up
     for (const d of active) {
         if (playing.has(d.id)) continue;
@@ -448,13 +454,16 @@ export async function recordTournament(input: {
             },
             entries: results.map((res, i) => {
                 const entry = input.entries[i];
+                const changeOf = (id: string | null) =>
+                    id ? res.members.find((m) => m.id === id)?.change ?? null : null;
                 return {
                     debater_id: entry.members[0],
                     partner_id: entry.members[1],
                     team_id: findTeam(input.teams, entry.members)?.id ?? null,
                     raw_wins: res.W_raw,
                     adjusted_wins: res.W_adjusted,
-                    elo_change: res.change,
+                    elo_change: changeOf(entry.members[0]),
+                    partner_elo_change: changeOf(entry.members[1]),
                     division: res.division,
                     team_elo: res.oldElo,
                     rounds: res.n,
@@ -487,7 +496,7 @@ export async function deleteTournament(input: {
             if (hasLaterHistory(d.history, tournament.date)) approximate = true;
             updates.push({
                 debater: d,
-                elo: d.elo - p.elo_change,
+                elo: d.elo - entryChangeFor(p, id),
                 history: removeLastMatchingHistoryPoint(
                     d.history,
                     tournament.date,

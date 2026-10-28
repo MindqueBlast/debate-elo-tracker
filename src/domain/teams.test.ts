@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateTournamentElo } from './elo';
+import { calculatePracticeEloForPairs, calculateTournamentElo } from './elo';
 import { practiceRecord } from './ranking';
 import { replay, seasonOf } from './replay';
 import {
@@ -142,7 +142,7 @@ describe('replay', () => {
         expect(seasonOf('2026-07-01')).toBe('2026-27');
     });
 
-    it('gives both partners the same change and keeps everyone else flat', () => {
+    it('scores each person on their own Elo and keeps everyone else flat', () => {
         const out = replay({
             people: [
                 { id: 'j', startElo: 900, startDate: '2025-08-01', rosterSeasons: ['2025-26'] },
@@ -164,15 +164,23 @@ describe('replay', () => {
         const p = out.practice.p1;
         expect(p.winnerElo).toBe(650);
         expect(p.loserElo).toBe(800);
-        expect(out.history.a[1]).toEqual({ date: '2025-09-10', elo: 650 + p.winnerChange });
-        expect(out.history.l[1]).toEqual({ date: '2025-09-10', elo: 700 + p.loserChange });
+        // the lower-rated loser (Leon, 700) loses less than the higher-rated one (900)
+        expect(p.changes.l).toBeGreaterThan(p.changes.j);
+        expect(out.history.a[1]).toEqual({ date: '2025-09-10', elo: 650 + p.changes.a });
+        expect(out.history.l[1]).toEqual({ date: '2025-09-10', elo: 700 + p.changes.l });
+
         const e = out.tournaments.t1.entries.e1;
-        expect(e.teamElo).toBeCloseTo((900 + p.loserChange + 650 + p.winnerChange) / 2, 10);
-        expect(out.elo.j).toBeCloseTo(900 + p.loserChange + e.change, 10);
-        expect(out.elo.a).toBeCloseTo(650 + p.winnerChange + e.change, 10);
+        const jIn = 900 + p.changes.j;
+        const aIn = 650 + p.changes.a;
+        expect(e.teamElo).toBeCloseTo((jIn + aIn) / 2, 10);
+        // same result, own Elo: the higher-rated partner gains less
+        expect(e.changes.j).toBeLessThan(e.changes.a);
+        expect(e.change).toBeCloseTo((e.changes.j + e.changes.a) / 2, 10);
+        expect(out.elo.j).toBeCloseTo(jIn + e.changes.j, 10);
+        expect(out.elo.a).toBeCloseTo(aIn + e.changes.a, 10);
         // Leon and Chloe sat out: flat marker at the tournament, unchanged Elo
         expect(out.history.l.at(-1)).toEqual({ date: '2025-09-20', elo: out.elo.l, event: 'Tournament' });
-        expect(out.elo.c).toBeCloseTo(650 + p.winnerChange, 10);
+        expect(out.elo.c).toBeCloseTo(650 + p.changes.c, 10);
         // someone from a past season gets no marker
         expect(out.history.old).toHaveLength(1);
     });
@@ -193,6 +201,60 @@ describe('replay', () => {
                 },
             ],
         });
-        expect(out.tournaments.t.entries.e.teamElo).toBeCloseTo(800 + out.practice.p.winnerChange, 10);
+        expect(out.tournaments.t.entries.e.teamElo).toBeCloseTo(800 + out.practice.p.changes.x, 10);
+    });
+});
+
+describe('individual changes', () => {
+    const params = { n: 6, b: 30, k: 45, maxGain: 300, maxRounds: null };
+
+    it('uses each partner’s own Elo for their change, with the same adjusted wins and E', () => {
+        const pair = { id: 'e', name: 'J+L', elo: 1200, division: 'Varsity' as const, W_raw: 6 };
+        const solo = calculateTournamentElo([pair], params);
+        const { eTourney, results } = calculateTournamentElo(
+            [{ ...pair, members: [{ id: 'j', elo: 1300 }, { id: 'l', elo: 1100 }] }],
+            params
+        );
+        expect(eTourney).toBeCloseTo(solo.eTourney, 12);
+        expect(results[0].W_adjusted).toBeCloseTo(solo.results[0].W_adjusted, 12);
+        const [j, l] = results[0].members;
+        const expected = (elo: number) =>
+            45 * (results[0].W_adjusted / Math.pow(elo / 700, 1.5) - eTourney) + 30;
+        expect(j.change).toBeCloseTo(expected(1300), 10);
+        expect(l.change).toBeCloseTo(expected(1100), 10);
+        expect(j.change).toBeLessThan(l.change);
+        expect(results[0].change).toBeCloseTo((j.change + l.change) / 2, 10);
+    });
+
+    it('caps and protects each partner separately', () => {
+        const { results } = calculateTournamentElo(
+            [
+                {
+                    id: 'e',
+                    name: 'pair',
+                    elo: 700,
+                    members: [{ id: 'low', elo: 300 }, { id: 'high', elo: 1500 }],
+                    division: 'Novice',
+                    W_raw: 4,
+                },
+                { id: 'f', name: 'other', elo: 700, division: 'Novice', W_raw: 4 },
+            ],
+            { n: 4, b: 15, k: 45, maxGain: 200, maxRounds: 4 }
+        );
+        const [low, high] = results[0].members;
+        expect(low.change).toBe(200); // capped
+        expect(high.change).toBeGreaterThanOrEqual(0); // undefeated never loses Elo
+    });
+
+    it('scores practice-round partners on their own Elo', () => {
+        const r = calculatePracticeEloForPairs(
+            [{ id: 'w1', elo: 1000 }, { id: 'w2', elo: 600 }],
+            [{ id: 'l1', elo: 800 }, { id: 'l2', elo: 800 }]
+        );
+        expect(r.expected).toBeCloseTo(0.5, 10);
+        const [w1, w2] = r.winners;
+        expect(w1.change).toBeCloseTo(25 * (1 - 1 / (1 + Math.pow(10, (800 - 1000) / 400))), 10);
+        expect(w2.change).toBeGreaterThan(w1.change);
+        expect(r.losers[0].change).toBeCloseTo(-7.5, 10);
     });
 });

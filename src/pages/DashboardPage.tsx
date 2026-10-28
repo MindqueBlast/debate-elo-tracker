@@ -150,8 +150,11 @@ export function DashboardPage() {
                                     {pairingLabel([r.winner_id, r.winner_partner_id], byId)} def.{' '}
                                     {pairingLabel([r.loser_id, r.loser_partner_id], byId)}
                                 </span>
-                                <span className="delta-pos num">
-                                    +{r.winner_change.toFixed(1)}
+                                <span className="delta-pos num" style={{ whiteSpace: 'nowrap' }}>
+                                    {[r.winner_change, r.winner_partner_id ? (r.winner_partner_change ?? r.winner_change) : null]
+                                        .filter((x): x is number => x !== null)
+                                        .map((x) => `+${x.toFixed(1)}`)
+                                        .join(' / ')}
                                 </span>
                             </div>
                         ))

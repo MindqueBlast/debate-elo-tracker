@@ -1,5 +1,8 @@
 export type {
     Annotation,
+    MemberChange,
+    MemberElo,
+    PairPracticeResult,
     Pairing,
     RankedTeam,
     Team,
@@ -51,6 +54,7 @@ export {
     adjustedWins,
     averageElo,
     calculatePracticeElo,
+    calculatePracticeEloForPairs,
     calculateTournamentElo,
     expectedScore,
     pairingElo,
@@ -61,12 +65,14 @@ export {
 export { practiceRecord, rankDebaters } from './ranking';
 
 export {
+    entryChangeFor,
     findTeam,
     lookup,
     pairingEloOf,
     pairingHistory,
     pairingLabel,
     pairingMembers,
+    practiceChangeFor,
     practiceSide,
     rankTeams,
     sameMembers,

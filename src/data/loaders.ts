@@ -50,6 +50,8 @@ function asPracticeRounds(raw: unknown): PracticeRound[] {
             loser_partner_id: optionalId(r.loser_partner_id),
             winner_change,
             loser_change,
+            winner_partner_change: optionalNumber(r.winner_partner_change),
+            loser_partner_change: optionalNumber(r.loser_partner_change),
         });
     }
     return rounds;
@@ -87,6 +89,7 @@ function asTournaments(raw: unknown): Tournament[] {
                         raw_wins: Number(rec.raw_wins) || 0,
                         adjusted_wins: Number(rec.adjusted_wins) || 0,
                         elo_change: Number(rec.elo_change) || 0,
+                        partner_elo_change: optionalNumber(rec.partner_elo_change),
                         division: asDivision(rec.division) ?? 'Novice',
                         team_elo: optionalNumber(rec.team_elo),
                         rounds: optionalNumber(rec.rounds),

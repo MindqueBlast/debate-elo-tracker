@@ -6,6 +6,7 @@ import type {
     PracticeRound,
     RankedTeam,
     Team,
+    TournamentParticipant,
 } from './types';
 
 export type DebaterLookup = Map<string, Debater>;
@@ -111,6 +112,27 @@ export function rankTeams(
         .sort((a, b) => b.elo - a.elo || a.name.localeCompare(b.name));
     rows.forEach((r, i) => (r.rank = i + 1));
     return rows;
+}
+
+/** A person's own Elo change from a tournament entry. */
+export function entryChangeFor(p: TournamentParticipant, personId: string): number {
+    if (p.partner_id && personId === p.partner_id) {
+        return p.partner_elo_change ?? p.elo_change;
+    }
+    return p.elo_change;
+}
+
+/** A person's own Elo change from a practice round (0 if they weren't in it). */
+export function practiceChangeFor(round: PracticeRound, personId: string): number {
+    if (round.winner_id === personId) return round.winner_change;
+    if (round.winner_partner_id === personId) {
+        return round.winner_partner_change ?? round.winner_change;
+    }
+    if (round.loser_id === personId) return round.loser_change;
+    if (round.loser_partner_id === personId) {
+        return round.loser_partner_change ?? round.loser_change;
+    }
+    return 0;
 }
 
 /** Which side of a practice round a person was on, if any. */

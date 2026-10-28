@@ -54,6 +54,9 @@ export interface PracticeRound {
     loser_partner_id?: string | null;
     winner_change: number;
     loser_change: number;
+    /** The partners' own changes (null on rounds recorded before individual math). */
+    winner_partner_change?: number | null;
+    loser_partner_change?: number | null;
 }
 
 export interface TournamentParticipant {
@@ -64,7 +67,10 @@ export interface TournamentParticipant {
     team_id?: string | null;
     raw_wins: number;
     adjusted_wins: number;
+    /** Change for debater_id. */
     elo_change: number;
+    /** Change for partner_id (null on older rows: same as elo_change). */
+    partner_elo_change?: number | null;
     division: Division;
     team_elo?: number | null;
     rounds?: number | null;
@@ -88,11 +94,25 @@ export interface Annotation {
     name: string;
 }
 
+export interface MemberElo {
+    id: string;
+    elo: number;
+}
+
+export interface MemberChange {
+    id: string;
+    oldElo: number;
+    newElo: number;
+    change: number;
+}
+
 export interface TournamentParticipantInput {
     id: string;
     name: string;
-    /** Entry Elo: the average of the two partners. */
+    /** Entry Elo: the average of the two partners (for display). */
     elo: number;
+    /** The people in the entry, each scored on their own Elo. Defaults to one person at `elo`. */
+    members?: MemberElo[];
     division: Division;
     W_raw: number;
     /** Prelim rounds for this entry's division, when it differs from params.n. */
@@ -118,6 +138,17 @@ export interface TournamentResult {
     W_raw: number;
     division: Division;
     n: number;
+    /** Each person's own change. The entry-level change above is their average. */
+    members: (MemberChange & { p_value: number })[];
+}
+
+export interface PairPracticeResult {
+    /** Pair-vs-pair win probability, from the two pairs' average Elos. */
+    expected: number;
+    winnerElo: number;
+    loserElo: number;
+    winners: MemberChange[];
+    losers: MemberChange[];
 }
 
 export interface PracticeEloResult {

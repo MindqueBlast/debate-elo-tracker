@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import {
-    calculatePracticeElo,
+    calculatePracticeEloForPairs,
+    entryChangeFor,
     getLocalDateString,
     lookup,
     pairingEloOf,
     pairingLabel,
+    practiceChangeFor,
     practiceSide,
     type Division,
     type Tournament,
@@ -94,10 +96,12 @@ export function MatchesPage() {
 
     const winnerPair = pairingOf(winner);
     const loserPair = pairingOf(loser);
+    const asMembers = (ids: string[]) => ids.map((id) => ({ id, elo: byId.get(id)?.elo ?? 0 }));
     const odds =
         winnerPair && loserPair
-            ? calculatePracticeElo(pairingEloOf(winnerPair, byId), pairingEloOf(loserPair, byId))
+            ? calculatePracticeEloForPairs(asMembers(winnerPair), asMembers(loserPair))
             : null;
+    const nameOf = (id: string) => byId.get(id)?.name ?? 'Unknown';
 
     const params: TournamentParams = {
         n: parseFloat(n),
@@ -168,7 +172,9 @@ export function MatchesPage() {
                 debaters,
             });
             toast.push(
-                `${pairingLabel(winnerPair, byId)} +${r.winnerChange.toFixed(1)} each  /  ${pairingLabel(loserPair, byId)} ${r.loserChange.toFixed(1)} each`,
+                [...r.winners, ...r.losers]
+                    .map((m) => `${nameOf(m.id)} ${signed(m.change)}`)
+                    .join('  ·  '),
                 'success',
                 5000
             );
@@ -221,9 +227,8 @@ export function MatchesPage() {
             toast.push(
                 `E_tourney ${result.eTourney.toFixed(3)}\n` +
                     result.results
-                        .map(
-                            (r) =>
-                                `${r.name}: ${r.change >= 0 ? '+' : ''}${r.change.toFixed(1)} each`
+                        .map((r) =>
+                            r.members.map((m) => `${nameOf(m.id)} ${signed(m.change)}`).join(', ')
                         )
                         .join('\n'),
                 'success',
@@ -298,9 +303,21 @@ export function MatchesPage() {
                                 />
                             </div>
                             <p className="note" style={{ marginBottom: 12 }}>
-                                {odds && winnerPair
-                                    ? `Win probability for ${pairingLabel(winnerPair, byId)}: ${(odds.expected * 100).toFixed(1)}%. Each winner +${odds.winnerChange.toFixed(1)}, each loser ${odds.loserChange.toFixed(1)}.`
-                                    : 'Both partners on a side get the same change, based on the pair’s average Elo.'}
+                                {odds && winnerPair ? (
+                                    <>
+                                        Win probability for {pairingLabel(winnerPair, byId)}:{' '}
+                                        {(odds.expected * 100).toFixed(1)}%. If they win:{' '}
+                                        <Deltas
+                                            items={[...odds.winners, ...odds.losers].map((m) => ({
+                                                id: m.id,
+                                                name: nameOf(m.id),
+                                                change: m.change,
+                                            }))}
+                                        />
+                                    </>
+                                ) : (
+                                    'Each person’s change uses their own Elo against the other pair’s average.'
+                                )}
                             </p>
                             <Button type="submit" disabled={busy}>
                                 Record round
@@ -499,13 +516,18 @@ export function MatchesPage() {
                                         Raw {rawWinsOf(entry.prelimWins, entry.elimWins)}
                                     </span>
                                     <span
-                                        className={`num ${preview && preview.change < 0 ? 'delta-neg' : 'delta-pos'}`}
-                                        style={{ minWidth: 56, textAlign: 'right' }}
-                                        title="Projected change for each partner"
+                                        className="num"
+                                        style={{ minWidth: 96, textAlign: 'right', whiteSpace: 'nowrap' }}
+                                        title="Projected change for each partner, in the order listed"
                                     >
-                                        {preview
-                                            ? `${preview.change >= 0 ? '+' : ''}${preview.change.toFixed(1)}`
-                                            : ''}
+                                        {preview?.members.map((m, i) => (
+                                            <span key={m.id}>
+                                                {i > 0 && ' / '}
+                                                <span className={m.change < 0 ? 'delta-neg' : 'delta-pos'}>
+                                                    {signed(m.change)}
+                                                </span>
+                                            </span>
+                                        ))}
                                     </span>
                                     <Button
                                         size="sm"
@@ -521,8 +543,9 @@ export function MatchesPage() {
                         })}
                         {projected && (
                             <p className="note" style={{ marginTop: 8 }}>
-                                E_tourney {projected.eTourney.toFixed(3)}. Changes shown are for
-                                each partner.
+                                E_tourney {projected.eTourney.toFixed(3)}. Each partner’s change
+                                uses their own Elo, so the higher-rated partner gains less for the
+                                same result.
                             </p>
                         )}
                         <Button
@@ -571,11 +594,19 @@ export function MatchesPage() {
                                 <span>
                                     {pairingLabel([r.winner_id, r.winner_partner_id], byId)} def.{' '}
                                     {pairingLabel([r.loser_id, r.loser_partner_id], byId)}
+                                    <div className="note">
+                                        <Deltas
+                                            items={[r.winner_id, r.winner_partner_id, r.loser_id, r.loser_partner_id]
+                                                .filter((x): x is string => !!x)
+                                                .map((id) => ({
+                                                    id,
+                                                    name: nameOf(id),
+                                                    change: practiceChangeFor(r, id),
+                                                }))}
+                                        />
+                                    </div>
                                 </span>
                                 <span className="num match-row__deltas">
-                                    <span className="delta-pos">+{r.winner_change.toFixed(1)}</span>
-                                    {' / '}
-                                    <span className="delta-neg">{r.loser_change.toFixed(1)}</span>
                                     {isAdmin && (
                                         <Button
                                             size="sm"
@@ -658,21 +689,24 @@ export function MatchesPage() {
                                     .sort(
                                         (a, b) =>
                                             DIVS.indexOf(a.division) - DIVS.indexOf(b.division) ||
-                                            b.elo_change - a.elo_change
+                                            avgChange(b) - avgChange(a)
                                     )
                                     .map((p) => (
                                         <div key={p.id ?? p.debater_id} className="note entry-line">
                                             <span className="pill pill-div">{SHORT[p.division]}</span>
                                             <span className="entry-line__name">
-                                                {pairingLabel([p.debater_id, p.partner_id], byId)}
+                                                <Deltas
+                                                    items={[p.debater_id, p.partner_id]
+                                                        .filter((x): x is string => !!x)
+                                                        .map((id) => ({
+                                                            id,
+                                                            name: nameOf(id),
+                                                            change: entryChangeFor(p, id),
+                                                        }))}
+                                                />
+                                                {!p.partner_id && <span className="muted"> + ?</span>}
                                             </span>
                                             <span className="num muted">raw {p.raw_wins}</span>
-                                            <span
-                                                className={`num ${p.elo_change >= 0 ? 'delta-pos' : 'delta-neg'}`}
-                                            >
-                                                {p.elo_change >= 0 ? '+' : ''}
-                                                {p.elo_change.toFixed(1)}
-                                            </span>
                                         </div>
                                     ))}
                                 {isAdmin && (
@@ -702,5 +736,25 @@ export function MatchesPage() {
                 </Card>
             </div>
         </div>
+    );
+}
+
+const signed = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}`;
+
+const avgChange = (p: { elo_change: number; partner_elo_change?: number | null; partner_id?: string | null }) =>
+    p.partner_id ? (p.elo_change + (p.partner_elo_change ?? p.elo_change)) / 2 : p.elo_change;
+
+/** "Jiayi +12.3 · Leon +15.1" */
+function Deltas({ items }: { items: { id: string; name: string; change: number }[] }) {
+    return (
+        <>
+            {items.map((it, i) => (
+                <span key={it.id} style={{ whiteSpace: 'nowrap' }}>
+                    {i > 0 && ' · '}
+                    {it.name}{' '}
+                    <span className={it.change < 0 ? 'delta-neg' : 'delta-pos'}>{signed(it.change)}</span>
+                </span>
+            ))}
+        </>
     );
 }
