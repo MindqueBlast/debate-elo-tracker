@@ -5,8 +5,10 @@ import {
     isCalendarDate,
     lookup,
     snapshotFromSeries,
+    teamElo,
     teamKey,
     teamName,
+    type Team,
 } from '../domain';
 import {
     addAnnotation,
@@ -30,8 +32,9 @@ export function AnalyticsPage() {
         useAppData();
     const toast = useToast();
     const wrapRef = useRef<HTMLDivElement>(null);
+    const [view, setView] = useState<'people' | 'teams'>('people');
     const [selectedId, setSelectedId] = useState('ALL');
-    const [compareId, setCompareId] = useState('');
+    const [compareIds, setCompareIds] = useState<string[]>([]);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [showAnnotations, setShowAnnotations] = useState(true);
@@ -49,10 +52,46 @@ export function AnalyticsPage() {
         () =>
             teams
                 .filter((t) => showGraduated || t.active)
-                .map((t) => ({ key: teamKey(t.id), name: teamName(t, byId) }))
-                .sort((a, b) => a.name.localeCompare(b.name)),
+                .map((t) => ({
+                    key: teamKey(t.id),
+                    name: teamName(t, byId),
+                    elo: teamElo(t, byId),
+                }))
+                .sort((a, b) => b.elo - a.elo),
         [teams, showGraduated, byId]
     );
+
+    // A person's team: their current one if they have it, else their latest
+    const teamFor = (personId: string): Team | undefined => {
+        const theirs = teams.filter(
+            (t) => t.member1_id === personId || t.member2_id === personId
+        );
+        return theirs.find((t) => t.active) ?? theirs[theirs.length - 1];
+    };
+
+    // Switching keeps the same people on screen where it can:
+    // Jiayi vs Leon <-> their team, a team <-> its two members
+    const switchView = (next: 'people' | 'teams') => {
+        if (next === view) return;
+        if (next === 'teams') {
+            const a = selectedId === 'ALL' ? undefined : teamFor(selectedId);
+            const others = compareIds
+                .map((id) => teamFor(id))
+                .filter((t): t is Team => !!t && t.id !== a?.id)
+                .map((t) => teamKey(t.id));
+            setSelectedId(a ? teamKey(a.id) : ALL_TEAMS);
+            setCompareIds(a ? [...new Set(others)] : []);
+        } else {
+            const teamOf = (key: string) => teams.find((t) => teamKey(t.id) === key);
+            const team = teamOf(selectedId);
+            const people = [selectedId, ...compareIds]
+                .map(teamOf)
+                .flatMap((t) => (t ? [t.member1_id, t.member2_id] : []));
+            setSelectedId(team ? team.member1_id : 'ALL');
+            setCompareIds(team ? [...new Set(people)].filter((id) => id !== team.member1_id) : []);
+        }
+        setView(next);
+    };
     const isGroup = selectedId === 'ALL' || selectedId === ALL_TEAMS;
     const selectedName =
         selectedId === 'ALL'
@@ -69,7 +108,7 @@ export function AnalyticsPage() {
                 debaters,
                 teams,
                 selectedId,
-                compareId: isGroup ? null : compareId,
+                compareIds: isGroup ? [] : compareIds,
                 startDate: startDate || null,
                 endDate: endDate || null,
                 showGraduated,
@@ -85,7 +124,7 @@ export function AnalyticsPage() {
             practiceRounds,
             isGroup,
             selectedId,
-            compareId,
+            compareIds,
             startDate,
             endDate,
             showGraduated,
@@ -103,6 +142,22 @@ export function AnalyticsPage() {
             />
             <div className="grid grid-2">
                 <Card>
+                    <div className="segmented" role="group" aria-label="Chart by" style={{ marginBottom: 16 }}>
+                        <button
+                            type="button"
+                            aria-pressed={view === 'people'}
+                            onClick={() => switchView('people')}
+                        >
+                            Individuals
+                        </button>
+                        <button
+                            type="button"
+                            aria-pressed={view === 'teams'}
+                            onClick={() => switchView('teams')}
+                        >
+                            Teams (averaged)
+                        </button>
+                    </div>
                     <div className="chart-toolbar">
                         <div className="field">
                             <label htmlFor="analyticsDebater">Show</label>
@@ -110,57 +165,73 @@ export function AnalyticsPage() {
                                 id="analyticsDebater"
                                 value={selectedId}
                                 onChange={(e) => {
-                                    setSelectedId(e.target.value);
-                                    if (e.target.value === 'ALL' || e.target.value === ALL_TEAMS) {
-                                        setCompareId('');
-                                    }
+                                    const next = e.target.value;
+                                    setSelectedId(next);
+                                    setCompareIds((ids) =>
+                                        next === 'ALL' || next === ALL_TEAMS
+                                            ? []
+                                            : ids.filter((id) => id !== next)
+                                    );
                                 }}
                             >
-                                <option value="ALL">All people</option>
-                                <option value={ALL_TEAMS}>All active teams</option>
-                                <optgroup label="People">
-                                    {pool.map((d) => (
-                                        <option key={d.id} value={d.id}>
-                                            {d.name} ({Math.round(d.elo)})
+                                {view === 'people' ? (
+                                    <>
+                                        <option value="ALL">All people</option>
+                                        {pool.map((d) => (
+                                            <option key={d.id} value={d.id}>
+                                                {d.name} ({Math.round(d.elo)})
+                                            </option>
+                                        ))}
+                                    </>
+                                ) : (
+                                    <>
+                                        <option value={ALL_TEAMS}>
+                                            {showGraduated ? 'All teams' : 'All active teams'}
                                         </option>
-                                    ))}
-                                </optgroup>
-                                <optgroup label="Teams">
-                                    {teamPool.map((t) => (
-                                        <option key={t.key} value={t.key}>
-                                            {t.name}
-                                        </option>
-                                    ))}
-                                </optgroup>
+                                        {teamPool.map((t) => (
+                                            <option key={t.key} value={t.key}>
+                                                {t.name} ({Math.round(t.elo)})
+                                            </option>
+                                        ))}
+                                    </>
+                                )}
                             </select>
                         </div>
                         <div className="field">
                             <label htmlFor="compareDebater">Compare with</label>
                             <select
                                 id="compareDebater"
-                                value={compareId}
+                                value=""
                                 disabled={isGroup}
-                                onChange={(e) => setCompareId(e.target.value)}
+                                onChange={(e) => {
+                                    const id = e.target.value;
+                                    if (id) setCompareIds((ids) => [...ids, id]);
+                                }}
                             >
-                                <option value="">None</option>
-                                <optgroup label="People">
-                                    {pool
-                                        .filter((d) => d.id !== selectedId)
-                                        .map((d) => (
-                                            <option key={d.id} value={d.id}>
-                                                {d.name}
-                                            </option>
-                                        ))}
-                                </optgroup>
-                                <optgroup label="Teams">
-                                    {teamPool
-                                        .filter((t) => t.key !== selectedId)
-                                        .map((t) => (
-                                            <option key={t.key} value={t.key}>
-                                                {t.name}
-                                            </option>
-                                        ))}
-                                </optgroup>
+                                <option value="">
+                                    {isGroup
+                                        ? 'Pick one to compare'
+                                        : compareIds.length
+                                          ? 'Add another…'
+                                          : view === 'people'
+                                            ? 'Add a person…'
+                                            : 'Add a team…'}
+                                </option>
+                                {view === 'people'
+                                    ? pool
+                                          .filter((d) => d.id !== selectedId && !compareIds.includes(d.id))
+                                          .map((d) => (
+                                              <option key={d.id} value={d.id}>
+                                                  {d.name}
+                                              </option>
+                                          ))
+                                    : teamPool
+                                          .filter((t) => t.key !== selectedId && !compareIds.includes(t.key))
+                                          .map((t) => (
+                                              <option key={t.key} value={t.key}>
+                                                  {t.name}
+                                              </option>
+                                          ))}
                             </select>
                         </div>
                         <div className="field">
@@ -182,6 +253,44 @@ export function AnalyticsPage() {
                             />
                         </div>
                     </div>
+                    {!isGroup && compareIds.length > 0 && (
+                        <div className="chips compare-chips">
+                            <span className="note">Comparing:</span>
+                            {compareIds.map((id) => {
+                                const name =
+                                    teamPool.find((t) => t.key === id)?.name ??
+                                    (() => {
+                                        const team = teams.find((t) => teamKey(t.id) === id);
+                                        return team ? teamName(team, byId) : undefined;
+                                    })() ??
+                                    byId.get(id)?.name ??
+                                    'Unknown';
+                                return (
+                                    <span key={id} className="pill pill-removable">
+                                        {name}
+                                        <button
+                                            type="button"
+                                            aria-label={`Stop comparing ${name}`}
+                                            onClick={() =>
+                                                setCompareIds((ids) => ids.filter((x) => x !== id))
+                                            }
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
+                                );
+                            })}
+                            {compareIds.length > 1 && (
+                                <button
+                                    type="button"
+                                    className="btn btn-ghost btn-sm"
+                                    onClick={() => setCompareIds([])}
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
+                    )}
                     <label className="row" style={{ marginBottom: 12 }}>
                         <input
                             type="checkbox"

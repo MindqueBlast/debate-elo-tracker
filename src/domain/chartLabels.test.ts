@@ -183,3 +183,14 @@ describe('point labels', () => {
         expect(series[0].data.map((p) => p.event)).toEqual([undefined, 'Tournament']);
     });
 });
+
+describe('comparing several lines', () => {
+    it('draws every compared person once, skipping the selected one', () => {
+        const { series } = buildEloSeries({
+            debaters: people,
+            selectedId: 'j',
+            compareIds: ['l', 'a', 'j', 'l'],
+        });
+        expect(series.map((s) => s.label)).toEqual(['Jiayi', 'Leon', 'Aaditya']);
+    });
+});

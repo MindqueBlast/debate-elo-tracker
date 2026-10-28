@@ -1319,6 +1319,38 @@ p {
     gap: 6px;
 }
 
+.compare-chips {
+    align-items: center;
+    margin: -4px 0 14px;
+}
+
+.pill-removable {
+    gap: 4px;
+    padding: 3px 4px 3px 10px;
+    font-size: 13px;
+    color: var(--text);
+}
+
+.pill-removable button {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pill-removable button:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+}
+
 @media (max-width: 720px) {
     .pairing-custom {
         grid-template-columns: 1fr;

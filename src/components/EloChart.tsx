@@ -46,6 +46,10 @@ const HEX = [
     '#e2c36b',
     '#c084fc',
     '#67e8f9',
+    '#f472b6',
+    '#a3e635',
+    '#fb923c',
+    '#818cf8',
 ];
 
 const ANNOTATIONS = '__annotations__';

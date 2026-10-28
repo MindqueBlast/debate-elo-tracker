@@ -26,6 +26,8 @@ export interface BuildEloSeriesOptions {
     teams?: Team[];
     selectedId: string;
     compareId?: string | null;
+    /** Any number of extra people or teams drawn next to the selected one. */
+    compareIds?: string[];
     startDate?: string | null;
     endDate?: string | null;
     showGraduated?: boolean;
@@ -130,6 +132,7 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         teams = [],
         selectedId,
         compareId,
+        compareIds = [],
         startDate,
         endDate,
         showGraduated = false,
@@ -158,14 +161,16 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
             });
         }
     } else if (selectedId === ALL_TEAMS) {
-        for (const team of teams.filter((t) => t.active)) {
+        for (const team of teams.filter((t) => t.active || showGraduated)) {
             series.push(teamSeries(team, debaters, index, startDate, endDate));
         }
     } else {
         const primary = seriesFor(selectedId, debaters, teams, index, startDate, endDate);
         if (primary) series.push(primary);
-        if (compareId && compareId !== selectedId) {
-            const other = seriesFor(compareId, debaters, teams, index, startDate, endDate);
+        const others = [...compareIds, ...(compareId ? [compareId] : [])];
+        for (const id of new Set(others)) {
+            if (id === selectedId) continue;
+            const other = seriesFor(id, debaters, teams, index, startDate, endDate);
             if (other) series.push(other);
         }
     }
