@@ -1,8 +1,9 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { Logo } from '../components/Logo';
 import { AppBackground } from '../components/AppBackground';
 import { useTheme } from '../state/ThemeProvider';
+import { useAuth } from '../auth/AuthProvider';
 import {
     shouldAnimateDecorative,
     useReducedMotion,
@@ -225,8 +226,15 @@ const FEATURES: Array<{
 
 export function LandingPage() {
     const { toggle, theme } = useTheme();
+    const { enterGuestMode, role } = useAuth();
+    const navigate = useNavigate();
     const reduced = useReducedMotion();
     const animated = shouldAnimateDecorative(reduced);
+
+    function browseAsGuest() {
+        enterGuestMode();
+        navigate('/app');
+    }
 
     return (
         <div className="landing-root">
@@ -240,9 +248,15 @@ export function LandingPage() {
                     <Button variant="ghost" size="sm" onClick={toggle}>
                         {theme === 'dark' ? 'Light' : 'Dark'}
                     </Button>
-                    <Link to="/login" className="btn btn-sm">
-                        Enter Tracker
-                    </Link>
+                    {role ? (
+                        <Link to="/app" className="btn btn-sm">
+                            Open Tracker
+                        </Link>
+                    ) : (
+                        <Link to="/login" className="btn btn-sm">
+                            Enter Tracker
+                        </Link>
+                    )}
                 </div>
             </header>
             <section className="hero">
@@ -261,11 +275,9 @@ export function LandingPage() {
                         competitive record.
                     </p>
                     <div className="hero-ctas">
-                        <Link to="/login" className="btn">
-                            Enter Tracker
-                        </Link>
+                        <Button onClick={browseAsGuest}>Browse as guest</Button>
                         <Link to="/login" className="btn btn-secondary">
-                            Explore Rankings
+                            Sign in
                         </Link>
                     </div>
                     <div className="hero-mini-motifs" aria-hidden="true">

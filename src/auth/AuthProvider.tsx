@@ -3,6 +3,8 @@ import type { User } from 'firebase/auth';
 import { roleForEmail, type UserRole } from './allowlist';
 import { signInWithGoogle, signOutUser, subscribeAuth } from './firebase';
 
+const GUEST_KEY = 'det-guest';
+
 interface AuthContextValue {
     user: User | null;
     role: UserRole | null;
@@ -10,12 +12,31 @@ interface AuthContextValue {
     error: string | null;
     isAdmin: boolean;
     isDev: boolean;
+    isGuest: boolean;
     signIn: () => Promise<void>;
     signOut: () => Promise<void>;
+    enterGuestMode: () => void;
     enterDevMode: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function readGuestFlag() {
+    try {
+        return localStorage.getItem(GUEST_KEY) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function writeGuestFlag(on: boolean) {
+    try {
+        if (on) localStorage.setItem(GUEST_KEY, '1');
+        else localStorage.removeItem(GUEST_KEY);
+    } catch {
+        /* ignore */
+    }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
@@ -23,15 +44,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [devMode, setDevMode] = useState(false);
+    const [guestMode, setGuestMode] = useState(readGuestFlag);
 
     useEffect(() => {
         const unsub = subscribeAuth(async (next) => {
             setError(null);
             if (!next) {
                 setUser(null);
-                setRole(devMode ? 'admin' : null);
+                if (devMode) {
+                    setRole('admin');
+                } else if (guestMode) {
+                    setRole('viewer');
+                } else {
+                    setRole(null);
+                }
                 setLoading(false);
                 return;
+            }
+            // Signed-in Google users replace guest mode.
+            if (guestMode) {
+                setGuestMode(false);
+                writeGuestFlag(false);
             }
             const nextRole = roleForEmail(next.email);
             if (!nextRole) {
@@ -47,16 +80,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setLoading(false);
         });
         return unsub;
-    }, [devMode]);
+    }, [devMode, guestMode]);
+
+    const effectiveRole: UserRole | null = devMode
+        ? 'admin'
+        : guestMode && !user
+          ? 'viewer'
+          : role;
 
     const value = useMemo<AuthContextValue>(
         () => ({
             user,
-            role: devMode ? 'admin' : role,
+            role: effectiveRole,
             loading,
             error,
-            isAdmin: (devMode ? 'admin' : role) === 'admin',
+            isAdmin: effectiveRole === 'admin',
             isDev: devMode,
+            isGuest: guestMode && !user && !devMode,
             signIn: async () => {
                 setError(null);
                 try {
@@ -69,15 +109,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             },
             signOut: async () => {
                 setDevMode(false);
+                setGuestMode(false);
+                writeGuestFlag(false);
+                setRole(null);
                 await signOutUser();
             },
+            enterGuestMode: () => {
+                setError(null);
+                setDevMode(false);
+                setGuestMode(true);
+                writeGuestFlag(true);
+                setRole('viewer');
+                setLoading(false);
+            },
             enterDevMode: () => {
+                setGuestMode(false);
+                writeGuestFlag(false);
                 setDevMode(true);
                 setRole('admin');
                 setLoading(false);
             },
         }),
-        [user, role, loading, error, devMode]
+        [user, effectiveRole, loading, error, devMode, guestMode]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

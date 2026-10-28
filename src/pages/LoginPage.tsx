@@ -7,7 +7,8 @@ import { AppBackground } from '../components/AppBackground';
 import { ScalesMotif } from '../components/illustrations';
 
 export function LoginPage() {
-    const { role, loading, signIn, error, enterDevMode } = useAuth();
+    const { role, loading, signIn, error, enterGuestMode, enterDevMode } =
+        useAuth();
 
     if (!loading && role) return <Navigate to="/app" replace />;
 
@@ -27,8 +28,9 @@ export function LoginPage() {
                 </div>
                 <h1 style={{ fontSize: 28, marginBottom: 8 }}>Sign in</h1>
                 <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>
-                    Google accounts on the club allowlist can enter the tracker.
-                    Admins can record results; viewers can follow the board.
+                    Continue as a guest to browse rankings and history, or sign
+                    in with an allowlisted Google account. Admins can record
+                    results; guests and viewers are read-only.
                 </p>
                 {error && (
                     <p style={{ color: 'var(--loss)', marginBottom: 12 }}>{error}</p>
@@ -36,9 +38,16 @@ export function LoginPage() {
                 <Button onClick={() => void signIn()} style={{ width: '100%' }}>
                     Sign in with Google
                 </Button>
+                <Button
+                    variant="secondary"
+                    style={{ width: '100%', marginTop: 10 }}
+                    onClick={enterGuestMode}
+                >
+                    Continue as guest
+                </Button>
                 {import.meta.env.DEV && (
                     <Button
-                        variant="secondary"
+                        variant="ghost"
                         style={{ width: '100%', marginTop: 10 }}
                         onClick={enterDevMode}
                     >

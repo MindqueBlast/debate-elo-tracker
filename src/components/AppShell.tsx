@@ -16,9 +16,10 @@ const LINKS = [
 ];
 
 export function AppShell() {
-    const { user, isAdmin, isDev, signOut } = useAuth();
+    const { user, isAdmin, isDev, isGuest, signOut } = useAuth();
     const { theme, toggle } = useTheme();
     const [open, setOpen] = useState(false);
+    const roleLabel = isAdmin ? 'Admin' : isGuest ? 'Guest' : 'Viewer';
 
     return (
         <div className="app-shell">
@@ -54,7 +55,7 @@ export function AppShell() {
                 </nav>
                 <div className="nav-actions">
                     {isDev && <span className="badge">Test mode</span>}
-                    <span className="pill">{isAdmin ? 'Admin' : 'Viewer'}</span>
+                    <span className="pill">{roleLabel}</span>
                     <Button variant="ghost" size="sm" onClick={toggle}>
                         {theme === 'dark' ? 'Light' : 'Dark'}
                     </Button>
@@ -63,7 +64,7 @@ export function AppShell() {
                         size="sm"
                         onClick={() => void signOut()}
                     >
-                        {user?.email ? 'Log out' : 'Exit'}
+                        {user?.email ? 'Log out' : isGuest ? 'Exit guest' : 'Exit'}
                     </Button>
                     <Button
                         className="mobile-nav-toggle"
