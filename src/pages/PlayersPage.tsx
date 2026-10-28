@@ -1,13 +1,26 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
-import { parseEloInput, rankDebaters } from '../domain';
+import {
+    BASE_ELO,
+    lookup,
+    parseEloInput,
+    rankDebaters,
+    rankTeams,
+    type Debater,
+    type Division,
+    type Team,
+} from '../domain';
 import {
     addDebater,
+    createTeam,
+    deleteTeam,
     MutationError,
     removeDebater,
     setDebaterElo,
     toggleGraduate,
+    updateDebater,
+    updateTeam,
 } from '../data/mutations';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
@@ -17,84 +30,143 @@ import { EmptyRoster } from '../components/illustrations';
 import { useAppData } from '../state/AppDataProvider';
 import { useToast } from '../state/ToastProvider';
 
+const DIVS: Division[] = ['Varsity', 'JV', 'Novice'];
+
+const errorText = (err: unknown, fallback: string) =>
+    err instanceof MutationError ? err.message : fallback;
+
 export function PlayersPage() {
-    const { isAdmin } = useAuth();
-    const { debaters, practiceRounds, refresh } = useAppData();
-    const toast = useToast();
-    const [q, setQ] = useState('');
-    const [showGraduated, setShowGraduated] = useState(true);
-    const [name, setName] = useState('');
-    const [elo, setElo] = useState('1500');
-    const [eloTarget, setEloTarget] = useState<string | null>(null);
-    const [eloValue, setEloValue] = useState('');
-
-    const ranked = useMemo(
-        () => rankDebaters(debaters, practiceRounds, { showGraduated, search: q }),
-        [debaters, practiceRounds, showGraduated, q]
-    );
-
-    async function onAdd(e: React.FormEvent) {
-        e.preventDefault();
-        const parsed = parseEloInput(elo, 1500);
-        if (parsed == null) {
-            toast.push('Starting Elo must be a number.', 'warning');
-            return;
-        }
-        try {
-            await addDebater(name, parsed, debaters);
-            setName('');
-            toast.push(`Added ${name.trim()}.`, 'success');
-            await refresh();
-        } catch (err) {
-            toast.push(
-                err instanceof MutationError ? err.message : 'Failed to add debater.',
-                'error'
-            );
-        }
-    }
-
+    const [tab, setTab] = useState<'people' | 'teams'>('people');
     return (
         <div>
             <PageHeader
                 kicker="Roster"
                 title="Players"
                 illustration={<EmptyRoster size={72} tone="accent" />}
+                actions={
+                    <div className="segmented" role="group" aria-label="Show">
+                        <button
+                            type="button"
+                            aria-pressed={tab === 'people'}
+                            onClick={() => setTab('people')}
+                        >
+                            People
+                        </button>
+                        <button
+                            type="button"
+                            aria-pressed={tab === 'teams'}
+                            onClick={() => setTab('teams')}
+                        >
+                            Teams
+                        </button>
+                    </div>
+                }
             />
+            {tab === 'people' ? <People /> : <Teams />}
+        </div>
+    );
+}
+
+function People() {
+    const { isAdmin } = useAuth();
+    const { debaters, teams, practiceRounds, refresh } = useAppData();
+    const toast = useToast();
+    const [q, setQ] = useState('');
+    const [showGraduated, setShowGraduated] = useState(false);
+    const [name, setName] = useState('');
+    const [division, setDivision] = useState<Division>('Novice');
+    const [elo, setElo] = useState('');
+    const [editing, setEditing] = useState<Debater | null>(null);
+    const [eloTarget, setEloTarget] = useState<Debater | null>(null);
+    const [eloValue, setEloValue] = useState('');
+
+    const ranked = useMemo(
+        () => rankDebaters(debaters, practiceRounds, { showGraduated, search: q }),
+        [debaters, practiceRounds, showGraduated, q]
+    );
+    const teamCount = useMemo(() => {
+        const counts = new Map<string, number>();
+        for (const t of teams) {
+            if (!t.active) continue;
+            for (const id of [t.member1_id, t.member2_id]) {
+                counts.set(id, (counts.get(id) ?? 0) + 1);
+            }
+        }
+        return counts;
+    }, [teams]);
+
+    async function onAdd(e: React.FormEvent) {
+        e.preventDefault();
+        const parsed = parseEloInput(elo, BASE_ELO[division]);
+        if (parsed == null) {
+            toast.push('Starting Elo must be a number.', 'warning');
+            return;
+        }
+        try {
+            await addDebater({ name, division, startingElo: parsed, existing: debaters });
+            setName('');
+            setElo('');
+            toast.push(`Added ${name.trim()} at ${Math.round(parsed)}.`, 'success');
+            await refresh();
+        } catch (err) {
+            toast.push(errorText(err, 'Failed to add person.'), 'error');
+        }
+    }
+
+    return (
+        <>
             {isAdmin && (
                 <Card style={{ marginBottom: 20 }}>
-                    <form onSubmit={(e) => void onAdd(e)} className="grid grid-3">
+                    <form onSubmit={(e) => void onAdd(e)} className="grid grid-4">
                         <div className="field">
-                            <label htmlFor="debaterName">Name</label>
+                            <label htmlFor="personName">Name</label>
                             <input
-                                id="debaterName"
+                                id="personName"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                             />
                         </div>
                         <div className="field">
-                            <label htmlFor="debaterElo">Starting Elo</label>
+                            <label htmlFor="personDivision">Division</label>
+                            <select
+                                id="personDivision"
+                                value={division}
+                                onChange={(e) => setDivision(e.target.value as Division)}
+                            >
+                                {DIVS.map((d) => (
+                                    <option key={d}>{d}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="field">
+                            <label htmlFor="personElo">Starting Elo</label>
                             <input
-                                id="debaterElo"
+                                id="personElo"
+                                inputMode="decimal"
+                                placeholder={String(BASE_ELO[division])}
                                 value={elo}
                                 onChange={(e) => setElo(e.target.value)}
                             />
                         </div>
                         <div className="field" style={{ justifyContent: 'end' }}>
                             <label>&nbsp;</label>
-                            <Button type="submit">Add debater</Button>
+                            <Button type="submit">Add person</Button>
                         </div>
                     </form>
+                    <p className="note">
+                        New people start at {BASE_ELO.Novice} (Novice), {BASE_ELO.JV} (JV) or{' '}
+                        {BASE_ELO.Varsity} (Varsity) unless you enter a number.
+                    </p>
                 </Card>
             )}
-            <div className="row" style={{ marginBottom: 16 }}>
+            <div className="toolbar">
                 <input
                     className="input"
                     placeholder="Search…"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    style={{ maxWidth: 280 }}
                 />
-                <label className="row" style={{ alignItems: 'center' }}>
+                <label className="row check" style={{ marginBottom: 0 }}>
                     <input
                         type="checkbox"
                         checked={showGraduated}
@@ -106,8 +178,8 @@ export function PlayersPage() {
             <Card>
                 {ranked.length === 0 ? (
                     <EmptyState
-                        title="No players"
-                        body="Add a debater to the roster."
+                        title="No people"
+                        body="Add someone to the roster."
                         illustration={<EmptyRoster size={80} />}
                     />
                 ) : (
@@ -117,15 +189,24 @@ export function PlayersPage() {
                             <Link to={`/app/players/${d.id}`}>
                                 <strong>{d.name}</strong>
                             </Link>
+                            {d.division && <span className="pill">{d.division}</span>}
+                            {d.status === 'graduated' && <span className="pill">graduated</span>}
+                            {d.status === 'active' && !teamCount.get(d.id) && (
+                                <span className="pill" title="Not on an active team">
+                                    no team
+                                </span>
+                            )}
                             <span className="elo">{Math.round(d.elo)}</span>
-                            <span className="pill">{d.status}</span>
-                            {isAdmin ? (
+                            {isAdmin && (
                                 <span className="row">
+                                    <Button size="sm" variant="secondary" onClick={() => setEditing(d)}>
+                                        Edit
+                                    </Button>
                                     <Button
                                         size="sm"
                                         variant="secondary"
                                         onClick={() => {
-                                            setEloTarget(d.id);
+                                            setEloTarget(d);
                                             setEloValue(String(Math.round(d.elo)));
                                         }}
                                     >
@@ -135,12 +216,311 @@ export function PlayersPage() {
                                         size="sm"
                                         variant="secondary"
                                         onClick={async () => {
-                                            await toggleGraduate(d);
-                                            toast.push(`Status updated.`, 'success');
-                                            await refresh();
+                                            try {
+                                                await toggleGraduate(d);
+                                                toast.push('Status updated.', 'success');
+                                                await refresh();
+                                            } catch (err) {
+                                                toast.push(errorText(err, 'Failed to update.'), 'error');
+                                            }
                                         }}
                                     >
-                                        {d.status === 'active' ? 'Graduate' : 'Activate'}
+                                        {d.status === 'active' ? 'Graduate' : 'Reactivate'}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="danger"
+                                        onClick={async () => {
+                                            if (!confirm(`Permanently remove ${d.name}?`)) return;
+                                            try {
+                                                await removeDebater(d.id);
+                                                toast.push('Removed.', 'success');
+                                                await refresh();
+                                            } catch (err) {
+                                                toast.push(errorText(err, 'Failed to remove.'), 'error');
+                                            }
+                                        }}
+                                    >
+                                        Remove
+                                    </Button>
+                                </span>
+                            )}
+                        </div>
+                    ))
+                )}
+            </Card>
+            <AnimatePresence>
+                {editing && (
+                    <EditPerson
+                        key="edit-person"
+                        debater={editing}
+                        onClose={() => setEditing(null)}
+                    />
+                )}
+                {eloTarget && (
+                    <Modal key="set-elo" title={`Set Elo · ${eloTarget.name}`} onClose={() => setEloTarget(null)}>
+                        <form
+                            onSubmit={async (e) => {
+                                e.preventDefault();
+                                const parsed = parseEloInput(eloValue, NaN);
+                                if (parsed == null || Number.isNaN(parsed)) {
+                                    toast.push('Enter a valid Elo.', 'warning');
+                                    return;
+                                }
+                                try {
+                                    await setDebaterElo(eloTarget, parsed);
+                                    toast.push(`Elo set to ${parsed}.`, 'success');
+                                    setEloTarget(null);
+                                    await refresh();
+                                } catch (err) {
+                                    toast.push(errorText(err, 'Failed to set Elo.'), 'error');
+                                }
+                            }}
+                        >
+                            <div className="field">
+                                <label htmlFor="newElo">New Elo</label>
+                                <input
+                                    id="newElo"
+                                    value={eloValue}
+                                    onChange={(e) => setEloValue(e.target.value)}
+                                />
+                            </div>
+                            <Button type="submit">Save</Button>
+                        </form>
+                    </Modal>
+                )}
+            </AnimatePresence>
+        </>
+    );
+}
+
+function EditPerson({ debater, onClose }: { debater: Debater; onClose: () => void }) {
+    const { debaters, refresh } = useAppData();
+    const toast = useToast();
+    const [name, setName] = useState(debater.name);
+    const [division, setDivision] = useState<Division | ''>(debater.division ?? '');
+    return (
+        <Modal title={`Edit ${debater.name}`} onClose={onClose}>
+            <form
+                onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                        await updateDebater(
+                            debater,
+                            { name, division: division || null },
+                            debaters
+                        );
+                        toast.push('Saved.', 'success');
+                        onClose();
+                        await refresh();
+                    } catch (err) {
+                        toast.push(errorText(err, 'Failed to save.'), 'error');
+                    }
+                }}
+            >
+                <div className="field">
+                    <label htmlFor="editName">Name</label>
+                    <input id="editName" value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
+                <div className="field">
+                    <label htmlFor="editDivision">Division</label>
+                    <select
+                        id="editDivision"
+                        value={division}
+                        onChange={(e) => setDivision(e.target.value as Division | '')}
+                    >
+                        <option value="">—</option>
+                        {DIVS.map((d) => (
+                            <option key={d}>{d}</option>
+                        ))}
+                    </select>
+                </div>
+                <Button type="submit">Save</Button>
+            </form>
+        </Modal>
+    );
+}
+
+function Teams() {
+    const { isAdmin } = useAuth();
+    const { debaters, teams, refresh } = useAppData();
+    const toast = useToast();
+    const byId = useMemo(() => lookup(debaters), [debaters]);
+    const active = useMemo(
+        () =>
+            debaters
+                .filter((d) => d.status === 'active')
+                .sort((a, b) => a.name.localeCompare(b.name)),
+        [debaters]
+    );
+    const [q, setQ] = useState('');
+    const [showInactive, setShowInactive] = useState(false);
+    const [members, setMembers] = useState<[string, string]>(['', '']);
+    const [name, setName] = useState('');
+    const [division, setDivision] = useState<Division | ''>('');
+    const [editing, setEditing] = useState<Team | null>(null);
+
+    const ranked = useMemo(
+        () => rankTeams(teams, debaters, { showInactive, search: q }),
+        [teams, debaters, showInactive, q]
+    );
+    const onActiveTeam = new Set(
+        teams.filter((t) => t.active).flatMap((t) => [t.member1_id, t.member2_id])
+    );
+
+    return (
+        <>
+            {isAdmin && (
+                <Card style={{ marginBottom: 20 }}>
+                    <form
+                        className="grid grid-5"
+                        onSubmit={async (e) => {
+                            e.preventDefault();
+                            try {
+                                await createTeam({
+                                    members,
+                                    name,
+                                    division: division || null,
+                                    teams,
+                                });
+                                setMembers(['', '']);
+                                setName('');
+                                setDivision('');
+                                toast.push('Team saved.', 'success');
+                                await refresh();
+                            } catch (err) {
+                                toast.push(errorText(err, 'Failed to save the team.'), 'error');
+                            }
+                        }}
+                    >
+                        {[0, 1].map((slot) => (
+                            <div className="field" key={slot}>
+                                <label htmlFor={`teamMember${slot}`}>
+                                    {slot === 0 ? 'Person 1' : 'Person 2'}
+                                </label>
+                                <select
+                                    id={`teamMember${slot}`}
+                                    value={members[slot]}
+                                    onChange={(e) => {
+                                        const next: [string, string] = [...members];
+                                        next[slot] = e.target.value;
+                                        setMembers(next);
+                                    }}
+                                >
+                                    <option value="">Select…</option>
+                                    {active.map((d) => (
+                                        <option
+                                            key={d.id}
+                                            value={d.id}
+                                            disabled={d.id === members[1 - slot]}
+                                        >
+                                            {d.name}
+                                            {onActiveTeam.has(d.id) ? '' : ' · no team'}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        ))}
+                        <div className="field">
+                            <label htmlFor="teamDivision">Division</label>
+                            <select
+                                id="teamDivision"
+                                value={division}
+                                onChange={(e) => setDivision(e.target.value as Division | '')}
+                            >
+                                <option value="">—</option>
+                                {DIVS.map((d) => (
+                                    <option key={d}>{d}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="field">
+                            <label htmlFor="teamName">Name (optional)</label>
+                            <input
+                                id="teamName"
+                                placeholder="e.g. Jiayi+Leon"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                            />
+                        </div>
+                        <div className="field" style={{ justifyContent: 'end' }}>
+                            <label>&nbsp;</label>
+                            <Button type="submit">Save team</Button>
+                        </div>
+                    </form>
+                    <p className="note">
+                        Teams are just saved partnerships for quick entry and the team
+                        rankings. A team’s Elo is the average of its two people, and every
+                        result counts for each person, whoever they debated with.
+                    </p>
+                </Card>
+            )}
+            <div className="toolbar">
+                <input
+                    className="input"
+                    placeholder="Search teams or people…"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                />
+                <label className="row check" style={{ marginBottom: 0 }}>
+                    <input
+                        type="checkbox"
+                        checked={showInactive}
+                        onChange={(e) => setShowInactive(e.target.checked)}
+                    />
+                    Show past teams
+                </label>
+            </div>
+            <Card>
+                {ranked.length === 0 ? (
+                    <EmptyState
+                        title="No teams"
+                        body="Save a partnership to see it here."
+                        illustration={<EmptyRoster size={80} />}
+                    />
+                ) : (
+                    ranked.map((r) => (
+                        <div key={r.team.id} className={`team-row ${r.rank <= 3 && r.team.active ? `rank-${r.rank}` : ''}`}>
+                            <span className="num">#{r.rank}</span>
+                            <div>
+                                <strong>{r.name}</strong>
+                                <div className="team-row__members">
+                                    {r.members.map((m, i) => (
+                                        <span key={m.id}>
+                                            {i > 0 && ' · '}
+                                            <Link to={`/app/players/${m.id}`}>
+                                                {m.name} {Math.round(m.elo)}
+                                            </Link>
+                                        </span>
+                                    ))}
+                                    {r.team.season && ` · ${r.team.season}`}
+                                </div>
+                            </div>
+                            <span className="chips">
+                                {r.team.division && <span className="pill">{r.team.division}</span>}
+                                {!r.team.active && <span className="pill">past</span>}
+                            </span>
+                            <span className="elo" style={{ textAlign: 'right' }}>
+                                {Math.round(r.elo)}
+                            </span>
+                            {isAdmin && (
+                                <span className="row team-row__actions">
+                                    <Button size="sm" variant="secondary" onClick={() => setEditing(r.team)}>
+                                        Edit
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={async () => {
+                                            try {
+                                                await updateTeam(r.team, { active: !r.team.active }, teams);
+                                                await refresh();
+                                            } catch (err) {
+                                                toast.push(errorText(err, 'Failed to update.'), 'error');
+                                            }
+                                        }}
+                                    >
+                                        {r.team.active ? 'Retire team' : 'Make active'}
                                     </Button>
                                     <Button
                                         size="sm"
@@ -148,60 +528,132 @@ export function PlayersPage() {
                                         onClick={async () => {
                                             if (
                                                 !confirm(
-                                                    'Permanently remove this debater and their data?'
+                                                    `Delete ${r.name}? Past results stay on each person's record.`
                                                 )
                                             )
                                                 return;
-                                            await removeDebater(d.id);
-                                            toast.push('Removed.', 'success');
-                                            await refresh();
+                                            try {
+                                                await deleteTeam(r.team);
+                                                await refresh();
+                                            } catch (err) {
+                                                toast.push(errorText(err, 'Failed to delete.'), 'error');
+                                            }
                                         }}
                                     >
-                                        Remove
+                                        Delete
                                     </Button>
                                 </span>
-                            ) : (
-                                <span />
                             )}
                         </div>
                     ))
                 )}
             </Card>
             <AnimatePresence>
-                {eloTarget && (
-                    <Modal
-                        key="set-elo"
-                        title="Set Elo"
-                        onClose={() => setEloTarget(null)}
-                    >
-                    <form
-                        onSubmit={async (e) => {
-                            e.preventDefault();
-                            const debater = debaters.find((d) => d.id === eloTarget);
-                            const parsed = parseEloInput(eloValue, NaN);
-                            if (!debater || parsed == null || Number.isNaN(parsed)) {
-                                toast.push('Enter a valid Elo.', 'warning');
-                                return;
-                            }
-                            await setDebaterElo(debater, parsed);
-                            toast.push(`Elo set to ${parsed}.`, 'success');
-                            setEloTarget(null);
-                            await refresh();
-                        }}
-                    >
-                        <div className="field">
-                            <label htmlFor="newElo">New Elo</label>
-                            <input
-                                id="newElo"
-                                value={eloValue}
-                                onChange={(e) => setEloValue(e.target.value)}
-                            />
-                        </div>
-                        <Button type="submit">Save</Button>
-                    </form>
-                    </Modal>
+                {editing && (
+                    <EditTeam
+                        key="edit-team"
+                        team={editing}
+                        people={debaters
+                            .filter(
+                                (d) =>
+                                    d.status === 'active' ||
+                                    d.id === editing.member1_id ||
+                                    d.id === editing.member2_id
+                            )
+                            .sort((a, b) => a.name.localeCompare(b.name))}
+                        byName={(id) => byId.get(id)?.name ?? 'Unknown'}
+                        onClose={() => setEditing(null)}
+                    />
                 )}
             </AnimatePresence>
-        </div>
+        </>
+    );
+}
+
+function EditTeam({
+    team,
+    people,
+    onClose,
+}: {
+    team: Team;
+    people: Debater[];
+    byName: (id: string) => string;
+    onClose: () => void;
+}) {
+    const { teams, refresh } = useAppData();
+    const toast = useToast();
+    const [members, setMembers] = useState<[string, string]>([team.member1_id, team.member2_id]);
+    const [name, setName] = useState(team.name ?? '');
+    const [division, setDivision] = useState<Division | ''>(team.division ?? '');
+    return (
+        <Modal title="Edit team" onClose={onClose}>
+            <form
+                onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                        await updateTeam(
+                            team,
+                            { members, name, division: division || null },
+                            teams
+                        );
+                        toast.push('Team saved.', 'success');
+                        onClose();
+                        await refresh();
+                    } catch (err) {
+                        toast.push(errorText(err, 'Failed to save.'), 'error');
+                    }
+                }}
+            >
+                {[0, 1].map((slot) => (
+                    <div className="field" key={slot}>
+                        <label htmlFor={`editMember${slot}`}>
+                            {slot === 0 ? 'Person 1' : 'Person 2'}
+                        </label>
+                        <select
+                            id={`editMember${slot}`}
+                            value={members[slot]}
+                            onChange={(e) => {
+                                const next: [string, string] = [...members];
+                                next[slot] = e.target.value;
+                                setMembers(next);
+                            }}
+                        >
+                            {people.map((d) => (
+                                <option key={d.id} value={d.id} disabled={d.id === members[1 - slot]}>
+                                    {d.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                ))}
+                <div className="field">
+                    <label htmlFor="editTeamName">Name</label>
+                    <input
+                        id="editTeamName"
+                        placeholder="Leave blank to use the two names"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                    />
+                </div>
+                <div className="field">
+                    <label htmlFor="editTeamDivision">Division</label>
+                    <select
+                        id="editTeamDivision"
+                        value={division}
+                        onChange={(e) => setDivision(e.target.value as Division | '')}
+                    >
+                        <option value="">—</option>
+                        {DIVS.map((d) => (
+                            <option key={d}>{d}</option>
+                        ))}
+                    </select>
+                </div>
+                <p className="note" style={{ marginBottom: 12 }}>
+                    Changing who’s on a team only changes the list. Past results stay with
+                    the people who earned them.
+                </p>
+                <Button type="submit">Save</Button>
+            </form>
+        </Modal>
     );
 }

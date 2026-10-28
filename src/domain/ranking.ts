@@ -1,3 +1,4 @@
+import { practiceSide } from './teams';
 import type { Debater, PracticeRound, RankedDebater } from './types';
 
 export function practiceRecord(
@@ -7,8 +8,9 @@ export function practiceRecord(
     let wins = 0;
     let losses = 0;
     for (const round of rounds) {
-        if (round.winner_id === debaterId) wins += 1;
-        else if (round.loser_id === debaterId) losses += 1;
+        const side = practiceSide(round, debaterId);
+        if (side === 'won') wins += 1;
+        else if (side === 'lost') losses += 1;
     }
     const played = wins + losses;
     return {

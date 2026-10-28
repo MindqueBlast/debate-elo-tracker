@@ -89,6 +89,22 @@ export function EloChart({
 
     const chartDuration = reduced ? 0 : DURATIONS.chart * 1000;
 
+    // Over long ranges (several seasons) show months with the year
+    const longRange = useMemo(() => {
+        let min = '';
+        let max = '';
+        for (const s of series) {
+            for (const p of s.data) {
+                if (!min || p.x < min) min = p.x;
+                if (!max || p.x > max) max = p.x;
+            }
+        }
+        if (!min || !max) return false;
+        const a = toChartX(min).getTime();
+        const b = toChartX(max).getTime();
+        return (b - a) / 86_400_000 > 300;
+    }, [series]);
+
     const options = useMemo<ChartOptions<'line'>>(
         () => ({
             responsive: true,
@@ -149,7 +165,13 @@ export function EloChart({
             scales: {
                 x: {
                     type: 'time',
-                    time: { unit: 'day', tooltipFormat: 'MMM d, yyyy' },
+                    time: longRange
+                        ? {
+                              unit: 'month',
+                              tooltipFormat: 'MMM d, yyyy',
+                              displayFormats: { month: "MMM ''yy" },
+                          }
+                        : { unit: 'day', tooltipFormat: 'MMM d, yyyy' },
                     grid: { color: 'rgba(255,255,255,0.04)' },
                     ticks: { maxRotation: 0, color: '#9aa3b5' },
                     title: { display: false },
@@ -163,7 +185,7 @@ export function EloChart({
                 },
             },
         }),
-        [series, yMin, yMax, chartDuration]
+        [series, yMin, yMax, chartDuration, longRange]
     );
 
     if (isEmpty) {

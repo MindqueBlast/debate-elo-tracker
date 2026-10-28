@@ -1,5 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
-import { buildEloSeries, isCalendarDate, snapshotFromSeries } from '../domain';
+import {
+    ALL_TEAMS,
+    buildEloSeries,
+    isCalendarDate,
+    lookup,
+    snapshotFromSeries,
+    teamKey,
+    teamName,
+} from '../domain';
 import {
     addAnnotation,
     deleteHistoryPoint,
@@ -18,7 +26,7 @@ import type { ChartSeries } from '../domain';
 
 export function AnalyticsPage() {
     const { isAdmin } = useAuth();
-    const { debaters, annotations, refresh } = useAppData();
+    const { debaters, teams, annotations, refresh } = useAppData();
     const toast = useToast();
     const wrapRef = useRef<HTMLDivElement>(null);
     const [selectedId, setSelectedId] = useState('ALL');
@@ -31,16 +39,35 @@ export function AnalyticsPage() {
     const [eventName, setEventName] = useState('');
     const [uploaded, setUploaded] = useState<ChartSeries[] | null>(null);
 
-    const pool = showGraduated
-        ? debaters
-        : debaters.filter((d) => d.status === 'active');
+    const pool = debaters
+        .filter((d) => showGraduated || d.status === 'active')
+        .sort((a, b) => b.elo - a.elo);
+    const byId = useMemo(() => lookup(debaters), [debaters]);
+    const teamPool = useMemo(
+        () =>
+            teams
+                .filter((t) => showGraduated || t.active)
+                .map((t) => ({ key: teamKey(t.id), name: teamName(t, byId) }))
+                .sort((a, b) => a.name.localeCompare(b.name)),
+        [teams, showGraduated, byId]
+    );
+    const isGroup = selectedId === 'ALL' || selectedId === ALL_TEAMS;
+    const selectedName =
+        selectedId === 'ALL'
+            ? 'all_people'
+            : selectedId === ALL_TEAMS
+              ? 'all_teams'
+              : (teamPool.find((t) => t.key === selectedId)?.name ??
+                debaters.find((d) => d.id === selectedId)?.name ??
+                'elo');
 
     const result = useMemo(
         () =>
             buildEloSeries({
                 debaters,
+                teams,
                 selectedId,
-                compareId: selectedId === 'ALL' ? null : compareId,
+                compareId: isGroup ? null : compareId,
                 startDate: startDate || null,
                 endDate: endDate || null,
                 showGraduated,
@@ -49,6 +76,8 @@ export function AnalyticsPage() {
             }),
         [
             debaters,
+            teams,
+            isGroup,
             selectedId,
             compareId,
             startDate,
@@ -70,21 +99,33 @@ export function AnalyticsPage() {
                 <Card>
                     <div className="chart-toolbar">
                         <div className="field">
-                            <label htmlFor="analyticsDebater">Debater</label>
+                            <label htmlFor="analyticsDebater">Show</label>
                             <select
                                 id="analyticsDebater"
                                 value={selectedId}
                                 onChange={(e) => {
                                     setSelectedId(e.target.value);
-                                    if (e.target.value === 'ALL') setCompareId('');
+                                    if (e.target.value === 'ALL' || e.target.value === ALL_TEAMS) {
+                                        setCompareId('');
+                                    }
                                 }}
                             >
-                                <option value="ALL">All debaters</option>
-                                {pool.map((d) => (
-                                    <option key={d.id} value={d.id}>
-                                        {d.name} ({Math.round(d.elo)})
-                                    </option>
-                                ))}
+                                <option value="ALL">All people</option>
+                                <option value={ALL_TEAMS}>All active teams</option>
+                                <optgroup label="People">
+                                    {pool.map((d) => (
+                                        <option key={d.id} value={d.id}>
+                                            {d.name} ({Math.round(d.elo)})
+                                        </option>
+                                    ))}
+                                </optgroup>
+                                <optgroup label="Teams">
+                                    {teamPool.map((t) => (
+                                        <option key={t.key} value={t.key}>
+                                            {t.name}
+                                        </option>
+                                    ))}
+                                </optgroup>
                             </select>
                         </div>
                         <div className="field">
@@ -92,17 +133,28 @@ export function AnalyticsPage() {
                             <select
                                 id="compareDebater"
                                 value={compareId}
-                                disabled={selectedId === 'ALL'}
+                                disabled={isGroup}
                                 onChange={(e) => setCompareId(e.target.value)}
                             >
                                 <option value="">None</option>
-                                {pool
-                                    .filter((d) => d.id !== selectedId)
-                                    .map((d) => (
-                                        <option key={d.id} value={d.id}>
-                                            {d.name}
-                                        </option>
-                                    ))}
+                                <optgroup label="People">
+                                    {pool
+                                        .filter((d) => d.id !== selectedId)
+                                        .map((d) => (
+                                            <option key={d.id} value={d.id}>
+                                                {d.name}
+                                            </option>
+                                        ))}
+                                </optgroup>
+                                <optgroup label="Teams">
+                                    {teamPool
+                                        .filter((t) => t.key !== selectedId)
+                                        .map((t) => (
+                                            <option key={t.key} value={t.key}>
+                                                {t.name}
+                                            </option>
+                                        ))}
+                                </optgroup>
                             </select>
                         </div>
                         <div className="field">
@@ -138,7 +190,7 @@ export function AnalyticsPage() {
                             checked={showGraduated}
                             onChange={(e) => setShowGraduated(e.target.checked)}
                         />
-                        Include graduated
+                        Include graduated people and past teams
                     </label>
                     <div ref={wrapRef}>
                         <EloChart
@@ -183,10 +235,7 @@ export function AnalyticsPage() {
                                 const canvas = wrapRef.current?.querySelector('canvas');
                                 if (!canvas) return;
                                 const a = document.createElement('a');
-                                a.download =
-                                    selectedId === 'ALL'
-                                        ? 'all_debaters_elo_graph.png'
-                                        : `${debaters.find((d) => d.id === selectedId)?.name ?? 'elo'}_graph.png`;
+                                a.download = `${selectedName.replace(/[^\w+-]+/g, '_')}_elo_graph.png`;
                                 a.href = canvas.toDataURL('image/png');
                                 a.click();
                             }}

@@ -2,16 +2,23 @@ import { useMemo, useState } from 'react';
 import {
     calculatePracticeElo,
     getLocalDateString,
-    type Debater,
+    lookup,
+    pairingEloOf,
+    pairingLabel,
+    practiceSide,
     type Division,
+    type Tournament,
+    type TournamentParams,
 } from '../domain';
 import {
     deletePracticeRound,
     deleteTournament,
     MutationError,
+    previewTournament,
+    rawWinsOf,
     recordPracticeRound,
     recordTournament,
-    type DraftParticipant,
+    type TournamentEntryDraft,
 } from '../data/mutations';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
@@ -21,93 +28,230 @@ import {
     EmptyMatches,
     TournamentTrophy,
 } from '../components/illustrations';
+import {
+    defaultDivision,
+    EMPTY_PAIRING,
+    pairingOf,
+    PairingPicker,
+    type PairingValue,
+} from '../components/PairingPicker';
 import { useAppData } from '../state/AppDataProvider';
 import { useToast } from '../state/ToastProvider';
 
 const PAGE = 10;
+const TOURNEY_PAGE = 8;
+const DIVS: Division[] = ['Varsity', 'JV', 'Novice'];
+const SHORT: Record<Division, string> = { Varsity: 'V', JV: 'JV', Novice: 'N' };
+
+/** Tournament bonus by type, per the league's rules. */
+const TYPES = [
+    { id: 'invitational', label: 'Invitational (5–6+ rounds)', bonus: 30 },
+    { id: 'local', label: 'Local / NYSFL / NCFL / NSDA elims', bonus: 15 },
+    { id: 'haftr', label: 'HAFTR / Citron / BDL', bonus: 10 },
+] as const;
+
+const errorText = (err: unknown, fallback: string) =>
+    err instanceof MutationError ? err.message : fallback;
 
 export function MatchesPage() {
     const { isAdmin } = useAuth();
-    const { debaters, practiceRounds, tournaments, refresh } = useAppData();
+    const { debaters, teams, practiceRounds, tournaments, refresh } = useAppData();
     const toast = useToast();
-    const active = debaters.filter((d) => d.status === 'active');
-    const nameOf = (id: string) =>
-        debaters.find((d) => d.id === id)?.name ?? 'Unknown';
+    const byId = useMemo(() => lookup(debaters), [debaters]);
+    const active = useMemo(() => debaters.filter((d) => d.status === 'active'), [debaters]);
+    const activeTeams = useMemo(() => teams.filter((t) => t.active), [teams]);
+    const [busy, setBusy] = useState(false);
 
-    const [winnerId, setWinnerId] = useState('');
-    const [loserId, setLoserId] = useState('');
+    // practice round form
+    const [winner, setWinner] = useState<PairingValue>(EMPTY_PAIRING);
+    const [loser, setLoser] = useState<PairingValue>(EMPTY_PAIRING);
     const [roundDate, setRoundDate] = useState(getLocalDateString());
+
+    // lists
     const [roundFilter, setRoundFilter] = useState('');
     const [roundPage, setRoundPage] = useState(1);
     const [tourneyQ, setTourneyQ] = useState('');
+    const [tourneyShown, setTourneyShown] = useState(TOURNEY_PAGE);
 
+    // tournament form
     const [tName, setTName] = useState('');
     const [tDate, setTDate] = useState(getLocalDateString());
+    const [tType, setTType] = useState<string>('invitational');
     const [n, setN] = useState('6');
-    const [b, setB] = useState('0');
+    const [b, setB] = useState('30');
     const [k, setK] = useState('45');
     const [maxGain, setMaxGain] = useState('300');
     const [maxRounds, setMaxRounds] = useState('');
-    const [addId, setAddId] = useState('');
-    const [division, setDivision] = useState<Division>('Novice');
-    const [participants, setParticipants] = useState<DraftParticipant[]>([]);
+    const [splitRounds, setSplitRounds] = useState(false);
+    const [roundsBy, setRoundsBy] = useState<Record<Division, string>>({
+        Varsity: '',
+        JV: '',
+        Novice: '',
+    });
+    const [pick, setPick] = useState<PairingValue>(EMPTY_PAIRING);
+    const [pickDivision, setPickDivision] = useState<Division | ''>('');
+    const [entries, setEntries] = useState<TournamentEntryDraft[]>([]);
 
-    const preview =
-        winnerId && loserId && winnerId !== loserId
-            ? (() => {
-                  const w = debaters.find((d) => d.id === winnerId);
-                  const l = debaters.find((d) => d.id === loserId);
-                  if (!w || !l) return null;
-                  return { w, l, r: calculatePracticeElo(w.elo, l.elo) };
-              })()
+    const winnerPair = pairingOf(winner);
+    const loserPair = pairingOf(loser);
+    const odds =
+        winnerPair && loserPair
+            ? calculatePracticeElo(pairingEloOf(winnerPair, byId), pairingEloOf(loserPair, byId))
             : null;
+
+    const params: TournamentParams = {
+        n: parseFloat(n),
+        b: parseFloat(b),
+        k: parseFloat(k),
+        maxGain: parseFloat(maxGain),
+        maxRounds: maxRounds.trim() === '' ? null : parseFloat(maxRounds),
+    };
+    const roundsByDivision = useMemo(() => {
+        if (!splitRounds) return undefined;
+        const out: Partial<Record<Division, number>> = {};
+        for (const d of DIVS) {
+            const v = parseFloat(roundsBy[d]);
+            if (Number.isFinite(v) && v > 0) out[d] = v;
+        }
+        return out;
+    }, [splitRounds, roundsBy]);
+
+    const projected = useMemo(() => {
+        if (entries.length === 0 || !Number.isFinite(params.n) || params.n <= 0) return null;
+        try {
+            const { eTourney, results } = previewTournament({
+                params,
+                roundsByDivision,
+                entries,
+                debaters,
+            });
+            return { eTourney, byKey: new Map(results.map((r) => [r.id, r])) };
+        } catch {
+            return null;
+        }
+    }, [entries, n, b, k, maxGain, maxRounds, roundsByDivision, debaters]);
+
+    const usedInEntries = entries.flatMap((e) => e.members.filter(Boolean) as string[]);
 
     const filteredRounds = useMemo(() => {
         return [...practiceRounds]
-            .filter((r) => !roundFilter || r.winner_id === roundFilter || r.loser_id === roundFilter)
-            .sort((a, b) => (a.date < b.date ? 1 : -1));
+            .filter((r) => !roundFilter || practiceSide(r, roundFilter) !== null)
+            .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     }, [practiceRounds, roundFilter]);
     const roundSlice = filteredRounds.slice((roundPage - 1) * PAGE, roundPage * PAGE);
 
     const filteredTournaments = useMemo(() => {
         const q = tourneyQ.trim().toLowerCase();
         return [...tournaments]
-            .filter(
-                (t) =>
-                    !q ||
-                    (t.name && t.name.toLowerCase().includes(q)) ||
-                    t.date.includes(q)
-            )
-            .sort((a, b) => (a.date < b.date ? 1 : -1));
-    }, [tournaments, tourneyQ]);
+            .filter((t) => {
+                if (!q) return true;
+                if (t.name?.toLowerCase().includes(q) || t.date.includes(q)) return true;
+                return t.tournament_participants.some((p) =>
+                    pairingLabel([p.debater_id, p.partner_id], byId).toLowerCase().includes(q)
+                );
+            })
+            .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    }, [tournaments, tourneyQ, byId]);
 
     async function submitRound(e: React.FormEvent) {
         e.preventDefault();
-        const winner = debaters.find((d) => d.id === winnerId);
-        const loser = debaters.find((d) => d.id === loserId);
-        if (!winner || !loser) {
-            toast.push('Please select two different debaters.', 'warning');
+        if (!winnerPair || !loserPair) {
+            toast.push('Pick both sides (two people each).', 'warning');
             return;
         }
+        setBusy(true);
         try {
-            const result = await recordPracticeRound({
-                winner,
-                loser,
+            const r = await recordPracticeRound({
+                winner: winnerPair,
+                loser: loserPair,
                 date: roundDate,
+                debaters,
             });
             toast.push(
-                `${winner.name} ${Math.round(winner.elo)} → ${Math.round(result.newWinnerElo)}  /  ${loser.name} ${Math.round(loser.elo)} → ${Math.round(result.newLoserElo)}`,
+                `${pairingLabel(winnerPair, byId)} +${r.winnerChange.toFixed(1)} each  /  ${pairingLabel(loserPair, byId)} ${r.loserChange.toFixed(1)} each`,
                 'success',
                 5000
             );
-            setWinnerId('');
-            setLoserId('');
+            setWinner(EMPTY_PAIRING);
+            setLoser(EMPTY_PAIRING);
             await refresh();
         } catch (err) {
+            toast.push(errorText(err, 'Failed to save the round.'), 'error');
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    function addEntry() {
+        const members = pairingOf(pick);
+        if (!members) {
+            toast.push('Pick a team or two people.', 'warning');
+            return;
+        }
+        if (members.some((id) => usedInEntries.includes(id))) {
+            toast.push('Someone in that pairing is already entered.', 'warning');
+            return;
+        }
+        setEntries((prev) => [
+            ...prev,
+            {
+                key: crypto.randomUUID(),
+                members,
+                division: pickDivision || defaultDivision(pick, teams, debaters),
+                prelimWins: 0,
+                elimWins: 0,
+            },
+        ]);
+        setPick(EMPTY_PAIRING);
+        setPickDivision('');
+    }
+
+    async function submitTournament() {
+        setBusy(true);
+        try {
+            const result = await recordTournament({
+                name: tName.trim(),
+                date: tDate,
+                params,
+                roundsByDivision,
+                entries,
+                debaters,
+                teams,
+            });
             toast.push(
-                err instanceof MutationError ? err.message : 'Failed to save match.',
-                'error'
+                `E_tourney ${result.eTourney.toFixed(3)}\n` +
+                    result.results
+                        .map(
+                            (r) =>
+                                `${r.name}: ${r.change >= 0 ? '+' : ''}${r.change.toFixed(1)} each`
+                        )
+                        .join('\n'),
+                'success',
+                8000
             );
+            setEntries([]);
+            setTName('');
+            await refresh();
+        } catch (err) {
+            toast.push(errorText(err, 'Failed to record tournament.'), 'error');
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    async function undoTournament(t: Tournament) {
+        if (!confirm('Delete this tournament and undo its Elo changes?')) return;
+        try {
+            const res = await deleteTournament({ tournament: t, debaters });
+            toast.push(
+                res.approximate
+                    ? 'Deleted. Later results exist, so current ratings may be slightly off.'
+                    : 'Tournament deleted and Elo reverted.',
+                res.approximate ? 'warning' : 'success'
+            );
+            await refresh();
+        } catch (err) {
+            toast.push(errorText(err, 'Failed to undo the tournament.'), 'error');
         }
     }
 
@@ -126,19 +270,23 @@ export function MatchesPage() {
                             Record practice round
                         </h2>
                         <form onSubmit={(e) => void submitRound(e)}>
-                            <PlayerSelect
+                            <PairingPicker
                                 id="winner"
                                 label="Winner"
-                                value={winnerId}
-                                onChange={setWinnerId}
+                                value={winner}
+                                onChange={setWinner}
                                 debaters={active}
+                                teams={activeTeams}
+                                exclude={loserPair ?? []}
                             />
-                            <PlayerSelect
+                            <PairingPicker
                                 id="loser"
                                 label="Loser"
-                                value={loserId}
-                                onChange={setLoserId}
+                                value={loser}
+                                onChange={setLoser}
                                 debaters={active}
+                                teams={activeTeams}
+                                exclude={winnerPair ?? []}
                             />
                             <div className="field">
                                 <label htmlFor="roundDate">Date</label>
@@ -149,12 +297,14 @@ export function MatchesPage() {
                                     onChange={(e) => setRoundDate(e.target.value)}
                                 />
                             </div>
-                            <p style={{ color: 'var(--accent)', marginBottom: 12 }}>
-                                {preview
-                                    ? `Win probability for ${preview.w.name}: ${(preview.r.expected * 100).toFixed(1)}%`
-                                    : 'Win probability: —'}
+                            <p className="note" style={{ marginBottom: 12 }}>
+                                {odds && winnerPair
+                                    ? `Win probability for ${pairingLabel(winnerPair, byId)}: ${(odds.expected * 100).toFixed(1)}%. Each winner +${odds.winnerChange.toFixed(1)}, each loser ${odds.loserChange.toFixed(1)}.`
+                                    : 'Both partners on a side get the same change, based on the pair’s average Elo.'}
                             </p>
-                            <Button type="submit">Record round</Button>
+                            <Button type="submit" disabled={busy}>
+                                Record round
+                            </Button>
                         </form>
                     </Card>
                     <Card>
@@ -162,221 +312,223 @@ export function MatchesPage() {
                             <TournamentTrophy size={32} tone="gold" />
                             Record tournament
                         </h2>
-                        <div className="field">
-                            <label htmlFor="tName">Name (for graph)</label>
-                            <input
-                                id="tName"
-                                value={tName}
-                                onChange={(e) => setTName(e.target.value)}
-                            />
+                        <div className="grid grid-2 tight">
+                            <div className="field">
+                                <label htmlFor="tName">Name (for graph)</label>
+                                <input
+                                    id="tName"
+                                    value={tName}
+                                    onChange={(e) => setTName(e.target.value)}
+                                />
+                            </div>
+                            <div className="field">
+                                <label htmlFor="tDate">Date</label>
+                                <input
+                                    id="tDate"
+                                    type="date"
+                                    value={tDate}
+                                    onChange={(e) => setTDate(e.target.value)}
+                                />
+                            </div>
                         </div>
                         <div className="field">
-                            <label htmlFor="tDate">Date</label>
-                            <input
-                                id="tDate"
-                                type="date"
-                                value={tDate}
-                                onChange={(e) => setTDate(e.target.value)}
-                            />
+                            <label htmlFor="tType">Type</label>
+                            <select
+                                id="tType"
+                                value={tType}
+                                onChange={(e) => {
+                                    setTType(e.target.value);
+                                    const type = TYPES.find((t) => t.id === e.target.value);
+                                    if (type) setB(String(type.bonus));
+                                }}
+                            >
+                                {TYPES.map((t) => (
+                                    <option key={t.id} value={t.id}>
+                                        {t.label} · bonus {t.bonus}
+                                    </option>
+                                ))}
+                                <option value="custom">Custom bonus</option>
+                            </select>
                         </div>
                         <div className="row">
-                            {[
-                                ['n', 'Rounds', n, setN],
-                                ['b', 'Bonus', b, setB],
-                                ['k', 'Affect', k, setK],
-                                ['g', 'Max gain', maxGain, setMaxGain],
-                                ['m', 'Max rounds', maxRounds, setMaxRounds],
-                            ].map(([id, label, val, set]) => (
-                                <div className="field" style={{ flex: 1 }} key={id as string}>
-                                    <label>{label as string}</label>
+                            {(
+                                [
+                                    ['n', 'Rounds', n, setN],
+                                    ['b', 'Bonus', b, setB],
+                                    ['k', 'Affect', k, setK],
+                                    ['g', 'Max gain', maxGain, setMaxGain],
+                                    ['m', 'Max rounds', maxRounds, setMaxRounds],
+                                ] as const
+                            ).map(([id, label, val, set]) => (
+                                <div className="field" style={{ flex: 1, minWidth: 72 }} key={id}>
+                                    <label htmlFor={`param-${id}`}>{label}</label>
                                     <input
-                                        value={val as string}
-                                        onChange={(e) =>
-                                            (set as (v: string) => void)(e.target.value)
-                                        }
+                                        id={`param-${id}`}
+                                        inputMode="decimal"
+                                        value={val}
+                                        onChange={(e) => {
+                                            set(e.target.value);
+                                            if (id === 'b') setTType('custom');
+                                        }}
                                     />
                                 </div>
                             ))}
                         </div>
-                        <div className="row">
-                            <div className="field" style={{ flex: 1 }}>
-                                <label>Participant</label>
-                                <select
-                                    value={addId}
-                                    onChange={(e) => setAddId(e.target.value)}
-                                >
-                                    <option value="">Select…</option>
-                                    {active
-                                        .filter(
-                                            (d) => !participants.some((p) => p.id === d.id)
-                                        )
-                                        .map((d) => (
-                                            <option key={d.id} value={d.id}>
-                                                {d.name}
-                                            </option>
-                                        ))}
-                                </select>
+                        <label className="row check">
+                            <input
+                                type="checkbox"
+                                checked={splitRounds}
+                                onChange={(e) => setSplitRounds(e.target.checked)}
+                            />
+                            Rounds differ by division
+                        </label>
+                        {splitRounds && (
+                            <div className="row">
+                                {DIVS.map((d) => (
+                                    <div className="field" style={{ flex: 1 }} key={d}>
+                                        <label htmlFor={`rounds-${d}`}>{d} rounds</label>
+                                        <input
+                                            id={`rounds-${d}`}
+                                            inputMode="decimal"
+                                            placeholder={n}
+                                            value={roundsBy[d]}
+                                            onChange={(e) =>
+                                                setRoundsBy((prev) => ({
+                                                    ...prev,
+                                                    [d]: e.target.value,
+                                                }))
+                                            }
+                                        />
+                                    </div>
+                                ))}
                             </div>
-                            <div className="field">
-                                <label>Division</label>
-                                <select
-                                    value={division}
-                                    onChange={(e) =>
-                                        setDivision(e.target.value as Division)
-                                    }
-                                >
-                                    <option>Novice</option>
-                                    <option>JV</option>
-                                    <option>Varsity</option>
-                                </select>
-                            </div>
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={() => {
-                                    const d = active.find((x) => x.id === addId);
-                                    if (!d) return;
-                                    setParticipants((prev) => [
-                                        ...prev,
-                                        {
-                                            id: d.id,
-                                            name: d.name,
-                                            division,
-                                            prelim_wins: 0,
-                                            elim_wins: 0,
-                                        },
-                                    ]);
-                                    setAddId('');
+                        )}
+                        <div className="entry-adder">
+                            <PairingPicker
+                                id="entry"
+                                label="Entry"
+                                value={pick}
+                                onChange={(v) => {
+                                    setPick(v);
+                                    setPickDivision('');
                                 }}
-                            >
-                                Add
-                            </Button>
-                        </div>
-                        {participants.map((p) => (
-                            <div key={p.id} className="participant-row">
-                                <strong style={{ flex: 1 }}>
-                                    {p.name} · {p.division}
-                                </strong>
-                                <label>
-                                    Prelim
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={p.prelim_wins}
-                                        style={{ width: 64, marginLeft: 6 }}
-                                        onChange={(e) =>
-                                            setParticipants((prev) =>
-                                                prev.map((x) =>
-                                                    x.id === p.id
-                                                        ? {
-                                                              ...x,
-                                                              prelim_wins: Math.max(
-                                                                  0,
-                                                                  Number(e.target.value)
-                                                              ),
-                                                          }
-                                                        : x
-                                                )
-                                            )
+                                debaters={active}
+                                teams={activeTeams}
+                                exclude={usedInEntries}
+                            />
+                            <div className="row" style={{ alignItems: 'flex-end' }}>
+                                <div className="field" style={{ flex: 1 }}>
+                                    <label htmlFor="entryDivision">Division</label>
+                                    <select
+                                        id="entryDivision"
+                                        value={
+                                            pickDivision ||
+                                            (pairingOf(pick)
+                                                ? defaultDivision(pick, teams, debaters)
+                                                : '')
                                         }
-                                    />
-                                </label>
-                                <label>
-                                    Elim
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={p.elim_wins}
-                                        style={{ width: 64, marginLeft: 6 }}
                                         onChange={(e) =>
-                                            setParticipants((prev) =>
-                                                prev.map((x) =>
-                                                    x.id === p.id
-                                                        ? {
-                                                              ...x,
-                                                              elim_wins: Math.max(
-                                                                  0,
-                                                                  Number(e.target.value)
-                                                              ),
-                                                          }
-                                                        : x
-                                                )
-                                            )
+                                            setPickDivision(e.target.value as Division)
                                         }
-                                    />
-                                </label>
-                                <span className="num">
-                                    Raw {p.prelim_wins + 2 * p.elim_wins}
-                                </span>
-                                <Button
-                                    size="sm"
-                                    variant="danger"
-                                    onClick={() =>
-                                        setParticipants((prev) =>
-                                            prev.filter((x) => x.id !== p.id)
-                                        )
-                                    }
-                                >
-                                    Remove
-                                </Button>
+                                    >
+                                        {!pairingOf(pick) && <option value="">—</option>}
+                                        {DIVS.map((d) => (
+                                            <option key={d}>{d}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="field">
+                                    <Button type="button" variant="secondary" onClick={addEntry}>
+                                        Add entry
+                                    </Button>
+                                </div>
                             </div>
-                        ))}
+                        </div>
+                        {entries.map((entry) => {
+                            const preview = projected?.byKey.get(entry.key);
+                            const set = (patch: Partial<TournamentEntryDraft>) =>
+                                setEntries((prev) =>
+                                    prev.map((x) => (x.key === entry.key ? { ...x, ...patch } : x))
+                                );
+                            return (
+                                <div key={entry.key} className="participant-row">
+                                    <div style={{ flex: 1, minWidth: 140 }}>
+                                        <strong>{pairingLabel(entry.members, byId)}</strong>
+                                        <div className="note">
+                                            <select
+                                                aria-label="Division"
+                                                className="inline-select"
+                                                value={entry.division}
+                                                onChange={(e) =>
+                                                    set({ division: e.target.value as Division })
+                                                }
+                                            >
+                                                {DIVS.map((d) => (
+                                                    <option key={d}>{d}</option>
+                                                ))}
+                                            </select>{' '}
+                                            · Elo {Math.round(pairingEloOf(entry.members, byId))}
+                                        </div>
+                                    </div>
+                                    <label>
+                                        Prelim
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            step={0.5}
+                                            value={entry.prelimWins}
+                                            style={{ width: 60, marginLeft: 6 }}
+                                            onChange={(e) =>
+                                                set({ prelimWins: Math.max(0, Number(e.target.value)) })
+                                            }
+                                        />
+                                    </label>
+                                    <label>
+                                        Elim
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={entry.elimWins}
+                                            style={{ width: 60, marginLeft: 6 }}
+                                            onChange={(e) =>
+                                                set({ elimWins: Math.max(0, Number(e.target.value)) })
+                                            }
+                                        />
+                                    </label>
+                                    <span className="num" title="Raw wins (elims count double)">
+                                        Raw {rawWinsOf(entry.prelimWins, entry.elimWins)}
+                                    </span>
+                                    <span
+                                        className={`num ${preview && preview.change < 0 ? 'delta-neg' : 'delta-pos'}`}
+                                        style={{ minWidth: 56, textAlign: 'right' }}
+                                        title="Projected change for each partner"
+                                    >
+                                        {preview
+                                            ? `${preview.change >= 0 ? '+' : ''}${preview.change.toFixed(1)}`
+                                            : ''}
+                                    </span>
+                                    <Button
+                                        size="sm"
+                                        variant="danger"
+                                        onClick={() =>
+                                            setEntries((prev) => prev.filter((x) => x.key !== entry.key))
+                                        }
+                                    >
+                                        Remove
+                                    </Button>
+                                </div>
+                            );
+                        })}
+                        {projected && (
+                            <p className="note" style={{ marginTop: 8 }}>
+                                E_tourney {projected.eTourney.toFixed(3)}. Changes shown are for
+                                each partner.
+                            </p>
+                        )}
                         <Button
                             style={{ marginTop: 12 }}
-                            onClick={async () => {
-                                try {
-                                    const maxRoundsVal =
-                                        maxRounds.trim() === ''
-                                            ? null
-                                            : parseInt(maxRounds, 10);
-                                    const result = await recordTournament({
-                                        name: tName.trim(),
-                                        date: tDate,
-                                        params: {
-                                            n: parseInt(n, 10),
-                                            b: parseFloat(b),
-                                            k: parseFloat(k),
-                                            maxGain: parseFloat(maxGain),
-                                            maxRounds: maxRoundsVal,
-                                        },
-                                        participants: participants.map((p) => {
-                                            const live = debaters.find(
-                                                (d) => d.id === p.id
-                                            ) as Debater;
-                                            return {
-                                                id: p.id,
-                                                name: p.name,
-                                                elo: live.elo,
-                                                division: p.division,
-                                                W_raw:
-                                                    p.prelim_wins + 2 * p.elim_wins,
-                                            };
-                                        }),
-                                        activeDebaters: active,
-                                    });
-                                    toast.push(
-                                        `E_tourney ${result.eTourney.toFixed(3)}\n` +
-                                            result.results
-                                                .map(
-                                                    (r) =>
-                                                        `${r.name}: ${r.change >= 0 ? '+' : ''}${r.change.toFixed(1)}`
-                                                )
-                                                .join('\n'),
-                                        'success',
-                                        8000
-                                    );
-                                    setParticipants([]);
-                                    setTName('');
-                                    await refresh();
-                                } catch (err) {
-                                    toast.push(
-                                        err instanceof MutationError
-                                            ? err.message
-                                            : 'Failed to record tournament.',
-                                        'error'
-                                    );
-                                }
-                            }}
+                            disabled={busy || entries.length === 0}
+                            onClick={() => void submitTournament()}
                         >
                             Calculate tournament Elo
                         </Button>
@@ -388,6 +540,8 @@ export function MatchesPage() {
                 <Card>
                     <h2 style={{ fontSize: 18, marginBottom: 12 }}>Practice rounds</h2>
                     <select
+                        aria-label="Filter by person"
+                        className="select"
                         value={roundFilter}
                         onChange={(e) => {
                             setRoundFilter(e.target.value);
@@ -395,12 +549,14 @@ export function MatchesPage() {
                         }}
                         style={{ marginBottom: 12 }}
                     >
-                        <option value="">All debaters</option>
-                        {debaters.map((d) => (
-                            <option key={d.id} value={d.id}>
-                                {d.name}
-                            </option>
-                        ))}
+                        <option value="">Everyone</option>
+                        {[...debaters]
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map((d) => (
+                                <option key={d.id} value={d.id}>
+                                    {d.name}
+                                </option>
+                            ))}
                     </select>
                     {roundSlice.length === 0 ? (
                         <EmptyState
@@ -410,53 +566,38 @@ export function MatchesPage() {
                         />
                     ) : (
                         roundSlice.map((r) => (
-                            <div key={r.id} className="match-row">
+                            <div key={r.id} className="match-row match-row--practice">
                                 <span className="num">{r.date}</span>
                                 <span>
-                                    {nameOf(r.winner_id)} def. {nameOf(r.loser_id)}
+                                    {pairingLabel([r.winner_id, r.winner_partner_id], byId)} def.{' '}
+                                    {pairingLabel([r.loser_id, r.loser_partner_id], byId)}
                                 </span>
-                                <span>
-                                    <span className="delta-pos">
-                                        +{r.winner_change.toFixed(1)}
-                                    </span>
+                                <span className="num match-row__deltas">
+                                    <span className="delta-pos">+{r.winner_change.toFixed(1)}</span>
                                     {' / '}
-                                    <span className="delta-neg">
-                                        {r.loser_change.toFixed(1)}
-                                    </span>
+                                    <span className="delta-neg">{r.loser_change.toFixed(1)}</span>
                                     {isAdmin && (
                                         <Button
                                             size="sm"
                                             variant="danger"
                                             style={{ marginLeft: 8 }}
                                             onClick={async () => {
-                                                const winner = debaters.find(
-                                                    (d) => d.id === r.winner_id
-                                                );
-                                                const loser = debaters.find(
-                                                    (d) => d.id === r.loser_id
-                                                );
-                                                if (!winner || !loser) return;
-                                                if (
-                                                    !confirm(
-                                                        'Delete this round and undo its Elo changes?'
-                                                    )
-                                                )
-                                                    return;
-                                                const res = await deletePracticeRound({
-                                                    roundId: r.id,
-                                                    date: r.date,
-                                                    winner,
-                                                    loser,
-                                                    winnerChange: r.winner_change,
-                                                    loserChange: r.loser_change,
-                                                });
-                                                toast.push(
-                                                    res.approximate
-                                                        ? 'Deleted. Later events exist, so remaining ratings may be approximate.'
-                                                        : 'Practice round deleted and Elo reverted.',
-                                                    res.approximate ? 'warning' : 'success'
-                                                );
-                                                await refresh();
+                                                if (!confirm('Delete this round and undo its Elo changes?')) return;
+                                                try {
+                                                    const res = await deletePracticeRound({
+                                                        round: r,
+                                                        debaters,
+                                                    });
+                                                    toast.push(
+                                                        res.approximate
+                                                            ? 'Deleted. Later results exist, so current ratings may be slightly off.'
+                                                            : 'Practice round deleted and Elo reverted.',
+                                                        res.approximate ? 'warning' : 'success'
+                                                    );
+                                                    await refresh();
+                                                } catch (err) {
+                                                    toast.push(errorText(err, 'Failed to undo the round.'), 'error');
+                                                }
                                             }}
                                         >
                                             Undo
@@ -489,9 +630,12 @@ export function MatchesPage() {
                     <h2 style={{ fontSize: 18, marginBottom: 12 }}>Tournaments</h2>
                     <input
                         className="input"
-                        placeholder="Search all tournaments…"
+                        placeholder="Search tournaments or people…"
                         value={tourneyQ}
-                        onChange={(e) => setTourneyQ(e.target.value)}
+                        onChange={(e) => {
+                            setTourneyQ(e.target.value);
+                            setTourneyShown(TOURNEY_PAGE);
+                        }}
                         style={{ marginBottom: 12 }}
                     />
                     {filteredTournaments.length === 0 ? (
@@ -501,61 +645,42 @@ export function MatchesPage() {
                             illustration={<TournamentTrophy size={64} tone="gold" />}
                         />
                     ) : (
-                        filteredTournaments.map((t) => (
-                            <div key={t.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--line)' }}>
+                        filteredTournaments.slice(0, tourneyShown).map((t) => (
+                            <div key={t.id} className="tourney-block">
                                 <strong>
                                     {t.name || 'Unnamed'} — {t.date}
                                 </strong>
                                 <div className="page-kicker">
                                     E_tourney {t.e_tourney.toFixed(2)}
+                                    {t.bonus != null && ` · bonus ${t.bonus}`}
                                 </div>
-                                {t.tournament_participants.map((p) => (
-                                    <div key={p.debater_id} className="note">
-                                        {p.debaters?.name || nameOf(p.debater_id)}:{' '}
-                                        <span
-                                            className={
-                                                p.elo_change >= 0
-                                                    ? 'delta-pos'
-                                                    : 'delta-neg'
-                                            }
-                                        >
-                                            {p.elo_change >= 0 ? '+' : ''}
-                                            {p.elo_change.toFixed(1)}
-                                        </span>
-                                    </div>
-                                ))}
+                                {[...t.tournament_participants]
+                                    .sort(
+                                        (a, b) =>
+                                            DIVS.indexOf(a.division) - DIVS.indexOf(b.division) ||
+                                            b.elo_change - a.elo_change
+                                    )
+                                    .map((p) => (
+                                        <div key={p.id ?? p.debater_id} className="note entry-line">
+                                            <span className="pill pill-div">{SHORT[p.division]}</span>
+                                            <span className="entry-line__name">
+                                                {pairingLabel([p.debater_id, p.partner_id], byId)}
+                                            </span>
+                                            <span className="num muted">raw {p.raw_wins}</span>
+                                            <span
+                                                className={`num ${p.elo_change >= 0 ? 'delta-pos' : 'delta-neg'}`}
+                                            >
+                                                {p.elo_change >= 0 ? '+' : ''}
+                                                {p.elo_change.toFixed(1)}
+                                            </span>
+                                        </div>
+                                    ))}
                                 {isAdmin && (
                                     <Button
                                         size="sm"
                                         variant="danger"
                                         style={{ marginTop: 8 }}
-                                        onClick={async () => {
-                                            if (
-                                                !confirm(
-                                                    'Delete this tournament and revert participant Elo changes?'
-                                                )
-                                            )
-                                                return;
-                                            const res = await deleteTournament({
-                                                tournamentId: t.id,
-                                                date: t.date,
-                                                participantChanges:
-                                                    t.tournament_participants.map(
-                                                        (p) => ({
-                                                            debaterId: p.debater_id,
-                                                            eloChange: p.elo_change,
-                                                        })
-                                                    ),
-                                                debaters,
-                                            });
-                                            toast.push(
-                                                res.approximate
-                                                    ? 'Deleted. Later events exist, so remaining ratings may be approximate.'
-                                                    : 'Tournament deleted and Elo reverted.',
-                                                res.approximate ? 'warning' : 'success'
-                                            );
-                                            await refresh();
-                                        }}
+                                        onClick={() => void undoTournament(t)}
                                     >
                                         Undo
                                     </Button>
@@ -563,41 +688,19 @@ export function MatchesPage() {
                             </div>
                         ))
                     )}
+                    {filteredTournaments.length > tourneyShown && (
+                        <div className="pagination">
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setTourneyShown((s) => s + TOURNEY_PAGE)}
+                            >
+                                Show more ({filteredTournaments.length - tourneyShown} left)
+                            </Button>
+                        </div>
+                    )}
                 </Card>
             </div>
-        </div>
-    );
-}
-
-function PlayerSelect({
-    id,
-    label,
-    value,
-    onChange,
-    debaters,
-}: {
-    id: string;
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    debaters: Debater[];
-}) {
-    return (
-        <div className="field">
-            <label htmlFor={id}>{label}</label>
-            <select
-                id={id}
-                required
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-            >
-                <option value="">Select a debater…</option>
-                {debaters.map((d) => (
-                    <option key={d.id} value={d.id}>
-                        {d.name} ({Math.round(d.elo)})
-                    </option>
-                ))}
-            </select>
         </div>
     );
 }

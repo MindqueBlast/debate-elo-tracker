@@ -3,6 +3,7 @@ import {
     filterHistoryByRange,
     sanitizeHistory,
 } from './history';
+import { lookup, pairingHistory, pairingMembers, teamName } from './teams';
 import type {
     Annotation,
     ChartPoint,
@@ -10,10 +11,16 @@ import type {
     Debater,
     EloSeriesResult,
     HistoryPoint,
+    Team,
 } from './types';
+
+/** Chart selection ids: a debater id, 'ALL', 'ALL_TEAMS' or 'team:<id>'. */
+export const ALL_TEAMS = 'ALL_TEAMS';
+export const teamKey = (id: string) => `team:${id}`;
 
 export interface BuildEloSeriesOptions {
     debaters: Debater[];
+    teams?: Team[];
     selectedId: string;
     compareId?: string | null;
     startDate?: string | null;
@@ -43,6 +50,42 @@ function prepareHistory(
     return filterHistoryByRange(history, startDate, endDate);
 }
 
+function teamSeries(
+    team: Team,
+    debaters: Debater[],
+    startDate?: string | null,
+    endDate?: string | null
+): ChartSeries {
+    const byId = lookup(debaters);
+    const members = pairingMembers([team.member1_id, team.member2_id], byId).map(
+        (m) => ({ ...m, history: sanitizeHistory(m.history) })
+    );
+    const data = pairingHistory(members).filter(
+        (p) => (!startDate || p.x >= startDate) && (!endDate || p.x <= endDate)
+    );
+    return { id: teamKey(team.id), label: teamName(team, byId), data };
+}
+
+function seriesFor(
+    id: string,
+    debaters: Debater[],
+    teams: Team[],
+    startDate?: string | null,
+    endDate?: string | null
+): ChartSeries | null {
+    if (id.startsWith('team:')) {
+        const team = teams.find((t) => teamKey(t.id) === id);
+        return team ? teamSeries(team, debaters, startDate, endDate) : null;
+    }
+    const debater = debaters.find((d) => d.id === id);
+    if (!debater) return null;
+    return {
+        id: debater.id,
+        label: debater.name,
+        data: pointsFromHistory(prepareHistory(debater, startDate, endDate)),
+    };
+}
+
 function yDomain(series: ChartSeries[]): { min: number | null; max: number | null } {
     const values: number[] = [];
     for (const s of series) {
@@ -52,12 +95,13 @@ function yDomain(series: ChartSeries[]): { min: number | null; max: number | nul
     const min = Math.min(...values);
     const max = Math.max(...values);
     const pad = Math.max(12, (max - min) * 0.08 || 24);
-    return { min: min - pad, max: max + pad };
+    return { min: Math.floor((min - pad) / 10) * 10, max: Math.ceil((max + pad) / 10) * 10 };
 }
 
 export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult {
     const {
         debaters,
+        teams = [],
         selectedId,
         compareId,
         startDate,
@@ -81,28 +125,16 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
                 data: pointsFromHistory(history),
             });
         }
-    } else {
-        const primary = debaters.find((d) => d.id === selectedId);
-        if (primary) {
-            series.push({
-                id: primary.id,
-                label: primary.name,
-                data: pointsFromHistory(
-                    prepareHistory(primary, startDate, endDate)
-                ),
-            });
+    } else if (selectedId === ALL_TEAMS) {
+        for (const team of teams.filter((t) => t.active)) {
+            series.push(teamSeries(team, debaters, startDate, endDate));
         }
+    } else {
+        const primary = seriesFor(selectedId, debaters, teams, startDate, endDate);
+        if (primary) series.push(primary);
         if (compareId && compareId !== selectedId) {
-            const other = debaters.find((d) => d.id === compareId);
-            if (other) {
-                series.push({
-                    id: other.id,
-                    label: other.name,
-                    data: pointsFromHistory(
-                        prepareHistory(other, startDate, endDate)
-                    ),
-                });
-            }
+            const other = seriesFor(compareId, debaters, teams, startDate, endDate);
+            if (other) series.push(other);
         }
     }
 

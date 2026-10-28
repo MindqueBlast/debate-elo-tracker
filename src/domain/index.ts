@@ -1,5 +1,8 @@
 export type {
     Annotation,
+    Pairing,
+    RankedTeam,
+    Team,
     ChartPoint,
     ChartSeries,
     Debater,
@@ -39,6 +42,8 @@ export {
     sortHistory,
 } from './history';
 
+export { BASE_ELO, DIVISIONS } from './types';
+
 export {
     PRACTICE_BONUS_K,
     PRACTICE_COMPETITIVE_K,
@@ -48,13 +53,39 @@ export {
     calculatePracticeElo,
     calculateTournamentElo,
     expectedScore,
+    pairingElo,
     validatePracticeMatch,
     validateTournamentParams,
 } from './elo';
 
 export { practiceRecord, rankDebaters } from './ranking';
 
-export { buildEloSeries, snapshotFromSeries } from './chartSeries';
+export {
+    findTeam,
+    lookup,
+    pairingEloOf,
+    pairingHistory,
+    pairingLabel,
+    pairingMembers,
+    practiceSide,
+    rankTeams,
+    sameMembers,
+    teamElo,
+    teamName,
+    type DebaterLookup,
+} from './teams';
+
+export {
+    replay,
+    seasonOf,
+    type ReplayEntry,
+    type ReplayPerson,
+    type ReplayPractice,
+    type ReplayResult,
+    type ReplayTournament,
+} from './replay';
+
+export { ALL_TEAMS, buildEloSeries, snapshotFromSeries, teamKey } from './chartSeries';
 
 export {
     parseEloInput,

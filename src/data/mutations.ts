@@ -3,16 +3,24 @@ import {
     appendHistory,
     calculatePracticeElo,
     calculateTournamentElo,
+    findTeam,
     getLocalDateString,
     hasLaterHistory,
+    lookup,
+    pairingElo,
+    pairingLabel,
     removeLastMatchingHistoryPoint,
+    seasonOf,
     validatePlayerName,
-    validatePracticeMatch,
     validateTournamentParams,
     type Debater,
     type Division,
+    type HistoryPoint,
+    type Pairing,
+    type PracticeRound,
+    type Team,
+    type Tournament,
     type TournamentParams,
-    type TournamentParticipantInput,
 } from '../domain';
 
 export class MutationError extends Error {
@@ -22,38 +30,76 @@ export class MutationError extends Error {
     }
 }
 
-export async function addDebater(
-    name: string,
-    startingElo: number,
-    existing: Debater[]
-) {
-    const nameError = validatePlayerName(name, existing);
+// ---------------------------------------------------------------- people
+
+export async function addDebater(input: {
+    name: string;
+    division: Division;
+    startingElo: number;
+    existing: Debater[];
+}) {
+    const nameError = validatePlayerName(input.name, input.existing);
     if (nameError) throw new MutationError(nameError);
+    if (!Number.isFinite(input.startingElo)) {
+        throw new MutationError('Starting Elo must be a number.');
+    }
     const today = getLocalDateString();
     const { error } = await supabase.from('debaters').insert({
-        name: name.trim(),
-        elo: startingElo,
+        name: input.name.trim(),
+        elo: input.startingElo,
         status: 'active',
         graduation_date: null,
-        history: [{ date: today, elo: startingElo }],
+        division: input.division,
+        history: [{ date: today, elo: input.startingElo }],
     });
-    if (error) throw new MutationError('Failed to add debater.');
+    if (error) throw new MutationError('Failed to add person.');
+}
+
+export async function updateDebater(
+    debater: Debater,
+    patch: { name?: string; division?: Division | null },
+    existing: Debater[]
+) {
+    const update: Record<string, unknown> = {};
+    if (patch.name !== undefined && patch.name.trim() !== debater.name) {
+        const nameError = validatePlayerName(patch.name, existing, debater.id);
+        if (nameError) throw new MutationError(nameError);
+        update.name = patch.name.trim();
+    }
+    if (patch.division !== undefined) update.division = patch.division;
+    if (Object.keys(update).length === 0) return;
+    const { error } = await supabase
+        .from('debaters')
+        .update(update)
+        .eq('id', debater.id);
+    if (error) throw new MutationError('Failed to save changes.');
 }
 
 export async function removeDebater(id: string) {
     const { error } = await supabase.from('debaters').delete().eq('id', id);
-    if (error) throw new MutationError('Failed to remove debater.');
+    if (error) {
+        throw new MutationError(
+            'This person has recorded results, so they can’t be removed. Mark them graduated instead.'
+        );
+    }
 }
 
 export async function toggleGraduate(debater: Debater) {
     const newStatus = debater.status === 'active' ? 'graduated' : 'active';
-    const newGraduationDate =
-        newStatus === 'graduated' ? new Date().getFullYear().toString() : null;
+    // graduation_date is a date column, so store today's date (not just the year)
+    const newGraduationDate = newStatus === 'graduated' ? getLocalDateString() : null;
     const { error } = await supabase
         .from('debaters')
         .update({ status: newStatus, graduation_date: newGraduationDate })
         .eq('id', debater.id);
     if (error) throw new MutationError('Failed to update status.');
+    if (newStatus === 'graduated') {
+        // A graduated person's teams come off the active list
+        await supabase
+            .from('teams')
+            .update({ active: false })
+            .or(`member1_id.eq.${debater.id},member2_id.eq.${debater.id}`);
+    }
 }
 
 export async function setDebaterElo(debater: Debater, newElo: number) {
@@ -72,268 +118,437 @@ export async function setDebaterElo(debater: Debater, newElo: number) {
     if (error) throw new MutationError('Failed to set Elo.');
 }
 
-export async function recordPracticeRound(input: {
-    winner: Debater;
-    loser: Debater;
-    date?: string;
+// ----------------------------------------------------------------- teams
+
+function checkPair(ids: (string | null | undefined)[]): [string, string] {
+    const [a, b] = ids;
+    if (!a || !b) throw new MutationError('Pick two people.');
+    if (a === b) throw new MutationError('Pick two different people.');
+    return [a, b];
+}
+
+export async function createTeam(input: {
+    members: (string | null)[];
+    name: string;
+    division: Division | null;
+    teams: Team[];
 }) {
-    const invalid = validatePracticeMatch(input.winner.id, input.loser.id);
-    if (invalid) throw new MutationError(invalid);
-
-    const date = input.date || getLocalDateString();
-    const result = calculatePracticeElo(input.winner.elo, input.loser.elo);
-    const winnerHistory = appendHistory(input.winner.history, {
-        date,
-        elo: result.newWinnerElo,
+    const [a, b] = checkPair(input.members);
+    const existing = findTeam(input.teams, [a, b]);
+    if (existing?.active) {
+        throw new MutationError('These two are already a team.');
+    }
+    if (existing) {
+        const { error } = await supabase
+            .from('teams')
+            .update({
+                active: true,
+                name: input.name.trim() || existing.name,
+                division: input.division ?? existing.division,
+                season: seasonOf(getLocalDateString()),
+            })
+            .eq('id', existing.id);
+        if (error) throw new MutationError('Failed to save the team.');
+        return;
+    }
+    const { error } = await supabase.from('teams').insert({
+        member1_id: a,
+        member2_id: b,
+        name: input.name.trim() || null,
+        division: input.division,
+        season: seasonOf(getLocalDateString()),
+        active: true,
     });
-    const loserHistory = appendHistory(input.loser.history, {
-        date,
-        elo: result.newLoserElo,
-    });
+    if (error) throw new MutationError('Failed to save the team.');
+}
 
-    const { error: winnerError } = await supabase
-        .from('debaters')
-        .update({ elo: result.newWinnerElo, history: winnerHistory })
-        .eq('id', input.winner.id);
-    if (winnerError) throw new MutationError('Failed to save match results.');
+export async function updateTeam(
+    team: Team,
+    patch: {
+        name?: string;
+        members?: (string | null)[];
+        division?: Division | null;
+        active?: boolean;
+    },
+    teams: Team[]
+) {
+    const update: Record<string, unknown> = {};
+    if (patch.name !== undefined) update.name = patch.name.trim() || null;
+    if (patch.division !== undefined) update.division = patch.division;
+    if (patch.active !== undefined) update.active = patch.active;
+    if (patch.members) {
+        const [a, b] = checkPair(patch.members);
+        const clash = findTeam(
+            teams.filter((t) => t.id !== team.id),
+            [a, b]
+        );
+        if (clash?.active) {
+            throw new MutationError('Those two are already a team.');
+        }
+        update.member1_id = a;
+        update.member2_id = b;
+    }
+    const { error } = await supabase.from('teams').update(update).eq('id', team.id);
+    if (error) throw new MutationError('Failed to save the team.');
+}
 
-    const { error: loserError } = await supabase
-        .from('debaters')
-        .update({ elo: result.newLoserElo, history: loserHistory })
-        .eq('id', input.loser.id);
-    if (loserError) {
-        await supabase
+export async function deleteTeam(team: Team) {
+    const { error } = await supabase.from('teams').delete().eq('id', team.id);
+    if (error) throw new MutationError('Failed to delete the team.');
+}
+
+// -------------------------------------------------------- shared helpers
+
+type EloUpdate = { debater: Debater; elo: number; history: HistoryPoint[] };
+
+/** Save new Elo + history for several people; undo the ones that saved if any fail. */
+async function saveUpdates(updates: EloUpdate[], message: string) {
+    const done: EloUpdate[] = [];
+    for (const u of updates) {
+        const { error } = await supabase
             .from('debaters')
-            .update({ elo: input.winner.elo, history: input.winner.history })
-            .eq('id', input.winner.id);
-        throw new MutationError('Failed to save match results.');
+            .update({ elo: u.elo, history: u.history })
+            .eq('id', u.debater.id);
+        if (error) {
+            await restore(done);
+            throw new MutationError(message);
+        }
+        done.push(u);
     }
+    return done;
+}
 
-    const { error: insertError } = await supabase.from('practice_rounds').insert([
-        {
-            date,
-            winner_id: input.winner.id,
-            loser_id: input.loser.id,
-            winner_change: result.winnerChange,
-            loser_change: result.loserChange,
-        },
-    ]);
-    if (insertError) {
-        await Promise.all([
+async function restore(updates: EloUpdate[]) {
+    await Promise.all(
+        updates.map((u) =>
             supabase
                 .from('debaters')
-                .update({ elo: input.winner.elo, history: input.winner.history })
-                .eq('id', input.winner.id),
-            supabase
-                .from('debaters')
-                .update({ elo: input.loser.elo, history: input.loser.history })
-                .eq('id', input.loser.id),
-        ]);
-        throw new MutationError('Failed to save match results.');
-    }
+                .update({ elo: u.debater.elo, history: u.debater.history })
+                .eq('id', u.debater.id)
+        )
+    );
+}
 
-    return result;
+function membersOf(ids: (string | null | undefined)[], byId: Map<string, Debater>) {
+    const out: Debater[] = [];
+    for (const id of ids) {
+        if (!id) continue;
+        const d = byId.get(id);
+        if (!d) throw new MutationError('Someone in this result is no longer on the roster.');
+        out.push(d);
+    }
+    return out;
+}
+
+function checkNoOverlap(sides: Pairing[]) {
+    const seen = new Set<string>();
+    for (const side of sides) {
+        checkPair(side);
+        for (const id of side) {
+            if (!id) continue;
+            if (seen.has(id)) {
+                throw new MutationError('The same person can’t be on two sides.');
+            }
+            seen.add(id);
+        }
+    }
+}
+
+// --------------------------------------------------------- practice rounds
+
+export async function recordPracticeRound(input: {
+    winner: Pairing;
+    loser: Pairing;
+    date?: string;
+    debaters: Debater[];
+}) {
+    checkNoOverlap([input.winner, input.loser]);
+    const byId = lookup(input.debaters);
+    const winners = membersOf(input.winner, byId);
+    const losers = membersOf(input.loser, byId);
+    const date = input.date || getLocalDateString();
+    const winnerElo = pairingElo(winners.map((d) => d.elo));
+    const loserElo = pairingElo(losers.map((d) => d.elo));
+    const result = calculatePracticeElo(winnerElo, loserElo);
+
+    const updates: EloUpdate[] = [
+        ...winners.map((d) => ({
+            debater: d,
+            elo: d.elo + result.winnerChange,
+            history: appendHistory(d.history, { date, elo: d.elo + result.winnerChange }),
+        })),
+        ...losers.map((d) => ({
+            debater: d,
+            elo: d.elo + result.loserChange,
+            history: appendHistory(d.history, { date, elo: d.elo + result.loserChange }),
+        })),
+    ];
+    const saved = await saveUpdates(updates, 'Failed to save the round.');
+
+    const { error } = await supabase.from('practice_rounds').insert({
+        date,
+        winner_id: input.winner[0],
+        winner_partner_id: input.winner[1],
+        loser_id: input.loser[0],
+        loser_partner_id: input.loser[1],
+        winner_change: result.winnerChange,
+        loser_change: result.loserChange,
+    });
+    if (error) {
+        await restore(saved);
+        throw new MutationError('Failed to save the round.');
+    }
+    return { ...result, winnerElo, loserElo };
 }
 
 export async function deletePracticeRound(input: {
-    roundId: string;
-    date: string;
-    winner: Debater;
-    loser: Debater;
-    winnerChange: number;
-    loserChange: number;
+    round: PracticeRound;
+    debaters: Debater[];
 }): Promise<{ approximate: boolean }> {
-    const winnerHistory = removeLastMatchingHistoryPoint(
-        input.winner.history,
-        input.date
-    );
-    const loserHistory = removeLastMatchingHistoryPoint(
-        input.loser.history,
-        input.date
-    );
-    const approximate =
-        hasLaterHistory(input.winner.history, input.date) ||
-        hasLaterHistory(input.loser.history, input.date);
-
-    const { error } = await supabase
-        .from('debaters')
-        .update({
-            elo: input.winner.elo - input.winnerChange,
-            history: winnerHistory,
-        })
-        .eq('id', input.winner.id);
-    if (error) throw new MutationError('Failed to delete and undo changes.');
-
-    const { error: loserError } = await supabase
-        .from('debaters')
-        .update({
-            elo: input.loser.elo - input.loserChange,
-            history: loserHistory,
-        })
-        .eq('id', input.loser.id);
-    if (loserError) throw new MutationError('Failed to delete and undo changes.');
-
-    const { error: deleteError } = await supabase
-        .from('practice_rounds')
-        .delete()
-        .eq('id', input.roundId);
-    if (deleteError) throw new MutationError('Failed to delete and undo changes.');
-
+    const { round } = input;
+    const byId = lookup(input.debaters);
+    const sides: [(string | null | undefined)[], number][] = [
+        [[round.winner_id, round.winner_partner_id], round.winner_change],
+        [[round.loser_id, round.loser_partner_id], round.loser_change],
+    ];
+    let approximate = false;
+    const updates: EloUpdate[] = [];
+    for (const [ids, change] of sides) {
+        for (const id of ids) {
+            if (!id) continue;
+            const d = byId.get(id);
+            if (!d) continue;
+            if (hasLaterHistory(d.history, round.date)) approximate = true;
+            updates.push({
+                debater: d,
+                elo: d.elo - change,
+                history: removeLastMatchingHistoryPoint(d.history, round.date),
+            });
+        }
+    }
+    const saved = await saveUpdates(updates, 'Failed to undo the round.');
+    const { error } = await supabase.from('practice_rounds').delete().eq('id', round.id);
+    if (error) {
+        await restore(saved);
+        throw new MutationError('Failed to undo the round.');
+    }
     return { approximate };
+}
+
+// ------------------------------------------------------------- tournaments
+
+export interface TournamentEntryDraft {
+    key: string;
+    members: Pairing;
+    division: Division;
+    prelimWins: number;
+    elimWins: number;
+}
+
+/** Break wins count double. */
+export const rawWinsOf = (prelim: number, elim: number) => prelim + 2 * elim;
+
+export function previewTournament(input: {
+    params: TournamentParams;
+    roundsByDivision?: Partial<Record<Division, number>>;
+    entries: TournamentEntryDraft[];
+    debaters: Debater[];
+}) {
+    const byId = lookup(input.debaters);
+    return calculateTournamentElo(
+        input.entries.map((e) => ({
+            id: e.key,
+            name: pairingLabel(e.members, byId),
+            elo: pairingElo(membersOf(e.members, byId).map((d) => d.elo)),
+            division: e.division,
+            W_raw: rawWinsOf(e.prelimWins, e.elimWins),
+            n: input.roundsByDivision?.[e.division] ?? input.params.n,
+        })),
+        input.params
+    );
 }
 
 export async function recordTournament(input: {
     name: string;
     date: string;
     params: TournamentParams;
-    participants: TournamentParticipantInput[];
-    activeDebaters: Debater[];
+    roundsByDivision?: Partial<Record<Division, number>>;
+    entries: TournamentEntryDraft[];
+    debaters: Debater[];
+    teams: Team[];
 }) {
+    const active = input.debaters.filter((d) => d.status === 'active');
     const invalid = validateTournamentParams(
         input.params,
-        input.participants.length,
-        input.activeDebaters.length
+        input.entries.length,
+        active.length
     );
     if (invalid) throw new MutationError(invalid);
-    if (input.participants.some((p) => p.W_raw === undefined || p.W_raw < 0)) {
-        throw new MutationError('Please enter valid raw wins for every participant.');
+    checkNoOverlap(input.entries.map((e) => e.members));
+    for (const e of input.entries) {
+        if (
+            !Number.isFinite(e.prelimWins) ||
+            !Number.isFinite(e.elimWins) ||
+            e.prelimWins < 0 ||
+            e.elimWins < 0
+        ) {
+            throw new MutationError('Please enter valid wins for every entry.');
+        }
     }
 
-    const liveParticipants = input.participants.map((p) => {
-        const live = input.activeDebaters.find((d) => d.id === p.id);
-        return { ...p, elo: live?.elo ?? p.elo };
-    });
-
-    const { eTourney, results } = calculateTournamentElo(
-        liveParticipants,
-        input.params
-    );
+    const byId = lookup(input.debaters);
+    const { eTourney, results } = previewTournament(input);
     const date = input.date || getLocalDateString();
 
     const { data: inserted, error: insertError } = await supabase
         .from('tournaments')
-        .insert([{ date, name: input.name, e_tourney: eTourney }])
+        .insert({
+            date,
+            name: input.name,
+            e_tourney: eTourney,
+            bonus: input.params.b,
+            affect: input.params.k,
+            max_gain: input.params.maxGain,
+            max_rounds: input.params.maxRounds,
+        })
         .select()
         .single();
     if (insertError || !inserted) {
         throw new MutationError('Failed to record tournament results.');
     }
 
-    if (input.name && date) {
-        await supabase
-            .from('annotations')
-            .insert({ date, name: input.name });
-    }
-
-    const participantIds = new Set(results.map((r) => r.id));
-    const byId = new Map(input.activeDebaters.map((d) => [d.id, d]));
-
-    for (const res of results) {
-        const debater = byId.get(res.id);
-        if (!debater) continue;
-        const newHistory = appendHistory(debater.history, {
-            date,
-            elo: res.newElo,
-            event: 'Tournament',
-        });
-        const { error } = await supabase
-            .from('debaters')
-            .update({ elo: res.newElo, history: newHistory })
-            .eq('id', res.id);
-        if (error) throw new MutationError('Failed to record tournament results.');
-    }
-
-    for (const debater of input.activeDebaters) {
-        if (participantIds.has(debater.id)) continue;
-        const last = debater.history[debater.history.length - 1];
+    const updates: EloUpdate[] = [];
+    const playing = new Set<string>();
+    results.forEach((res, i) => {
+        for (const d of membersOf(input.entries[i].members, byId)) {
+            playing.add(d.id);
+            const elo = d.elo + res.change;
+            updates.push({
+                debater: d,
+                elo,
+                history: appendHistory(d.history, { date, elo, event: 'Tournament' }),
+            });
+        }
+    });
+    // Flat point for everyone active who sat this one out, so graphs line up
+    for (const d of active) {
+        if (playing.has(d.id)) continue;
+        const last = d.history[d.history.length - 1];
         if (last && last.date === date) continue;
-        const newHistory = appendHistory(debater.history, {
-            date,
-            elo: debater.elo,
-            event: 'Tournament',
+        updates.push({
+            debater: d,
+            elo: d.elo,
+            history: appendHistory(d.history, { date, elo: d.elo, event: 'Tournament' }),
         });
-        const { error } = await supabase
-            .from('debaters')
-            .update({ history: newHistory })
-            .eq('id', debater.id);
-        if (error) throw new MutationError('Failed to record tournament results.');
     }
 
-    const { error: partsError } = await supabase
-        .from('tournament_participants')
-        .insert(
-            results.map((res) => ({
-                tournament_id: inserted.id,
-                debater_id: res.id,
-                raw_wins: res.W_raw,
-                adjusted_wins: res.W_adjusted,
-                elo_change: res.change,
-                division: res.division,
-            }))
-        );
-    if (partsError) throw new MutationError('Failed to record tournament results.');
+    let saved: EloUpdate[] = [];
+    try {
+        saved = await saveUpdates(updates, 'Failed to record tournament results.');
+        const { error: partsError } = await supabase
+            .from('tournament_participants')
+            .insert(
+                results.map((res, i) => {
+                    const entry = input.entries[i];
+                    return {
+                        tournament_id: inserted.id,
+                        debater_id: entry.members[0],
+                        partner_id: entry.members[1],
+                        team_id: findTeam(input.teams, entry.members)?.id ?? null,
+                        raw_wins: res.W_raw,
+                        adjusted_wins: res.W_adjusted,
+                        elo_change: res.change,
+                        division: res.division,
+                        team_elo: res.oldElo,
+                        rounds: res.n,
+                    };
+                })
+            );
+        if (partsError) throw new MutationError('Failed to record tournament results.');
+    } catch (err) {
+        await restore(saved);
+        await supabase.from('tournaments').delete().eq('id', inserted.id);
+        throw err instanceof MutationError
+            ? err
+            : new MutationError('Failed to record tournament results.');
+    }
+
+    if (input.name && date) {
+        await supabase.from('annotations').insert({ date, name: input.name });
+    }
 
     return { eTourney, results };
 }
 
 export async function deleteTournament(input: {
-    tournamentId: string;
-    date: string;
-    participantChanges: { debaterId: string; eloChange: number }[];
+    tournament: Tournament;
     debaters: Debater[];
 }): Promise<{ approximate: boolean }> {
+    const { tournament } = input;
+    const byId = lookup(input.debaters);
     let approximate = false;
-    for (const change of input.participantChanges) {
-        const debater = input.debaters.find((d) => d.id === change.debaterId);
-        if (!debater) continue;
-        if (hasLaterHistory(debater.history, input.date)) approximate = true;
-        const newHistory = removeLastMatchingHistoryPoint(
-            debater.history,
-            input.date,
-            'Tournament'
-        );
-        const { error } = await supabase
-            .from('debaters')
-            .update({
-                elo: debater.elo - change.eloChange,
-                history: newHistory,
-            })
-            .eq('id', debater.id);
-        if (error) throw new MutationError('Failed to revert Elo for a debater.');
+    const updates: EloUpdate[] = [];
+    const touched = new Set<string>();
+    for (const p of tournament.tournament_participants) {
+        for (const id of [p.debater_id, p.partner_id]) {
+            if (!id || touched.has(id)) continue;
+            const d = byId.get(id);
+            if (!d) continue;
+            touched.add(id);
+            if (hasLaterHistory(d.history, tournament.date)) approximate = true;
+            updates.push({
+                debater: d,
+                elo: d.elo - p.elo_change,
+                history: removeLastMatchingHistoryPoint(
+                    d.history,
+                    tournament.date,
+                    'Tournament'
+                ),
+            });
+        }
     }
-
-    const participantIds = new Set(input.participantChanges.map((p) => p.debaterId));
-    for (const debater of input.debaters) {
-        if (participantIds.has(debater.id)) continue;
-        const hasPoint = debater.history.some(
-            (h) => h.date === input.date && h.event === 'Tournament'
+    for (const d of input.debaters) {
+        if (touched.has(d.id)) continue;
+        const hasPoint = d.history.some(
+            (h) => h.date === tournament.date && h.event === 'Tournament'
         );
         if (!hasPoint) continue;
-        const newHistory = removeLastMatchingHistoryPoint(
-            debater.history,
-            input.date,
-            'Tournament'
-        );
-        await supabase
-            .from('debaters')
-            .update({ history: newHistory })
-            .eq('id', debater.id);
+        updates.push({
+            debater: d,
+            elo: d.elo,
+            history: removeLastMatchingHistoryPoint(
+                d.history,
+                tournament.date,
+                'Tournament'
+            ),
+        });
     }
 
+    const saved = await saveUpdates(updates, 'Failed to undo the tournament.');
     const { error: partsError } = await supabase
         .from('tournament_participants')
         .delete()
-        .eq('tournament_id', input.tournamentId);
-    if (partsError) throw new MutationError('Failed to delete tournament participants.');
-
+        .eq('tournament_id', tournament.id);
+    if (partsError) {
+        await restore(saved);
+        throw new MutationError('Failed to undo the tournament.');
+    }
     const { error: tourneyError } = await supabase
         .from('tournaments')
         .delete()
-        .eq('id', input.tournamentId);
-    if (tourneyError) throw new MutationError('Failed to delete tournament.');
-
+        .eq('id', tournament.id);
+    if (tourneyError) throw new MutationError('Failed to delete the tournament.');
+    if (tournament.name) {
+        await supabase
+            .from('annotations')
+            .delete()
+            .eq('date', tournament.date)
+            .eq('name', tournament.name);
+    }
     return { approximate };
 }
+
+// ------------------------------------------------------------ annotations
 
 export async function addAnnotation(date: string, name: string) {
     if (!date || !name.trim()) {
@@ -366,11 +581,3 @@ export async function deleteHistoryPoint(debater: Debater, date: string) {
         .eq('id', debater.id);
     if (error) throw new MutationError('Failed to update debater history.');
 }
-
-export type DraftParticipant = {
-    id: string;
-    name: string;
-    division: Division;
-    prelim_wins: number;
-    elim_wins: number;
-};

@@ -1,5 +1,12 @@
 import { Link } from 'react-router-dom';
-import { averageElo, buildEloSeries, rankDebaters } from '../domain';
+import {
+    averageElo,
+    buildEloSeries,
+    lookup,
+    pairingLabel,
+    rankDebaters,
+    rankTeams,
+} from '../domain';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Card, EmptyState, PageHeader, StatCard } from '../components/Card';
 import { EloChart } from '../components/EloChart';
@@ -11,9 +18,11 @@ import {
 import { useAppData } from '../state/AppDataProvider';
 
 export function DashboardPage() {
-    const { debaters, practiceRounds, tournaments, loading, error } =
+    const { debaters, teams, practiceRounds, tournaments, loading, error } =
         useAppData();
     const ranked = rankDebaters(debaters, practiceRounds);
+    const topTeams = rankTeams(teams, debaters).slice(0, 5);
+    const byId = lookup(debaters);
     const active = debaters.filter((d) => d.status === 'active');
     const avg = averageElo(active.map((d) => d.elo));
     const recentRounds = [...practiceRounds]
@@ -26,8 +35,6 @@ export function DashboardPage() {
               selectedId: top.id,
           })
         : null;
-    const name = (id: string) =>
-        debaters.find((d) => d.id === id)?.name ?? 'Unknown';
 
     if (error) {
         return <EmptyState title="Could not load data" body={error} />;
@@ -43,7 +50,7 @@ export function DashboardPage() {
             {loading && <p className="page-kicker">Refreshing…</p>}
             <div className="grid grid-4" style={{ marginBottom: 20 }}>
                 <StatCard
-                    label="Active roster"
+                    label="Active people"
                     value={<AnimatedNumber value={active.length} />}
                     accent={<EloCurveMotif size={36} tone="muted" />}
                 />
@@ -64,7 +71,7 @@ export function DashboardPage() {
             </div>
             <div className="grid grid-2">
                 <Card>
-                    <div className="card-title">Current top players</div>
+                    <div className="card-title">Top individuals</div>
                     {ranked.length === 0 ? (
                         <EmptyState
                             title="No players yet"
@@ -107,6 +114,27 @@ export function DashboardPage() {
                     )}
                 </Card>
                 <Card>
+                    <div className="card-title">Top teams</div>
+                    {topTeams.length === 0 ? (
+                        <EmptyState
+                            title="No teams yet"
+                            body="Save partnerships on the Players page."
+                            illustration={<EmptyMatches size={80} />}
+                        />
+                    ) : (
+                        topTeams.map((r) => (
+                            <div
+                                key={r.team.id}
+                                className={`list-row list-row--compact ${r.rank <= 3 ? `rank-${r.rank}` : ''}`}
+                            >
+                                <span className="num">#{r.rank}</span>
+                                <strong>{r.name}</strong>
+                                <span className="elo hide-sm">{Math.round(r.elo)}</span>
+                            </div>
+                        ))
+                    )}
+                </Card>
+                <Card>
                     <div className="card-title">Recent practice</div>
                     {recentRounds.length === 0 ? (
                         <EmptyState
@@ -119,7 +147,8 @@ export function DashboardPage() {
                             <div key={r.id} className="match-row">
                                 <span className="num">{r.date}</span>
                                 <span>
-                                    {name(r.winner_id)} def. {name(r.loser_id)}
+                                    {pairingLabel([r.winner_id, r.winner_partner_id], byId)} def.{' '}
+                                    {pairingLabel([r.loser_id, r.loser_partner_id], byId)}
                                 </span>
                                 <span className="delta-pos num">
                                     +{r.winner_change.toFixed(1)}

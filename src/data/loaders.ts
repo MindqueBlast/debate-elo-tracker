@@ -3,16 +3,31 @@ import { sanitizeDebaters } from '../domain';
 import type {
     Annotation,
     Debater,
+    Division,
     PracticeRound,
+    Team,
     Tournament,
 } from '../domain';
 
 export interface AppSnapshot {
     debaters: Debater[];
+    teams: Team[];
     practiceRounds: PracticeRound[];
     tournaments: Tournament[];
     annotations: Annotation[];
 }
+
+const optionalId = (v: unknown): string | null =>
+    typeof v === 'string' && v ? v : null;
+
+const optionalNumber = (v: unknown): number | null => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+};
+
+const asDivision = (v: unknown): Division | null =>
+    v === 'Novice' || v === 'JV' || v === 'Varsity' ? v : null;
 
 function asPracticeRounds(raw: unknown): PracticeRound[] {
     if (!Array.isArray(raw)) return [];
@@ -31,6 +46,8 @@ function asPracticeRounds(raw: unknown): PracticeRound[] {
             date: String(r.date ?? '').slice(0, 10),
             winner_id: String(r.winner_id ?? ''),
             loser_id: String(r.loser_id ?? ''),
+            winner_partner_id: optionalId(r.winner_partner_id),
+            loser_partner_id: optionalId(r.loser_partner_id),
             winner_change,
             loser_change,
         });
@@ -53,35 +70,53 @@ function asTournaments(raw: unknown): Tournament[] {
             date: String(t.date ?? '').slice(0, 10),
             name: typeof t.name === 'string' ? t.name : null,
             e_tourney: Number(t.e_tourney) || 0,
+            bonus: optionalNumber(t.bonus),
+            affect: optionalNumber(t.affect),
+            max_gain: optionalNumber(t.max_gain),
+            max_rounds: optionalNumber(t.max_rounds),
             tournament_participants: participantsRaw
                 .filter((p) => p && typeof p === 'object')
                 .map((p) => {
                     const rec = p as Record<string, unknown>;
-                    const division =
-                        rec.division === 'JV' || rec.division === 'Varsity'
-                            ? rec.division
-                            : 'Novice';
                     return {
+                        id: optionalId(rec.id) ?? undefined,
                         tournament_id: String(rec.tournament_id ?? t.id),
                         debater_id: String(rec.debater_id ?? ''),
+                        partner_id: optionalId(rec.partner_id),
+                        team_id: optionalId(rec.team_id),
                         raw_wins: Number(rec.raw_wins) || 0,
                         adjusted_wins: Number(rec.adjusted_wins) || 0,
                         elo_change: Number(rec.elo_change) || 0,
-                        division,
-                        debaters:
-                            rec.debaters && typeof rec.debaters === 'object'
-                                ? {
-                                      name: String(
-                                          (rec.debaters as { name?: unknown })
-                                              .name ?? ''
-                                      ),
-                                  }
-                                : null,
+                        division: asDivision(rec.division) ?? 'Novice',
+                        team_elo: optionalNumber(rec.team_elo),
+                        rounds: optionalNumber(rec.rounds),
                     };
                 }),
         });
     }
     return tournaments;
+}
+
+function asTeams(raw: unknown): Team[] {
+    if (!Array.isArray(raw)) return [];
+    const teams: Team[] = [];
+    for (const item of raw) {
+        if (!item || typeof item !== 'object') continue;
+        const t = item as Record<string, unknown>;
+        const member1 = optionalId(t.member1_id);
+        const member2 = optionalId(t.member2_id);
+        if (typeof t.id !== 'string' || !member1 || !member2) continue;
+        teams.push({
+            id: t.id,
+            name: typeof t.name === 'string' && t.name.trim() ? t.name.trim() : null,
+            member1_id: member1,
+            member2_id: member2,
+            division: asDivision(t.division),
+            season: typeof t.season === 'string' ? t.season : null,
+            active: t.active !== false,
+        });
+    }
+    return teams;
 }
 
 function asAnnotations(raw: unknown): Annotation[] {
@@ -100,21 +135,22 @@ function asAnnotations(raw: unknown): Annotation[] {
 }
 
 export async function loadSnapshot(): Promise<AppSnapshot> {
-    const [debatersRes, annotationsRes, roundsRes, tournamentsRes] =
+    const [debatersRes, teamsRes, annotationsRes, roundsRes, tournamentsRes] =
         await Promise.all([
-            supabase.from('debaters').select('*'),
+            supabase.from('debaters').select('*').order('created_at'),
+            supabase.from('teams').select('*').order('created_at'),
             supabase.from('annotations').select('*'),
             supabase.from('practice_rounds').select('*'),
-            supabase
-                .from('tournaments')
-                .select('*, tournament_participants(*, debaters(name))'),
+            supabase.from('tournaments').select('*, tournament_participants(*)'),
         ]);
 
     if (debatersRes.error) throw debatersRes.error;
     if (annotationsRes.error) throw annotationsRes.error;
+    if (tournamentsRes.error) throw tournamentsRes.error;
 
     return {
         debaters: sanitizeDebaters(debatersRes.data),
+        teams: asTeams(teamsRes.data ?? []),
         annotations: asAnnotations(annotationsRes.data),
         practiceRounds: asPracticeRounds(roundsRes.data ?? []),
         tournaments: asTournaments(tournamentsRes.data ?? []),

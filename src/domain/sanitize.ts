@@ -10,6 +10,10 @@ export function sanitizeDebater(raw: unknown): Debater | null {
     const status = rec.status === 'graduated' ? 'graduated' : 'active';
     const graduation_date =
         typeof rec.graduation_date === 'string' ? rec.graduation_date : null;
+    const division =
+        rec.division === 'Novice' || rec.division === 'JV' || rec.division === 'Varsity'
+            ? rec.division
+            : null;
     return {
         id: rec.id,
         name: rec.name,
@@ -17,6 +21,7 @@ export function sanitizeDebater(raw: unknown): Debater | null {
         status,
         graduation_date,
         history: sanitizeHistory(rec.history),
+        division,
     };
 }
 

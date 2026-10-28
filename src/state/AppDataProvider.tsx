@@ -17,6 +17,7 @@ interface AppDataContextValue extends AppSnapshot {
 
 const EMPTY: AppSnapshot = {
     debaters: [],
+    teams: [],
     practiceRounds: [],
     tournaments: [],
     annotations: [],

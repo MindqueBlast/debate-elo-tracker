@@ -53,20 +53,33 @@ export function adjustedWins(
     return ((-200 / (winPercent + 4) + 50) / 100) * n + W_raw;
 }
 
+/**
+ * Tournament Elo for every entry. An entry's Elo is the average of its two
+ * partners; the resulting change applies to each partner.
+ *
+ * Entries can carry their own round count (e.g. novices had 5 prelims and
+ * varsity had 6). Adjusted wins use the entry's own rounds, and the three
+ * phantom teams in E_tourney use the average rounds across entries, which is
+ * how the spreadsheet blends divisions.
+ */
 export function calculateTournamentElo(
     participants: TournamentParticipantInput[],
     params: TournamentParams
 ): { eTourney: number; results: TournamentResult[] } {
-    const { n, b, k, maxGain, maxRounds } = params;
+    const { b, k, maxGain, maxRounds } = params;
     const t = participants.length;
     let s = 0;
+    let roundsTotal = 0;
     const withAdjusted = participants.map((p) => {
+        const n = p.n ?? params.n;
         const W_adjusted = adjustedWins(p.division, p.W_raw, n);
         s += W_adjusted;
-        return { ...p, W_adjusted };
+        roundsTotal += n;
+        return { ...p, n, W_adjusted };
     });
+    const avgRounds = t > 0 ? roundsTotal / t : params.n;
 
-    const eTourney = (s + (3 * n) / 2) / (t + 3);
+    const eTourney = (s + (3 * avgRounds) / 2) / (t + 3);
 
     const results: TournamentResult[] = withAdjusted.map((p) => {
         const p_prop = Math.pow(p.elo / TOURNAMENT_FIELD_ELO, 1.5);
@@ -87,10 +100,17 @@ export function calculateTournamentElo(
             p_value: p_prop,
             W_raw: p.W_raw,
             division: p.division,
+            n: p.n,
         };
     });
 
     return { eTourney, results };
+}
+
+/** A pairing's Elo: the average of the people in it. */
+export function pairingElo(elos: number[]): number {
+    if (elos.length === 0) return 0;
+    return elos.reduce((sum, e) => sum + e, 0) / elos.length;
 }
 
 export function validateTournamentParams(
