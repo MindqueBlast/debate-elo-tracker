@@ -199,34 +199,45 @@ export async function deleteTeam(team: Team) {
 
 // -------------------------------------------------------- shared helpers
 
-type EloUpdate = { debater: Debater; elo: number; history: HistoryPoint[] };
+type EloUpdate = {
+    debater: Debater;
+    elo: number;
+    history: HistoryPoint[];
+    /** Only the history changes (a flat tournament marker), so leave the Elo as stored. */
+    historyOnly?: boolean;
+};
 
-/** Save new Elo + history for several people; undo the ones that saved if any fail. */
-async function saveUpdates(updates: EloUpdate[], message: string) {
-    const done: EloUpdate[] = [];
-    for (const u of updates) {
-        const { error } = await supabase
-            .from('debaters')
-            .update({ elo: u.elo, history: u.history })
-            .eq('id', u.debater.id);
-        if (error) {
-            await restore(done);
-            throw new MutationError(message);
+/**
+ * Apply a whole result in one database transaction: the new or removed
+ * tournament / practice round plus everyone's new Elo and history. Either all
+ * of it saves or none of it does, so closing the tab mid-save can't leave a
+ * half-recorded result.
+ */
+async function saveResult(
+    payload: Record<string, unknown> & { updates: EloUpdate[] },
+    message: string
+): Promise<string | null> {
+    const { updates, ...rest } = payload;
+    const { data, error } = await supabase.rpc('save_result', {
+        payload: {
+            ...rest,
+            updates: updates.map((u) => ({
+                id: u.debater.id,
+                elo: u.historyOnly ? null : u.elo,
+                history: u.history,
+                prev_elo: u.debater.elo,
+            })),
+        },
+    });
+    if (error) {
+        if (error.message?.includes('stale_data')) {
+            throw new MutationError(
+                'Someone else saved a result since this page loaded. Refresh and try again.'
+            );
         }
-        done.push(u);
+        throw new MutationError(message);
     }
-    return done;
-}
-
-async function restore(updates: EloUpdate[]) {
-    await Promise.all(
-        updates.map((u) =>
-            supabase
-                .from('debaters')
-                .update({ elo: u.debater.elo, history: u.debater.history })
-                .eq('id', u.debater.id)
-        )
-    );
+    return typeof data === 'string' ? data : null;
 }
 
 function membersOf(ids: (string | null | undefined)[], byId: Map<string, Debater>) {
@@ -283,21 +294,21 @@ export async function recordPracticeRound(input: {
             history: appendHistory(d.history, { date, elo: d.elo + result.loserChange }),
         })),
     ];
-    const saved = await saveUpdates(updates, 'Failed to save the round.');
-
-    const { error } = await supabase.from('practice_rounds').insert({
-        date,
-        winner_id: input.winner[0],
-        winner_partner_id: input.winner[1],
-        loser_id: input.loser[0],
-        loser_partner_id: input.loser[1],
-        winner_change: result.winnerChange,
-        loser_change: result.loserChange,
-    });
-    if (error) {
-        await restore(saved);
-        throw new MutationError('Failed to save the round.');
-    }
+    await saveResult(
+        {
+            practice: {
+                date,
+                winner_id: input.winner[0],
+                winner_partner_id: input.winner[1],
+                loser_id: input.loser[0],
+                loser_partner_id: input.loser[1],
+                winner_change: result.winnerChange,
+                loser_change: result.loserChange,
+            },
+            updates,
+        },
+        'Failed to save the round.'
+    );
     return { ...result, winnerElo, loserElo };
 }
 
@@ -326,12 +337,10 @@ export async function deletePracticeRound(input: {
             });
         }
     }
-    const saved = await saveUpdates(updates, 'Failed to undo the round.');
-    const { error } = await supabase.from('practice_rounds').delete().eq('id', round.id);
-    if (error) {
-        await restore(saved);
-        throw new MutationError('Failed to undo the round.');
-    }
+    await saveResult(
+        { delete_practice_id: round.id, updates },
+        'Failed to undo the round.'
+    );
     return { approximate };
 }
 
@@ -400,23 +409,6 @@ export async function recordTournament(input: {
     const { eTourney, results } = previewTournament(input);
     const date = input.date || getLocalDateString();
 
-    const { data: inserted, error: insertError } = await supabase
-        .from('tournaments')
-        .insert({
-            date,
-            name: input.name,
-            e_tourney: eTourney,
-            bonus: input.params.b,
-            affect: input.params.k,
-            max_gain: input.params.maxGain,
-            max_rounds: input.params.maxRounds,
-        })
-        .select()
-        .single();
-    if (insertError || !inserted) {
-        throw new MutationError('Failed to record tournament results.');
-    }
-
     const updates: EloUpdate[] = [];
     const playing = new Set<string>();
     results.forEach((res, i) => {
@@ -439,43 +431,40 @@ export async function recordTournament(input: {
             debater: d,
             elo: d.elo,
             history: appendHistory(d.history, { date, elo: d.elo, event: 'Tournament' }),
+            historyOnly: true,
         });
     }
 
-    let saved: EloUpdate[] = [];
-    try {
-        saved = await saveUpdates(updates, 'Failed to record tournament results.');
-        const { error: partsError } = await supabase
-            .from('tournament_participants')
-            .insert(
-                results.map((res, i) => {
-                    const entry = input.entries[i];
-                    return {
-                        tournament_id: inserted.id,
-                        debater_id: entry.members[0],
-                        partner_id: entry.members[1],
-                        team_id: findTeam(input.teams, entry.members)?.id ?? null,
-                        raw_wins: res.W_raw,
-                        adjusted_wins: res.W_adjusted,
-                        elo_change: res.change,
-                        division: res.division,
-                        team_elo: res.oldElo,
-                        rounds: res.n,
-                    };
-                })
-            );
-        if (partsError) throw new MutationError('Failed to record tournament results.');
-    } catch (err) {
-        await restore(saved);
-        await supabase.from('tournaments').delete().eq('id', inserted.id);
-        throw err instanceof MutationError
-            ? err
-            : new MutationError('Failed to record tournament results.');
-    }
-
-    if (input.name && date) {
-        await supabase.from('annotations').insert({ date, name: input.name });
-    }
+    await saveResult(
+        {
+            tournament: {
+                date,
+                name: input.name,
+                e_tourney: eTourney,
+                bonus: input.params.b,
+                affect: input.params.k,
+                max_gain: input.params.maxGain,
+                max_rounds: input.params.maxRounds,
+            },
+            entries: results.map((res, i) => {
+                const entry = input.entries[i];
+                return {
+                    debater_id: entry.members[0],
+                    partner_id: entry.members[1],
+                    team_id: findTeam(input.teams, entry.members)?.id ?? null,
+                    raw_wins: res.W_raw,
+                    adjusted_wins: res.W_adjusted,
+                    elo_change: res.change,
+                    division: res.division,
+                    team_elo: res.oldElo,
+                    rounds: res.n,
+                };
+            }),
+            ...(input.name ? { annotation: { date, name: input.name } } : {}),
+            updates,
+        },
+        'Failed to record tournament results.'
+    );
 
     return { eTourney, results };
 }
@@ -521,30 +510,20 @@ export async function deleteTournament(input: {
                 tournament.date,
                 'Tournament'
             ),
+            historyOnly: true,
         });
     }
 
-    const saved = await saveUpdates(updates, 'Failed to undo the tournament.');
-    const { error: partsError } = await supabase
-        .from('tournament_participants')
-        .delete()
-        .eq('tournament_id', tournament.id);
-    if (partsError) {
-        await restore(saved);
-        throw new MutationError('Failed to undo the tournament.');
-    }
-    const { error: tourneyError } = await supabase
-        .from('tournaments')
-        .delete()
-        .eq('id', tournament.id);
-    if (tourneyError) throw new MutationError('Failed to delete the tournament.');
-    if (tournament.name) {
-        await supabase
-            .from('annotations')
-            .delete()
-            .eq('date', tournament.date)
-            .eq('name', tournament.name);
-    }
+    await saveResult(
+        {
+            delete_tournament_id: tournament.id,
+            ...(tournament.name
+                ? { delete_annotation: { date: tournament.date, name: tournament.name } }
+                : {}),
+            updates,
+        },
+        'Failed to undo the tournament.'
+    );
     return { approximate };
 }
 
