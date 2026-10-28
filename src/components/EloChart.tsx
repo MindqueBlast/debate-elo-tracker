@@ -168,9 +168,12 @@ export function EloChart({
     const [zoom, setZoom] = useState<Zoom>(ALL_TIME);
     const primaryId = series.find((s) => s.id !== ANNOTATIONS)?.id ?? '';
     const [zoomFor, setZoomFor] = useState(primaryId);
+    // Lines switched off from the legend (or all at once)
+    const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
     if (zoomFor !== primaryId) {
         setZoomFor(primaryId);
         setZoom(ALL_TIME);
+        setHidden(new Set());
     }
     const zoomRef = useRef(zoom);
     zoomRef.current = zoom;
@@ -188,14 +191,19 @@ export function EloChart({
         () =>
             series
                 .filter((s) => s.id !== ANNOTATIONS)
-                .map((s) => s.data.map((p) => ({ t: msOf(p.x), y: p.y }))),
+                .map((s) => ({ id: s.id, points: s.data.map((p) => ({ t: msOf(p.x), y: p.y })) })),
         [series]
     );
+    const shown = useMemo(
+        () => lines.filter((l) => !hidden.has(l.id)).map((l) => l.points),
+        [lines, hidden]
+    );
+    const hiddenCount = lines.filter((l) => hidden.has(l.id)).length;
     // First and last moments with data (for the step arrows and tick spacing)
     const extent = useMemo(() => {
         let min = Infinity;
         let max = -Infinity;
-        for (const points of lines) {
+        for (const { points } of lines) {
             for (const p of points) {
                 if (p.t < min) min = p.t;
                 if (p.t > max) max = p.t;
@@ -207,10 +215,12 @@ export function EloChart({
     const win = zoom.level > 0 ? zoomWindow(zoom.level, zoom.center) : null;
     const viewStart = win ? msOf(win.center) - win.halfDays * DAY : null;
     const viewEnd = win ? msOf(win.center) + win.halfDays * DAY : null;
-    const domain = useMemo(
-        () => (viewStart !== null && viewEnd !== null ? visibleDomain(lines, viewStart, viewEnd) : null),
-        [lines, viewStart, viewEnd]
-    );
+    // The Elo axis fits what's on screen: the zoomed window and the lines still showing
+    const domain = useMemo(() => {
+        if (viewStart !== null && viewEnd !== null) return visibleDomain(shown, viewStart, viewEnd);
+        if (hiddenCount > 0) return visibleDomain(shown, -Infinity, Infinity);
+        return null;
+    }, [shown, viewStart, viewEnd, hiddenCount]);
     const viewMin = domain ? domain.min : yMin;
     const viewMax = domain ? domain.max : yMax;
 
@@ -239,6 +249,7 @@ export function EloChart({
                     borderColor: isAnno ? '#c0392b' : color,
                     backgroundColor: isAnno ? '#c0392b' : `${color}22`,
                     fill: !isAnno && series.length <= 2,
+                    hidden: hidden.has(s.id),
                     tension: 0.25,
                     // no overshoot between points, which shows when zoomed in
                     cubicInterpolationMode: 'monotone' as const,
@@ -251,7 +262,7 @@ export function EloChart({
                 };
             }),
         };
-    }, [series, viewMin, zoom.level]);
+    }, [series, viewMin, zoom.level, hidden]);
 
     const chartDuration = reduced ? 0 : DURATIONS.chart * 1000;
 
@@ -296,6 +307,17 @@ export function EloChart({
             plugins: {
                 legend: {
                     display: series.filter((s) => s.id !== ANNOTATIONS).length > 1,
+                    // clicking a name crosses it off (or brings it back)
+                    onClick: (_event, item) => {
+                        const id = series[item.datasetIndex ?? -1]?.id;
+                        if (!id) return;
+                        setHidden((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(id)) next.delete(id);
+                            else next.add(id);
+                            return next;
+                        });
+                    },
                     labels: {
                         boxWidth: 10,
                         color: getComputedStyle(document.documentElement)
@@ -450,18 +472,46 @@ export function EloChart({
             >
                 <Line data={data} options={options} />
             </div>
-            <p className="chart-zoom__hint">
-                {onPointClick ? (
-                    'Click a point to delete it'
-                ) : (
-                    <>
-                        <span className="hint-pointer">
-                            Click a point to zoom in · double-click to zoom out
-                        </span>
-                        <span className="hint-touch">Tap a point to zoom in</span>
-                    </>
+            <div className="chart-footer">
+                {lines.length > 1 && (
+                    <span className="chart-footer__lines">
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            disabled={hiddenCount === lines.length}
+                            onClick={() => setHidden(new Set(lines.map((l) => l.id)))}
+                        >
+                            Hide all lines
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            disabled={hiddenCount === 0}
+                            onClick={() => setHidden(new Set())}
+                        >
+                            Show all lines
+                        </button>
+                    </span>
                 )}
-            </p>
+                <p className="chart-zoom__hint">
+                    {lines.length > 1 && hiddenCount === lines.length ? (
+                        'Click names above the chart to bring lines back'
+                    ) : onPointClick ? (
+                        'Click a point to delete it'
+                    ) : (
+                        <>
+                            <span className="hint-pointer">
+                                Click a point to zoom in · double-click to zoom out
+                                {lines.length > 1 ? ' · click a name to hide it' : ''}
+                            </span>
+                            <span className="hint-touch">
+                                Tap a point to zoom in
+                                {lines.length > 1 ? ' · tap a name to hide it' : ''}
+                            </span>
+                        </>
+                    )}
+                </p>
+            </div>
         </div>
     );
 }
