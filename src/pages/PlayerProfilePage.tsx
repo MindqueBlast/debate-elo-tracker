@@ -40,7 +40,13 @@ export function PlayerProfilePage() {
     );
     const rank = ranked.find((d) => d.id === id)?.rank;
     const record = debater ? practiceRecord(debater.id, practiceRounds) : null;
-    const series = debater ? buildEloSeries({ debaters, selectedId: debater.id }) : null;
+    const series = useMemo(
+        () =>
+            debater
+                ? buildEloSeries({ debaters, selectedId: debater.id, tournaments, practiceRounds })
+                : null,
+        [debater, debaters, tournaments, practiceRounds]
+    );
 
     const results = useMemo(() => {
         if (!id) return [];

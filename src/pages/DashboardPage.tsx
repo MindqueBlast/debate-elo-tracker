@@ -33,6 +33,8 @@ export function DashboardPage() {
         ? buildEloSeries({
               debaters,
               selectedId: top.id,
+              tournaments,
+              practiceRounds,
           })
         : null;
 

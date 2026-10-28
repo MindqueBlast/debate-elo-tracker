@@ -26,7 +26,8 @@ import type { ChartSeries } from '../domain';
 
 export function AnalyticsPage() {
     const { isAdmin } = useAuth();
-    const { debaters, teams, annotations, refresh } = useAppData();
+    const { debaters, teams, annotations, tournaments, practiceRounds, refresh } =
+        useAppData();
     const toast = useToast();
     const wrapRef = useRef<HTMLDivElement>(null);
     const [selectedId, setSelectedId] = useState('ALL');
@@ -38,6 +39,7 @@ export function AnalyticsPage() {
     const [eventDate, setEventDate] = useState('');
     const [eventName, setEventName] = useState('');
     const [uploaded, setUploaded] = useState<ChartSeries[] | null>(null);
+    const [deleteMode, setDeleteMode] = useState(false);
 
     const pool = debaters
         .filter((d) => showGraduated || d.status === 'active')
@@ -73,10 +75,14 @@ export function AnalyticsPage() {
                 showGraduated,
                 annotations,
                 showAnnotations,
+                tournaments,
+                practiceRounds,
             }),
         [
             debaters,
             teams,
+            tournaments,
+            practiceRounds,
             isGroup,
             selectedId,
             compareId,
@@ -192,6 +198,16 @@ export function AnalyticsPage() {
                         />
                         Include graduated people and past teams
                     </label>
+                    {isAdmin && (
+                        <label className="row" style={{ marginBottom: 12 }}>
+                            <input
+                                type="checkbox"
+                                checked={deleteMode}
+                                onChange={(e) => setDeleteMode(e.target.checked)}
+                            />
+                            Delete history points by clicking them
+                        </label>
+                    )}
                     <div ref={wrapRef}>
                         <EloChart
                             series={result.series}
@@ -200,7 +216,7 @@ export function AnalyticsPage() {
                             isEmpty={result.isEmpty}
                             framed
                             onPointClick={
-                                isAdmin
+                                isAdmin && deleteMode
                                     ? async (debaterId, date) => {
                                           const debater = debaters.find(
                                               (d) => d.id === debaterId

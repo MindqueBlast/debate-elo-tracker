@@ -93,6 +93,17 @@ export {
 
 export { ALL_TEAMS, buildEloSeries, snapshotFromSeries, teamKey } from './chartSeries';
 
+export { buildEventIndex, describeDay, type EventIndex } from './describe';
+
+export {
+    adjacentAnchor,
+    MAX_ZOOM,
+    ZOOM_LEVEL_NAMES,
+    zoomWindow,
+    type ZoomLevel,
+    type ZoomWindow,
+} from './zoom';
+
 export {
     parseEloInput,
     sanitizeDebater,

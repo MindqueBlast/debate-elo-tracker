@@ -1,3 +1,4 @@
+import { buildEventIndex, describeDay, type EventIndex } from './describe';
 import {
     filterHistoryByGraduation,
     filterHistoryByRange,
@@ -11,7 +12,9 @@ import type {
     Debater,
     EloSeriesResult,
     HistoryPoint,
+    PracticeRound,
     Team,
+    Tournament,
 } from './types';
 
 /** Chart selection ids: a debater id, 'ALL', 'ALL_TEAMS' or 'team:<id>'. */
@@ -28,14 +31,28 @@ export interface BuildEloSeriesOptions {
     showGraduated?: boolean;
     annotations?: Annotation[];
     showAnnotations?: boolean;
+    /** With these, points are labelled with what happened (tournament name and change). */
+    tournaments?: Tournament[];
+    practiceRounds?: PracticeRound[];
 }
 
-function pointsFromHistory(history: HistoryPoint[]): ChartPoint[] {
-    return history.map((h) => ({
-        x: h.date,
-        y: h.elo,
-        event: h.event,
-    }));
+function pointsFromHistory(
+    debater: Debater,
+    history: HistoryPoint[],
+    index: EventIndex | null
+): ChartPoint[] {
+    const firstDate = sanitizeHistory(debater.history)[0]?.date;
+    return history.map((h) => {
+        let event = h.event;
+        if (index) {
+            if (h.event === 'Tournament') {
+                event = describeDay([debater.id], h.date, index, 'tournament') ?? h.event;
+            } else if (!h.event) {
+                event = describeDay([debater.id], h.date, index, 'plain', h.date === firstDate);
+            }
+        }
+        return { x: h.date, y: h.elo, event };
+    });
 }
 
 function prepareHistory(
@@ -53,6 +70,7 @@ function prepareHistory(
 function teamSeries(
     team: Team,
     debaters: Debater[],
+    index: EventIndex | null,
     startDate?: string | null,
     endDate?: string | null
 ): ChartSeries {
@@ -60,9 +78,16 @@ function teamSeries(
     const members = pairingMembers([team.member1_id, team.member2_id], byId).map(
         (m) => ({ ...m, history: sanitizeHistory(m.history) })
     );
-    const data = pairingHistory(members).filter(
-        (p) => (!startDate || p.x >= startDate) && (!endDate || p.x <= endDate)
-    );
+    const all = pairingHistory(members);
+    const firstDate = all[0]?.x;
+    const data = all
+        .filter((p) => (!startDate || p.x >= startDate) && (!endDate || p.x <= endDate))
+        .map((p) => ({
+            ...p,
+            event: index
+                ? describeDay(members.map((m) => m.id), p.x, index, 'any', p.x === firstDate) ?? p.event
+                : p.event,
+        }));
     return { id: teamKey(team.id), label: teamName(team, byId), data };
 }
 
@@ -70,19 +95,20 @@ function seriesFor(
     id: string,
     debaters: Debater[],
     teams: Team[],
+    index: EventIndex | null,
     startDate?: string | null,
     endDate?: string | null
 ): ChartSeries | null {
     if (id.startsWith('team:')) {
         const team = teams.find((t) => teamKey(t.id) === id);
-        return team ? teamSeries(team, debaters, startDate, endDate) : null;
+        return team ? teamSeries(team, debaters, index, startDate, endDate) : null;
     }
     const debater = debaters.find((d) => d.id === id);
     if (!debater) return null;
     return {
         id: debater.id,
         label: debater.name,
-        data: pointsFromHistory(prepareHistory(debater, startDate, endDate)),
+        data: pointsFromHistory(debater, prepareHistory(debater, startDate, endDate), index),
     };
 }
 
@@ -109,8 +135,14 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         showGraduated = false,
         annotations = [],
         showAnnotations = false,
+        tournaments,
+        practiceRounds,
     } = options;
 
+    const index =
+        tournaments || practiceRounds
+            ? buildEventIndex(tournaments ?? [], practiceRounds ?? [], lookup(debaters))
+            : null;
     const series: ChartSeries[] = [];
 
     if (selectedId === 'ALL') {
@@ -122,18 +154,18 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
             series.push({
                 id: debater.id,
                 label: debater.name,
-                data: pointsFromHistory(history),
+                data: pointsFromHistory(debater, history, index),
             });
         }
     } else if (selectedId === ALL_TEAMS) {
         for (const team of teams.filter((t) => t.active)) {
-            series.push(teamSeries(team, debaters, startDate, endDate));
+            series.push(teamSeries(team, debaters, index, startDate, endDate));
         }
     } else {
-        const primary = seriesFor(selectedId, debaters, teams, startDate, endDate);
+        const primary = seriesFor(selectedId, debaters, teams, index, startDate, endDate);
         if (primary) series.push(primary);
         if (compareId && compareId !== selectedId) {
-            const other = seriesFor(compareId, debaters, teams, startDate, endDate);
+            const other = seriesFor(compareId, debaters, teams, index, startDate, endDate);
             if (other) series.push(other);
         }
     }
