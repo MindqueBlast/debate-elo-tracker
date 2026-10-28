@@ -20,6 +20,9 @@ import type {
 /** Chart selection ids: a debater id, 'ALL', 'ALL_TEAMS' or 'team:<id>'. */
 export const ALL_TEAMS = 'ALL_TEAMS';
 export const teamKey = (id: string) => `team:${id}`;
+/** Everyone graduating in a year ('class:2027'), or with no class year set ('class:none'). */
+export const classKey = (year: number | null) => `class:${year ?? 'none'}`;
+export const isClassKey = (id: string) => id.startsWith('class:');
 
 export interface BuildEloSeriesOptions {
     debaters: Debater[];
@@ -154,9 +157,13 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
             : null;
     const series: ChartSeries[] = [];
 
-    if (selectedId === 'ALL') {
+    if (selectedId === 'ALL' || isClassKey(selectedId)) {
+        const cls = isClassKey(selectedId) ? selectedId.slice('class:'.length) : null;
         const pool = debaters.filter(
-            (d) => showGraduated || d.status === 'active'
+            (d) =>
+                (showGraduated || d.status === 'active') &&
+                (cls === null ||
+                    (cls === 'none' ? d.class_year == null : d.class_year === Number(cls)))
         );
         for (const debater of pool) {
             const history = prepareHistory(debater, startDate, endDate);

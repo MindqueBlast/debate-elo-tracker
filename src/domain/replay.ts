@@ -42,6 +42,16 @@ export interface ReplayPractice {
     loser: string[];
 }
 
+/** A by-hand change to someone's Elo on a date (added after that day's results). */
+export interface ReplayAdjustment {
+    id: string;
+    date: string;
+    person: string;
+    amount: number;
+    /** Shown on the history point, e.g. "Manual adjustment +12.0". */
+    label?: string;
+}
+
 export interface ReplayEntryResult {
     /** The pair's average Elo going in. */
     teamElo: number;
@@ -81,12 +91,17 @@ export function seasonOf(date: string): string {
 
 type Event =
     | { kind: 'practice'; date: string; order: number; p: ReplayPractice }
-    | { kind: 'tournament'; date: string; order: number; t: ReplayTournament };
+    | { kind: 'tournament'; date: string; order: number; t: ReplayTournament }
+    | { kind: 'adjustment'; date: string; order: number; a: ReplayAdjustment };
+
+/** Same-day order: practice rounds, then tournaments, then manual adjustments. */
+const KIND_ORDER = { practice: 0, tournament: 1, adjustment: 2 } as const;
 
 export function replay(input: {
     people: ReplayPerson[];
     tournaments: ReplayTournament[];
     practice: ReplayPractice[];
+    adjustments?: ReplayAdjustment[];
 }): ReplayResult {
     const elo: Record<string, number> = {};
     const history: Record<string, HistoryPoint[]> = {};
@@ -107,15 +122,29 @@ export function replay(input: {
         ...input.tournaments.map(
             (t, i): Event => ({ kind: 'tournament', date: t.date, order: i, t })
         ),
+        ...(input.adjustments ?? []).map(
+            (a, i): Event => ({ kind: 'adjustment', date: a.date, order: i, a })
+        ),
     ].sort((a, b) => {
         if (a.date !== b.date) return a.date < b.date ? -1 : 1;
-        if (a.kind !== b.kind) return a.kind === 'practice' ? -1 : 1;
+        if (a.kind !== b.kind) return KIND_ORDER[a.kind] - KIND_ORDER[b.kind];
         return a.order - b.order;
     });
 
     const out: ReplayResult = { elo, history, tournaments: {}, practice: {} };
 
     for (const ev of events) {
+        if (ev.kind === 'adjustment') {
+            const { a } = ev;
+            need(a.person);
+            elo[a.person] += a.amount;
+            history[a.person].push({
+                date: a.date,
+                elo: elo[a.person],
+                event: a.label ?? 'Manual adjustment',
+            });
+            continue;
+        }
         if (ev.kind === 'practice') {
             const { p } = ev;
             [...p.winner, ...p.loser].forEach(need);

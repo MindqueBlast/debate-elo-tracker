@@ -58,6 +58,8 @@ const person = (id: string, name: string, history: Debater['history']): Debater 
     status: 'active',
     graduation_date: null,
     history,
+    start_elo: history[0].elo,
+    start_date: history[0].date,
 });
 
 const princeton: Tournament = {

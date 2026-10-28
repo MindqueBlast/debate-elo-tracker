@@ -2,6 +2,8 @@ import { useMemo, useRef, useState } from 'react';
 import {
     ALL_TEAMS,
     buildEloSeries,
+    classKey,
+    isClassKey,
     isCalendarDate,
     lookup,
     snapshotFromSeries,
@@ -12,7 +14,6 @@ import {
 } from '../domain';
 import {
     addAnnotation,
-    deleteHistoryPoint,
     editAnnotationDate,
     MutationError,
     removeAnnotation,
@@ -33,7 +34,8 @@ export function AnalyticsPage() {
     const toast = useToast();
     const wrapRef = useRef<HTMLDivElement>(null);
     const [view, setView] = useState<'people' | 'teams'>('people');
-    const [selectedId, setSelectedId] = useState('ALL');
+    // '' = the default: the oldest class still on the team
+    const [chosenId, setSelectedId] = useState('');
     const [compareIds, setCompareIds] = useState<string[]>([]);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
@@ -42,12 +44,35 @@ export function AnalyticsPage() {
     const [eventDate, setEventDate] = useState('');
     const [eventName, setEventName] = useState('');
     const [uploaded, setUploaded] = useState<ChartSeries[] | null>(null);
-    const [deleteMode, setDeleteMode] = useState(false);
 
     const pool = debaters
         .filter((d) => showGraduated || d.status === 'active')
         .sort((a, b) => b.elo - a.elo);
     const byId = useMemo(() => lookup(debaters), [debaters]);
+
+    // "Class of 2027", "Class of 2028", … for everyone listed (plus anyone with no year set)
+    const classOptions = useMemo(() => {
+        const counts = new Map<number | null, number>();
+        for (const d of pool) {
+            const y = d.class_year ?? null;
+            counts.set(y, (counts.get(y) ?? 0) + 1);
+        }
+        return [...counts.entries()]
+            .sort((a, b) => (a[0] ?? 9999) - (b[0] ?? 9999))
+            .map(([year, count]) => ({
+                key: classKey(year),
+                label: year == null ? 'Class year not set' : `Class of ${year}`,
+                count,
+            }));
+    }, [pool]);
+    const defaultSelection = classOptions[0]?.key ?? 'ALL';
+    // a class that's no longer listed (e.g. graduated people hidden) falls back to the default
+    const selectedId =
+        !chosenId || (isClassKey(chosenId) && !classOptions.some((c) => c.key === chosenId))
+            ? view === 'teams'
+                ? ALL_TEAMS
+                : defaultSelection
+            : chosenId;
     const teamPool = useMemo(
         () =>
             teams
@@ -74,7 +99,7 @@ export function AnalyticsPage() {
     const switchView = (next: 'people' | 'teams') => {
         if (next === view) return;
         if (next === 'teams') {
-            const a = selectedId === 'ALL' ? undefined : teamFor(selectedId);
+            const a = selectedId === 'ALL' || isClassKey(selectedId) ? undefined : teamFor(selectedId);
             const others = compareIds
                 .map((id) => teamFor(id))
                 .filter((t): t is Team => !!t && t.id !== a?.id)
@@ -87,17 +112,19 @@ export function AnalyticsPage() {
             const people = [selectedId, ...compareIds]
                 .map(teamOf)
                 .flatMap((t) => (t ? [t.member1_id, t.member2_id] : []));
-            setSelectedId(team ? team.member1_id : 'ALL');
+            setSelectedId(team ? team.member1_id : '');
             setCompareIds(team ? [...new Set(people)].filter((id) => id !== team.member1_id) : []);
         }
         setView(next);
     };
-    const isGroup = selectedId === 'ALL' || selectedId === ALL_TEAMS;
+    const isGroup = selectedId === 'ALL' || selectedId === ALL_TEAMS || isClassKey(selectedId);
     const selectedName =
         selectedId === 'ALL'
             ? 'all_people'
-            : selectedId === ALL_TEAMS
-              ? 'all_teams'
+            : isClassKey(selectedId)
+              ? `class_of_${selectedId.slice('class:'.length)}`
+              : selectedId === ALL_TEAMS
+                ? 'all_teams'
               : (teamPool.find((t) => t.key === selectedId)?.name ??
                 debaters.find((d) => d.id === selectedId)?.name ??
                 'elo');
@@ -168,7 +195,7 @@ export function AnalyticsPage() {
                                     const next = e.target.value;
                                     setSelectedId(next);
                                     setCompareIds((ids) =>
-                                        next === 'ALL' || next === ALL_TEAMS
+                                        next === 'ALL' || next === ALL_TEAMS || isClassKey(next)
                                             ? []
                                             : ids.filter((id) => id !== next)
                                     );
@@ -176,12 +203,20 @@ export function AnalyticsPage() {
                             >
                                 {view === 'people' ? (
                                     <>
-                                        <option value="ALL">All people</option>
-                                        {pool.map((d) => (
-                                            <option key={d.id} value={d.id}>
-                                                {d.name} ({Math.round(d.elo)})
-                                            </option>
-                                        ))}
+                                        <optgroup label="Classes">
+                                            {classOptions.map((c) => (
+                                                <option key={c.key} value={c.key}>
+                                                    {c.label} ({c.count})
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                        <optgroup label="People">
+                                            {pool.map((d) => (
+                                                <option key={d.id} value={d.id}>
+                                                    {d.name} ({Math.round(d.elo)})
+                                                </option>
+                                            ))}
+                                        </optgroup>
                                     </>
                                 ) : (
                                     <>
@@ -307,16 +342,6 @@ export function AnalyticsPage() {
                         />
                         Include graduated people and past teams
                     </label>
-                    {isAdmin && (
-                        <label className="row" style={{ marginBottom: 12 }}>
-                            <input
-                                type="checkbox"
-                                checked={deleteMode}
-                                onChange={(e) => setDeleteMode(e.target.checked)}
-                            />
-                            Delete history points by clicking them
-                        </label>
-                    )}
                     <div ref={wrapRef} className="chart-fullscreen-host">
                         <EloChart
                             series={result.series}
@@ -324,25 +349,6 @@ export function AnalyticsPage() {
                             yMax={result.yMax}
                             isEmpty={result.isEmpty}
                             framed
-                            onPointClick={
-                                isAdmin && deleteMode
-                                    ? async (debaterId, date) => {
-                                          const debater = debaters.find(
-                                              (d) => d.id === debaterId
-                                          );
-                                          if (!debater) return;
-                                          if (
-                                              !confirm(
-                                                  `Delete Elo point for ${debater.name} on ${date}?`
-                                              )
-                                          )
-                                              return;
-                                          await deleteHistoryPoint(debater, date);
-                                          toast.push('History point removed.', 'success');
-                                          await refresh();
-                                      }
-                                    : undefined
-                            }
                         />
                     </div>
                     <div className="row" style={{ marginTop: 12 }}>

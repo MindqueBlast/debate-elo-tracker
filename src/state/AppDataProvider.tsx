@@ -7,7 +7,7 @@ import {
     useRef,
     useState,
 } from 'react';
-import { loadSnapshot, type AppSnapshot } from '../data/loaders';
+import { EMPTY_SNAPSHOT, loadSnapshot, type AppSnapshot } from '../data/loaders';
 
 interface AppDataContextValue extends AppSnapshot {
     loading: boolean;
@@ -15,13 +15,7 @@ interface AppDataContextValue extends AppSnapshot {
     refresh: () => Promise<void>;
 }
 
-const EMPTY: AppSnapshot = {
-    debaters: [],
-    teams: [],
-    practiceRounds: [],
-    tournaments: [],
-    annotations: [],
-};
+const EMPTY: AppSnapshot = EMPTY_SNAPSHOT;
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
 

@@ -18,6 +18,8 @@ const person = (id: string, name: string, elo: number, extra: Partial<Debater> =
     status: 'active',
     graduation_date: null,
     history: [],
+    start_elo: elo,
+    start_date: '2024-08-01',
     ...extra,
 });
 

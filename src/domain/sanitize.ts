@@ -14,14 +14,29 @@ export function sanitizeDebater(raw: unknown): Debater | null {
         rec.division === 'Novice' || rec.division === 'JV' || rec.division === 'Varsity'
             ? rec.division
             : null;
+    const history = sanitizeHistory(rec.history);
+    const startElo = Number(rec.start_elo);
+    const created = typeof rec.created_at === 'string' ? rec.created_at : null;
+    const startDate =
+        typeof rec.start_date === 'string' && rec.start_date
+            ? rec.start_date.slice(0, 10)
+            : (history[0]?.date ?? (created ? created.slice(0, 10) : '2000-01-01'));
     return {
         id: rec.id,
         name: rec.name,
         elo,
         status,
         graduation_date,
-        history: sanitizeHistory(rec.history),
+        history,
         division,
+        class_year:
+            rec.class_year != null && Number.isFinite(Number(rec.class_year))
+                ? Number(rec.class_year)
+                : null,
+        start_elo:
+            rec.start_elo != null && Number.isFinite(startElo) ? startElo : (history[0]?.elo ?? elo),
+        start_date: startDate,
+        created_at: created,
     };
 }
 

@@ -21,11 +21,29 @@ export interface HistoryPoint {
 export interface Debater {
     id: string;
     name: string;
+    /** Worked out from all results (never typed in). */
     elo: number;
     status: DebaterStatus;
     graduation_date: string | null;
+    /** Worked out from all results (never typed in). */
     history: HistoryPoint[];
     division?: Division | null;
+    /** Graduation year, e.g. 2027 (the first two digits of their student ID). */
+    class_year?: number | null;
+    /** Where their Elo starts, before any results. */
+    start_elo: number;
+    start_date: string;
+    created_at?: string | null;
+}
+
+/** A by-hand change to someone's Elo, kept as its own record so replays keep it. */
+export interface EloAdjustment {
+    id: string;
+    debater_id: string;
+    date: string;
+    amount: number;
+    note: string | null;
+    created_at?: string | null;
 }
 
 /**
@@ -57,6 +75,7 @@ export interface PracticeRound {
     /** The partners' own changes (null on rounds recorded before individual math). */
     winner_partner_change?: number | null;
     loser_partner_change?: number | null;
+    created_at?: string | null;
 }
 
 export interface TournamentParticipant {
@@ -85,6 +104,7 @@ export interface Tournament {
     affect?: number | null;
     max_gain?: number | null;
     max_rounds?: number | null;
+    created_at?: string | null;
     tournament_participants: TournamentParticipant[];
 }
 

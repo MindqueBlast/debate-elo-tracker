@@ -14,6 +14,8 @@ const d = (
     status,
     graduation_date: status === 'graduated' ? '2025' : null,
     history: [],
+    start_elo: elo,
+    start_date: '2024-08-01',
 });
 
 describe('rankings', () => {

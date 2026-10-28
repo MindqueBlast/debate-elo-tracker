@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import {
     BASE_ELO,
+    getLocalDateString,
     lookup,
     parseEloInput,
+    seasonOf,
     rankDebaters,
     rankTeams,
     type Debater,
@@ -14,6 +16,7 @@ import {
 import {
     addDebater,
     createTeam,
+    deleteAdjustment,
     deleteTeam,
     MutationError,
     removeDebater,
@@ -31,6 +34,17 @@ import { useAppData } from '../state/AppDataProvider';
 import { useToast } from '../state/ToastProvider';
 
 const DIVS: Division[] = ['Varsity', 'JV', 'Novice'];
+
+/** This season's four classes, seniors first, e.g. 2027–2030 in 2026–27. */
+function currentClasses(): { year: number; label: string }[] {
+    const start = Number(seasonOf(getLocalDateString()).slice(0, 4));
+    return ['Senior', 'Junior', 'Sophomore', 'Freshman'].map((label, i) => ({
+        year: start + 1 + i,
+        label,
+    }));
+}
+
+const shortClass = (year: number) => `’${String(year).slice(2)}`;
 
 const errorText = (err: unknown, fallback: string) =>
     err instanceof MutationError ? err.message : fallback;
@@ -69,16 +83,28 @@ export function PlayersPage() {
 
 function People() {
     const { isAdmin } = useAuth();
-    const { debaters, teams, practiceRounds, refresh } = useAppData();
+    const data = useAppData();
+    const { debaters, teams, practiceRounds, tournaments, adjustments, refresh } = data;
     const toast = useToast();
     const [q, setQ] = useState('');
     const [showGraduated, setShowGraduated] = useState(false);
     const [name, setName] = useState('');
     const [division, setDivision] = useState<Division>('Novice');
     const [elo, setElo] = useState('');
+    const [classPick, setClassPick] = useState('');
+    const [classOther, setClassOther] = useState('');
+    const classes = currentClasses();
     const [editing, setEditing] = useState<Debater | null>(null);
     const [eloTarget, setEloTarget] = useState<Debater | null>(null);
     const [eloValue, setEloValue] = useState('');
+    const [eloNote, setEloNote] = useState('');
+    const [busy, setBusy] = useState(false);
+    const resultCount = (id: string) =>
+        tournaments.reduce(
+            (n, t) =>
+                n + t.tournament_participants.filter((p) => p.debater_id === id || p.partner_id === id).length,
+            0
+        );
 
     const ranked = useMemo(
         () => rankDebaters(debaters, practiceRounds, { showGraduated, search: q }),
@@ -102,10 +128,17 @@ function People() {
             toast.push('Starting Elo must be a number.', 'warning');
             return;
         }
+        const classYear = Number(classPick === 'other' ? classOther : classPick);
+        if (!classPick || !Number.isInteger(classYear) || classYear < 2000 || classYear > 2100) {
+            toast.push('Pick their class year (the year they graduate).', 'warning');
+            return;
+        }
         try {
-            await addDebater({ name, division, startingElo: parsed, existing: debaters });
+            await addDebater(data, { name, division, startingElo: parsed, classYear });
             setName('');
             setElo('');
+            setClassPick('');
+            setClassOther('');
             toast.push(`Added ${name.trim()} at ${Math.round(parsed)}.`, 'success');
             await refresh();
         } catch (err) {
@@ -117,7 +150,7 @@ function People() {
         <>
             {isAdmin && (
                 <Card style={{ marginBottom: 20 }}>
-                    <form onSubmit={(e) => void onAdd(e)} className="grid grid-4">
+                    <form onSubmit={(e) => void onAdd(e)} className="grid grid-5">
                         <div className="field">
                             <label htmlFor="personName">Name</label>
                             <input
@@ -139,6 +172,33 @@ function People() {
                             </select>
                         </div>
                         <div className="field">
+                            <label htmlFor="personClass">Class of</label>
+                            <select
+                                id="personClass"
+                                value={classPick}
+                                required
+                                onChange={(e) => setClassPick(e.target.value)}
+                            >
+                                <option value="">Pick…</option>
+                                {classes.map((c) => (
+                                    <option key={c.year} value={c.year}>
+                                        {c.year} ({c.label.toLowerCase()})
+                                    </option>
+                                ))}
+                                <option value="other">Other…</option>
+                            </select>
+                            {classPick === 'other' && (
+                                <input
+                                    aria-label="Class year"
+                                    inputMode="numeric"
+                                    placeholder="e.g. 2031"
+                                    value={classOther}
+                                    onChange={(e) => setClassOther(e.target.value)}
+                                    style={{ marginTop: 6 }}
+                                />
+                            )}
+                        </div>
+                        <div className="field">
                             <label htmlFor="personElo">Starting Elo</label>
                             <input
                                 id="personElo"
@@ -155,7 +215,8 @@ function People() {
                     </form>
                     <p className="note">
                         New people start at {BASE_ELO.Novice} (Novice), {BASE_ELO.JV} (JV) or{' '}
-                        {BASE_ELO.Varsity} (Varsity) unless you enter a number.
+                        {BASE_ELO.Varsity} (Varsity) unless you enter a number. Class of = the year
+                        they graduate (the first two digits of their student ID).
                     </p>
                 </Card>
             )}
@@ -190,6 +251,11 @@ function People() {
                                 <strong>{d.name}</strong>
                             </Link>
                             {d.division && <span className="pill">{d.division}</span>}
+                            {d.class_year != null && (
+                                <span className="pill" title={`Class of ${d.class_year}`}>
+                                    {shortClass(d.class_year)}
+                                </span>
+                            )}
                             {d.status === 'graduated' && <span className="pill">graduated</span>}
                             {d.status === 'active' && !teamCount.get(d.id) && (
                                 <span className="pill" title="Not on an active team">
@@ -208,6 +274,7 @@ function People() {
                                         onClick={() => {
                                             setEloTarget(d);
                                             setEloValue(String(Math.round(d.elo)));
+                                            setEloNote('');
                                         }}
                                     >
                                         Set Elo
@@ -215,13 +282,17 @@ function People() {
                                     <Button
                                         size="sm"
                                         variant="secondary"
+                                        disabled={busy}
                                         onClick={async () => {
+                                            setBusy(true);
                                             try {
-                                                await toggleGraduate(d);
+                                                await toggleGraduate(data, d);
                                                 toast.push('Status updated.', 'success');
                                                 await refresh();
                                             } catch (err) {
                                                 toast.push(errorText(err, 'Failed to update.'), 'error');
+                                            } finally {
+                                                setBusy(false);
                                             }
                                         }}
                                     >
@@ -230,14 +301,25 @@ function People() {
                                     <Button
                                         size="sm"
                                         variant="danger"
+                                        disabled={busy}
                                         onClick={async () => {
-                                            if (!confirm(`Permanently remove ${d.name}?`)) return;
+                                            const n = resultCount(d.id);
+                                            const message =
+                                                n === 0
+                                                    ? `Permanently remove ${d.name}?`
+                                                    : `Permanently remove ${d.name} and their ${n} tournament result${n === 1 ? '' : 's'}? ` +
+                                                      'Partners keep their shared results (partner left blank), ' +
+                                                      'and everyone is recalculated without them.';
+                                            if (!confirm(message)) return;
+                                            setBusy(true);
                                             try {
-                                                await removeDebater(d.id);
-                                                toast.push('Removed.', 'success');
+                                                await removeDebater(data, d.id);
+                                                toast.push(`${d.name} removed. Everyone was recalculated.`, 'success');
                                                 await refresh();
                                             } catch (err) {
                                                 toast.push(errorText(err, 'Failed to remove.'), 'error');
+                                            } finally {
+                                                setBusy(false);
                                             }
                                         }}
                                     >
@@ -267,16 +349,23 @@ function People() {
                                     toast.push('Enter a valid Elo.', 'warning');
                                     return;
                                 }
+                                setBusy(true);
                                 try {
-                                    await setDebaterElo(eloTarget, parsed);
+                                    await setDebaterElo(data, eloTarget, parsed, eloNote);
                                     toast.push(`Elo set to ${parsed}.`, 'success');
                                     setEloTarget(null);
                                     await refresh();
                                 } catch (err) {
                                     toast.push(errorText(err, 'Failed to set Elo.'), 'error');
+                                } finally {
+                                    setBusy(false);
                                 }
                             }}
                         >
+                            <p className="note" style={{ marginBottom: 12 }}>
+                                Now {Math.round(eloTarget.elo)}. This saves a one-off adjustment today
+                                (the difference), so it stays in place whenever results are recalculated.
+                            </p>
                             <div className="field">
                                 <label htmlFor="newElo">New Elo</label>
                                 <input
@@ -285,8 +374,58 @@ function People() {
                                     onChange={(e) => setEloValue(e.target.value)}
                                 />
                             </div>
-                            <Button type="submit">Save</Button>
+                            <div className="field">
+                                <label htmlFor="eloNote">Reason (optional)</label>
+                                <input
+                                    id="eloNote"
+                                    value={eloNote}
+                                    onChange={(e) => setEloNote(e.target.value)}
+                                />
+                            </div>
+                            <Button type="submit" disabled={busy}>
+                                Save
+                            </Button>
                         </form>
+                        {adjustments.some((a) => a.debater_id === eloTarget.id) && (
+                            <div style={{ marginTop: 20 }}>
+                                <div className="stat-label">Earlier adjustments</div>
+                                {adjustments
+                                    .filter((a) => a.debater_id === eloTarget.id)
+                                    .sort((a, b) => (a.date < b.date ? 1 : -1))
+                                    .map((a) => (
+                                        <div key={a.id} className="match-row">
+                                            <span className="num">{a.date}</span>
+                                            <span>
+                                                <span className={a.amount < 0 ? 'delta-neg' : 'delta-pos'}>
+                                                    {a.amount >= 0 ? '+' : ''}
+                                                    {a.amount.toFixed(1)}
+                                                </span>
+                                                {a.note && <span className="note"> · {a.note}</span>}
+                                            </span>
+                                            <Button
+                                                size="sm"
+                                                variant="danger"
+                                                disabled={busy}
+                                                onClick={async () => {
+                                                    setBusy(true);
+                                                    try {
+                                                        await deleteAdjustment(data, a.id);
+                                                        toast.push('Adjustment removed.', 'success');
+                                                        setEloTarget(null);
+                                                        await refresh();
+                                                    } catch (err) {
+                                                        toast.push(errorText(err, 'Failed to remove.'), 'error');
+                                                    } finally {
+                                                        setBusy(false);
+                                                    }
+                                                }}
+                                            >
+                                                Remove
+                                            </Button>
+                                        </div>
+                                    ))}
+                            </div>
+                        )}
                     </Modal>
                 )}
             </AnimatePresence>
@@ -295,26 +434,48 @@ function People() {
 }
 
 function EditPerson({ debater, onClose }: { debater: Debater; onClose: () => void }) {
-    const { debaters, refresh } = useAppData();
+    const data = useAppData();
+    const { refresh } = data;
     const toast = useToast();
     const [name, setName] = useState(debater.name);
     const [division, setDivision] = useState<Division | ''>(debater.division ?? '');
+    const [classYear, setClassYear] = useState(
+        debater.class_year == null ? '' : String(debater.class_year)
+    );
+    const [startElo, setStartElo] = useState(String(debater.start_elo));
+    const [startDate, setStartDate] = useState(debater.start_date);
+    const [saving, setSaving] = useState(false);
     return (
         <Modal title={`Edit ${debater.name}`} onClose={onClose}>
             <form
                 onSubmit={async (e) => {
                     e.preventDefault();
+                    const elo = parseEloInput(startElo, NaN);
+                    if (elo == null || Number.isNaN(elo)) {
+                        toast.push('Starting Elo must be a number.', 'warning');
+                        return;
+                    }
+                    const year = classYear.trim() === '' ? null : Number(classYear);
+                    if (year != null && (!Number.isInteger(year) || year < 2000 || year > 2100)) {
+                        toast.push('Class year should look like 2027.', 'warning');
+                        return;
+                    }
+                    setSaving(true);
                     try {
-                        await updateDebater(
-                            debater,
-                            { name, division: division || null },
-                            debaters
-                        );
-                        toast.push('Saved.', 'success');
+                        await updateDebater(data, debater, {
+                            name,
+                            division: division || null,
+                            classYear: year,
+                            startElo: elo,
+                            startDate,
+                        });
+                        toast.push('Saved. Everyone was recalculated.', 'success');
                         onClose();
                         await refresh();
                     } catch (err) {
                         toast.push(errorText(err, 'Failed to save.'), 'error');
+                    } finally {
+                        setSaving(false);
                     }
                 }}
             >
@@ -335,7 +496,43 @@ function EditPerson({ debater, onClose }: { debater: Debater; onClose: () => voi
                         ))}
                     </select>
                 </div>
-                <Button type="submit">Save</Button>
+                <div className="field">
+                    <label htmlFor="editClass">Class of</label>
+                    <input
+                        id="editClass"
+                        inputMode="numeric"
+                        placeholder="e.g. 2027"
+                        value={classYear}
+                        onChange={(e) => setClassYear(e.target.value)}
+                    />
+                </div>
+                <div className="grid grid-2 tight">
+                    <div className="field">
+                        <label htmlFor="editStartElo">Starting Elo</label>
+                        <input
+                            id="editStartElo"
+                            inputMode="decimal"
+                            value={startElo}
+                            onChange={(e) => setStartElo(e.target.value)}
+                        />
+                    </div>
+                    <div className="field">
+                        <label htmlFor="editStartDate">Start date</label>
+                        <input
+                            id="editStartDate"
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                        />
+                    </div>
+                </div>
+                <p className="note" style={{ marginBottom: 12 }}>
+                    Their Elo is worked out from this starting point through every result, so
+                    changing it updates everything after.
+                </p>
+                <Button type="submit" disabled={saving}>
+                    Save
+                </Button>
             </form>
         </Modal>
     );

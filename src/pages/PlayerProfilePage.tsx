@@ -149,6 +149,9 @@ export function PlayerProfilePage() {
                     <div className="row" style={{ marginTop: 16 }}>
                         <span className="pill">Rank #{rank ?? '—'}</span>
                         {debater.division && <span className="pill">{debater.division}</span>}
+                        {debater.class_year != null && (
+                            <span className="pill">Class of {debater.class_year}</span>
+                        )}
                         <span className="pill">{debater.status}</span>
                         <span className="pill">
                             {record && record.played

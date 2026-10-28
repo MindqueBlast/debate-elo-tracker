@@ -19,6 +19,8 @@ const player = (
     status: 'active',
     graduation_date: null,
     history: [],
+    start_elo: 1500,
+    start_date: '2024-08-01',
     ...overrides,
 });
 

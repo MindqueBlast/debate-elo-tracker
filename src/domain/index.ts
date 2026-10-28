@@ -11,6 +11,7 @@ export type {
     Debater,
     DebaterStatus,
     Division,
+    EloAdjustment,
     EloSeriesResult,
     HistoryPoint,
     PracticeEloResult,
@@ -91,7 +92,14 @@ export {
     type ReplayTournament,
 } from './replay';
 
-export { ALL_TEAMS, buildEloSeries, snapshotFromSeries, teamKey } from './chartSeries';
+export {
+    ALL_TEAMS,
+    buildEloSeries,
+    classKey,
+    isClassKey,
+    snapshotFromSeries,
+    teamKey,
+} from './chartSeries';
 
 export { buildEventIndex, competedOn, describeDay, type EventIndex } from './describe';
 
@@ -111,3 +119,23 @@ export {
     sanitizeDebaters,
     validatePlayerName,
 } from './sanitize';
+
+export {
+    computeAll,
+    DEFAULT_PARAMS,
+    diffDerived,
+    isEmptyDerived,
+    seasonsBetween,
+    withoutPerson,
+    type Derived,
+    type DerivedEntry,
+    type DerivedPerson,
+    type DerivedPractice,
+    type InputAdjustment,
+    type InputEntry,
+    type InputPerson,
+    type InputPractice,
+    type Inputs,
+    type InputTournament,
+    type WithoutPerson,
+} from './rebuild';
