@@ -179,6 +179,8 @@ export interface ChartPoint {
     x: string;
     y: number;
     event?: string;
+    /** False when nobody on this line played that day (e.g. a skipped tournament). */
+    competed?: boolean;
 }
 
 export interface ChartSeries {

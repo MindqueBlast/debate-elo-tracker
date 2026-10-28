@@ -93,7 +93,7 @@ export {
 
 export { ALL_TEAMS, buildEloSeries, snapshotFromSeries, teamKey } from './chartSeries';
 
-export { buildEventIndex, describeDay, type EventIndex } from './describe';
+export { buildEventIndex, competedOn, describeDay, type EventIndex } from './describe';
 
 export {
     MAX_ZOOM,

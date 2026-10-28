@@ -1,4 +1,4 @@
-import { buildEventIndex, describeDay, type EventIndex } from './describe';
+import { buildEventIndex, competedOn, describeDay, type EventIndex } from './describe';
 import {
     filterHistoryByGraduation,
     filterHistoryByRange,
@@ -53,7 +53,12 @@ function pointsFromHistory(
                 event = describeDay([debater.id], h.date, index, 'plain', h.date === firstDate);
             }
         }
-        return { x: h.date, y: h.elo, event };
+        return {
+            x: h.date,
+            y: h.elo,
+            event,
+            competed: index ? competedOn([debater.id], h.date, index) : undefined,
+        };
     });
 }
 
@@ -89,6 +94,7 @@ function teamSeries(
             event: index
                 ? describeDay(members.map((m) => m.id), p.x, index, 'any', p.x === firstDate) ?? p.event
                 : p.event,
+            competed: index ? competedOn(members.map((m) => m.id), p.x, index) : undefined,
         }));
     return { id: teamKey(team.id), label: teamName(team, byId), data };
 }

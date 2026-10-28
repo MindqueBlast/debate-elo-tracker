@@ -194,3 +194,16 @@ describe('comparing several lines', () => {
         expect(series.map((s) => s.label)).toEqual(['Jiayi', 'Leon', 'Aaditya']);
     });
 });
+
+describe('dots', () => {
+    it('marks only the days someone actually played', () => {
+        const { series } = buildEloSeries({
+            debaters: people,
+            selectedId: 'l',
+            compareIds: ['a'],
+            tournaments: [princeton],
+        });
+        expect(series[0].data.map((p) => p.competed)).toEqual([false, true]);
+        expect(series[1].data.map((p) => p.competed)).toEqual([false, false]);
+    });
+});

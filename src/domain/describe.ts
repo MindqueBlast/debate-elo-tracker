@@ -34,6 +34,23 @@ export function buildEventIndex(
     return { tournamentsByDate, practiceByDate, byId };
 }
 
+/** Whether any of these people played a tournament or practice round that day. */
+export function competedOn(ids: string[], date: string, index: EventIndex): boolean {
+    for (const t of index.tournamentsByDate.get(date) ?? []) {
+        if (
+            t.tournament_participants.some(
+                (p) => ids.includes(p.debater_id) || (!!p.partner_id && ids.includes(p.partner_id))
+            )
+        ) {
+            return true;
+        }
+    }
+    for (const r of index.practiceByDate.get(date) ?? []) {
+        if (ids.some((id) => practiceSide(r, id) !== null)) return true;
+    }
+    return false;
+}
+
 const signed = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}`;
 
 /**

@@ -236,6 +236,10 @@ export function EloChart({
             datasets: series.map((s, i) => {
                 const isAnno = s.id === ANNOTATIONS;
                 const color = HEX[i % HEX.length];
+                const radius = s.data.length === 1 || zoom.level >= 3 ? 4 : 2;
+                // dots only where they actually played; skipped tournaments are just line
+                const noDot = (p: ChartSeries['data'][number]) =>
+                    p.competed === false && s.data.length > 1;
                 return {
                     label: s.label,
                     id: s.id,
@@ -254,8 +258,8 @@ export function EloChart({
                     // no overshoot between points, which shows when zoomed in
                     cubicInterpolationMode: 'monotone' as const,
                     borderWidth: isAnno ? 0 : series.length > 8 ? 1.25 : 2,
-                    pointRadius: isAnno ? 8 : s.data.length === 1 || zoom.level >= 3 ? 4 : 2,
-                    pointHoverRadius: 5,
+                    pointRadius: isAnno ? 8 : s.data.map((p) => (noDot(p) ? 0 : radius)),
+                    pointHoverRadius: isAnno ? 5 : s.data.map((p) => (noDot(p) ? 3 : 5)),
                     pointStyle: isAnno ? ('star' as const) : ('circle' as const),
                     showLine: !isAnno,
                     spanGaps: false,
