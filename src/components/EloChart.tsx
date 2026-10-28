@@ -405,61 +405,61 @@ export function EloChart({
         <div className="chart-zoomable">
             <div className="chart-zoom">
                 {win ? (
-                    <>
-                        <span className="chart-zoom__nav">
-                            <button
-                                type="button"
-                                className="chart-zoom__step"
-                                aria-label="Previous period"
-                                disabled={!canPrev}
-                                onClick={() => step(-1)}
-                            >
-                                ‹
-                            </button>
-                            <span className="chart-zoom__label" aria-live="polite">
-                                <span className="chart-zoom__level">
-                                    {ZOOM_LEVEL_NAMES[zoom.level]}
-                                </span>{' '}
-                                {win.label}
-                            </span>
-                            <button
-                                type="button"
-                                className="chart-zoom__step"
-                                aria-label="Next period"
-                                disabled={!canNext}
-                                onClick={() => step(1)}
-                            >
-                                ›
-                            </button>
+                    <span className="chart-zoom__nav">
+                        <button
+                            type="button"
+                            className="chart-zoom__step"
+                            aria-label="Previous period"
+                            disabled={!canPrev}
+                            onClick={() => step(-1)}
+                        >
+                            ‹
+                        </button>
+                        <span className="chart-zoom__label" aria-live="polite">
+                            <span className="chart-zoom__level">
+                                {ZOOM_LEVEL_NAMES[zoom.level]}
+                            </span>{' '}
+                            {win.label}
                         </span>
-                        <span className="chart-zoom__actions">
-                            <button
-                                type="button"
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => {
-                                    cancelPending();
-                                    setZoom(zoomedOut(zoom));
-                                }}
-                            >
-                                Zoom out
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-ghost btn-sm"
-                                onClick={() => {
-                                    cancelPending();
-                                    setZoom(ALL_TIME);
-                                }}
-                            >
-                                Show all
-                            </button>
-                        </span>
-                    </>
+                        <button
+                            type="button"
+                            className="chart-zoom__step"
+                            aria-label="Next period"
+                            disabled={!canNext}
+                            onClick={() => step(1)}
+                        >
+                            ›
+                        </button>
+                    </span>
                 ) : (
                     <span className="chart-zoom__label chart-zoom__label--idle" aria-live="polite">
                         All time
                     </span>
                 )}
+                <span className="chart-zoom__actions">
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={!win}
+                        onClick={() => {
+                            cancelPending();
+                            setZoom(zoomedOut(zoom));
+                        }}
+                    >
+                        Zoom out
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={!win}
+                        onClick={() => {
+                            cancelPending();
+                            setZoom(ALL_TIME);
+                        }}
+                    >
+                        Reset zoom
+                    </button>
+                </span>
             </div>
             <div
                 className={wrapClass}

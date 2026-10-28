@@ -317,7 +317,7 @@ export function AnalyticsPage() {
                             Delete history points by clicking them
                         </label>
                     )}
-                    <div ref={wrapRef}>
+                    <div ref={wrapRef} className="chart-fullscreen-host">
                         <EloChart
                             series={result.series}
                             yMin={result.yMin}

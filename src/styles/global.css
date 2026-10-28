@@ -786,6 +786,28 @@ p {
     touch-action: manipulation;
 }
 
+/* Fullscreen: the chart takes the whole screen, not just its usual 420px */
+.chart-fullscreen-host:fullscreen {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    padding: 20px 28px 16px;
+    overflow: hidden;
+}
+
+.chart-fullscreen-host:fullscreen > .chart-zoomable {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.chart-fullscreen-host:fullscreen .chart-wrap {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+}
+
 .chart-zoom {
     display: flex;
     flex-wrap: wrap;
