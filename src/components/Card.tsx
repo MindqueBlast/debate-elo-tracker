@@ -16,65 +16,27 @@ export function Card({
     );
 }
 
-export function PageHeader({
-    kicker,
-    title,
-    actions,
-    illustration,
-}: {
-    kicker: string;
-    title: string;
-    actions?: ReactNode;
-    illustration?: ReactNode;
-}) {
+export function PageHeader({ title, actions }: { title: string; actions?: ReactNode }) {
     return (
         <header className="page-header">
-            <div className="page-header__main">
-                {illustration && (
-                    <div className="page-header__illus" aria-hidden="true">
-                        {illustration}
-                    </div>
-                )}
-                <div>
-                    <div className="page-kicker">{kicker}</div>
-                    <h1>{title}</h1>
-                </div>
-            </div>
+            <h1>{title}</h1>
             {actions}
         </header>
     );
 }
 
-export function EmptyState({
-    title,
-    body,
-    illustration,
-}: {
-    title: string;
-    body: string;
-    illustration?: ReactNode;
-}) {
+export function EmptyState({ title, body }: { title: string; body: string }) {
     return (
         <div className="empty">
-            {illustration && <div className="empty__illus">{illustration}</div>}
             <strong>{title}</strong>
             <p>{body}</p>
         </div>
     );
 }
 
-export function StatCard({
-    label,
-    value,
-    accent,
-}: {
-    label: string;
-    value: ReactNode;
-    accent?: ReactNode;
-}) {
+export function StatCard({ label, value }: { label: string; value: ReactNode }) {
     return (
         <Card className="stat-card">
-            {accent && <div className="stat-card__accent" aria-hidden="true">{accent}</div>}
             <div className="stat-label">{label}</div>
             <div className="stat-value num">{value}</div>
         </Card>

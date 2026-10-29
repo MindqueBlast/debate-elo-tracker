@@ -30,7 +30,6 @@ import { Button } from '../components/Button';
 import { Card, EmptyState, PageHeader } from '../components/Card';
 import {
     DebatePodium,
-    EmptyMatches,
     TournamentTrophy,
 } from '../components/illustrations';
 import {
@@ -189,7 +188,7 @@ export function MatchesPage() {
                 date: roundDate,
             });
             toast.push(
-                changes.map((m) => `${nameOf(m.id)} ${signed(m.change)}`).join('  ·  '),
+                changes.map((m) => `${nameOf(m.id)} ${signed(m.change)}`).join(', '),
                 'success',
                 5000
             );
@@ -343,9 +342,7 @@ export function MatchesPage() {
     return (
         <div>
             <PageHeader
-                kicker="Results"
                 title="Matches"
-                illustration={<DebatePodium size={72} tone="accent" />}
             />
             {isAdmin && (
                 <div className="grid grid-2" style={{ marginBottom: 20 }}>
@@ -441,7 +438,7 @@ export function MatchesPage() {
                             >
                                 {TYPES.map((t) => (
                                     <option key={t.id} value={t.id}>
-                                        {t.label} · bonus {t.bonus}
+                                        {t.label}, bonus {t.bonus}
                                     </option>
                                 ))}
                                 <option value="custom">Custom bonus</option>
@@ -528,7 +525,7 @@ export function MatchesPage() {
                                             setPickDivision(e.target.value as Division)
                                         }
                                     >
-                                        {!pairingOf(pick) && <option value="">—</option>}
+                                        {!pairingOf(pick) && <option value="">Pick…</option>}
                                         {DIVS.map((d) => (
                                             <option key={d}>{d}</option>
                                         ))}
@@ -551,7 +548,7 @@ export function MatchesPage() {
                                 <div key={entry.key} className="participant-row">
                                     <div style={{ flex: 1, minWidth: 140 }}>
                                         <strong>{pairingLabel(entry.members, byId)}</strong>
-                                        <div className="note">
+                                        <div className="note inline-meta">
                                             <select
                                                 aria-label="Division"
                                                 className="inline-select"
@@ -563,8 +560,10 @@ export function MatchesPage() {
                                                 {DIVS.map((d) => (
                                                     <option key={d}>{d}</option>
                                                 ))}
-                                            </select>{' '}
-                                            · Elo {Math.round(pairingEloOf(entry.members, byId))}
+                                            </select>
+                                            <span className="num">
+                                                Elo {Math.round(pairingEloOf(entry.members, byId))}
+                                            </span>
                                         </div>
                                     </div>
                                         <>
@@ -681,7 +680,6 @@ export function MatchesPage() {
                         <EmptyState
                             title="No practice rounds"
                             body="Recorded rounds will list here."
-                            illustration={<EmptyMatches size={80} />}
                         />
                     ) : (
                         roundSlice.map((r) => (
@@ -761,14 +759,13 @@ export function MatchesPage() {
                         <EmptyState
                             title="No tournaments"
                             body="Tournament results will appear here."
-                            illustration={<TournamentTrophy size={64} tone="gold" />}
                         />
                     ) : (
                         filteredTournaments.slice(0, tourneyShown).map((t) =>
                             editingId === t.id ? (
                                 <div key={t.id} className="tourney-block tourney-block--editing">
                                     <strong>
-                                        Editing {t.name || 'Unnamed'} — {t.date}
+                                        Editing {t.name || 'Unnamed'}, {t.date}
                                     </strong>
                                     <TournamentEditor
                                         tournament={t}
@@ -780,12 +777,13 @@ export function MatchesPage() {
                                 </div>
                             ) : (
                             <div key={t.id} className="tourney-block">
-                                <strong>
-                                    {t.name || 'Unnamed'} — {t.date}
-                                </strong>
-                                <div className="page-kicker">
-                                    E_tourney {t.e_tourney.toFixed(2)}
-                                    {t.bonus != null && ` · bonus ${t.bonus}`}
+                                <div className="tourney-head">
+                                    <strong>{t.name || 'Unnamed'}</strong>
+                                    <span className="num muted">{t.date}</span>
+                                </div>
+                                <div className="tourney-meta note">
+                                    <span className="num">E_tourney {t.e_tourney.toFixed(2)}</span>
+                                    {t.bonus != null && <span className="num">Bonus {t.bonus}</span>}
                                 </div>
                                 {[...t.tournament_participants]
                                     .sort(
@@ -857,13 +855,13 @@ const signed = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}`;
 const avgChange = (p: { elo_change: number; partner_elo_change?: number | null; partner_id?: string | null }) =>
     p.partner_id ? (p.elo_change + (p.partner_elo_change ?? p.elo_change)) / 2 : p.elo_change;
 
-/** "Jiayi +12.3 · Leon +15.1" */
+/** "Jiayi +12.3, Leon +15.1" */
 function Deltas({ items }: { items: { id: string; name: string; change: number }[] }) {
     return (
         <>
             {items.map((it, i) => (
                 <span key={it.id} style={{ whiteSpace: 'nowrap' }}>
-                    {i > 0 && ' · '}
+                    {i > 0 && ', '}
                     {it.name}{' '}
                     <span className={it.change < 0 ? 'delta-neg' : 'delta-pos'}>{signed(it.change)}</span>
                 </span>

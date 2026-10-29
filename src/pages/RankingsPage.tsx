@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { rankDebaters, rankTeams, seasonLabel } from '../domain';
 import { Card, EmptyState, PageHeader } from '../components/Card';
-import { EmptyRoster, ScalesMotif } from '../components/illustrations';
 import { useAppData } from '../state/AppDataProvider';
 
 export function RankingsPage() {
@@ -21,6 +20,9 @@ export function RankingsPage() {
             }),
         [debaters, practiceRounds, activeOnly, activeIds, q]
     );
+    // practice columns only once someone has recorded a practice round
+    const showPractice = practiceRounds.length > 0;
+    const rowClass = showPractice ? 'list-row' : 'list-row list-row--compact';
     const rankedTeams = useMemo(
         () => rankTeams(teams, debaters, { showInactive: showDisbanded, search: q }),
         [teams, debaters, showDisbanded, q]
@@ -29,9 +31,7 @@ export function RankingsPage() {
     return (
         <div>
             <PageHeader
-                kicker="Board"
                 title="Rankings"
-                illustration={<ScalesMotif size={72} tone="accent" />}
                 actions={
                     <div className="segmented" role="group" aria-label="Rank">
                         <button
@@ -84,38 +84,41 @@ export function RankingsPage() {
                         <EmptyState
                             title={q ? 'No matches' : 'No players'}
                             body={q ? 'Try a different name.' : 'The leaderboard fills in as the roster grows.'}
-                            illustration={<EmptyRoster size={100} />}
                         />
                     ) : (
                         <>
-                            <div className="list-row" style={{ color: 'var(--text-faint)' }}>
+                            <div className={`${rowClass} list-head`}>
                                 <span>Rank</span>
                                 <span>Player</span>
-                                <span className="hide-sm">Practice</span>
-                                <span className="hide-sm">Win rate</span>
+                                {showPractice && <span className="hide-sm">Practice</span>}
+                                {showPractice && <span className="hide-sm">Win rate</span>}
                                 <span>Elo</span>
                             </div>
                             {ranked.map((d) => (
                                 <Link
                                     key={d.id}
                                     to={`/app/players/${d.id}`}
-                                    className={`list-row ${d.rank <= 3 ? `rank-${d.rank}` : ''}`}
+                                    className={`${rowClass} ${d.rank <= 3 ? `rank-${d.rank}` : ''}`}
                                 >
                                     <span className="num">#{d.rank}</span>
-                                    <strong>
-                                        {d.name}
-                                        {activeIds.has(d.id)
-                                            ? ''
-                                            : d.status === 'graduated'
-                                              ? ' · Grad'
-                                              : ' · Inactive'}
-                                    </strong>
-                                    <span className="hide-sm num">
-                                        {d.played ? `${d.wins}–${d.losses}` : '—'}
+                                    <span className="name-cell">
+                                        <strong>{d.name}</strong>
+                                        {!activeIds.has(d.id) && (
+                                            <span className="pill">
+                                                {d.status === 'graduated' ? 'Grad' : 'Inactive'}
+                                            </span>
+                                        )}
                                     </span>
-                                    <span className="hide-sm num">
-                                        {d.winRate == null ? '—' : `${d.winRate.toFixed(1)}%`}
-                                    </span>
+                                    {showPractice && (
+                                        <span className="hide-sm num">
+                                            {d.played ? `${d.wins} won, ${d.losses} lost` : 'None'}
+                                        </span>
+                                    )}
+                                    {showPractice && (
+                                        <span className="hide-sm num">
+                                            {d.winRate == null ? '' : `${d.winRate.toFixed(1)}%`}
+                                        </span>
+                                    )}
                                     <span className="elo">{Math.round(d.elo)}</span>
                                 </Link>
                             ))}
@@ -125,11 +128,10 @@ export function RankingsPage() {
                     <EmptyState
                         title={q ? 'No matches' : 'No teams'}
                         body={q ? 'Try a different name.' : 'Save partnerships on the Players page.'}
-                        illustration={<EmptyRoster size={100} />}
                     />
                 ) : (
                     <>
-                        <div className="list-row list-row--teams" style={{ color: 'var(--text-faint)' }}>
+                        <div className="list-row list-row--teams list-head">
                             <span>Rank</span>
                             <span>Team</span>
                             <span className="hide-sm">Division</span>
@@ -142,13 +144,13 @@ export function RankingsPage() {
                                 className={`list-row list-row--teams ${r.rank <= 3 && r.team.active ? `rank-${r.rank}` : ''}`}
                             >
                                 <span className="num">#{r.rank}</span>
-                                <strong>
-                                    {r.name}
-                                    {r.team.active ? '' : ' · Disbanded'}
-                                </strong>
-                                <span className="hide-sm">{r.team.division ?? '—'}</span>
+                                <span className="name-cell">
+                                    <strong>{r.name}</strong>
+                                    {!r.team.active && <span className="pill">Disbanded</span>}
+                                </span>
+                                <span className="hide-sm">{r.team.division ?? ''}</span>
                                 <span className="hide-sm num">
-                                    {r.members.map((m) => `${m.name} ${Math.round(m.elo)}`).join(' · ')}
+                                    {r.members.map((m) => `${m.name} ${Math.round(m.elo)}`).join(', ')}
                                 </span>
                                 <span className="elo">{Math.round(r.elo)}</span>
                             </div>

@@ -11,11 +11,6 @@ import {
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Card, EmptyState, PageHeader, StatCard } from '../components/Card';
 import { EloChart } from '../components/EloChart';
-import {
-    EmptyMatches,
-    EloCurveMotif,
-    RankBadge,
-} from '../components/illustrations';
 import { useAppData } from '../state/AppDataProvider';
 
 export function DashboardPage() {
@@ -27,6 +22,8 @@ export function DashboardPage() {
     const byId = lookup(debaters);
     const active = debaters.filter((d) => activeIds.has(d.id));
     const avg = averageElo(active.map((d) => d.elo));
+    // practice panels only once someone has recorded a practice round
+    const hasPractice = practiceRounds.length > 0;
     const recentRounds = [...practiceRounds]
         .sort((a, b) => (a.date < b.date ? 1 : -1))
         .slice(0, 6);
@@ -46,28 +43,23 @@ export function DashboardPage() {
 
     return (
         <div>
-            <PageHeader
-                kicker="Overview"
-                title="Dashboard"
-                illustration={<RankBadge size={56} rank={1} tone="gold" />}
-            />
-            {loading && <p className="page-kicker">Refreshing…</p>}
-            <div className="grid grid-4" style={{ marginBottom: 20 }}>
+            <PageHeader title="Dashboard" />
+            {loading && <p className="note">Refreshing…</p>}
+            <div className={`grid ${hasPractice ? 'grid-4' : 'grid-3'} stat-grid`}>
                 <StatCard
                     label={season ? `Active in ${seasonLabel(season)}` : 'Active people'}
                     value={<AnimatedNumber value={active.length} />}
-                    accent={<EloCurveMotif size={36} tone="muted" />}
                 />
                 <StatCard
                     label="Average Elo"
                     value={<AnimatedNumber value={Math.round(avg)} />}
-                    accent={<RankBadge size={36} rank={1} tone="accent" />}
                 />
-                <StatCard
-                    label="Practice rounds"
-                    value={<AnimatedNumber value={practiceRounds.length} />}
-                    accent={<EmptyMatches size={36} />}
-                />
+                {hasPractice && (
+                    <StatCard
+                        label="Practice rounds"
+                        value={<AnimatedNumber value={practiceRounds.length} />}
+                    />
+                )}
                 <StatCard
                     label="Tournaments"
                     value={<AnimatedNumber value={tournaments.length} />}
@@ -80,10 +72,9 @@ export function DashboardPage() {
                         <EmptyState
                             title="No players yet"
                             body="Add debaters to start the board."
-                            illustration={<EmptyMatches size={80} />}
                         />
                     ) : (
-                        ranked.slice(0, 5).map((d) => (
+                        ranked.slice(0, 10).map((d) => (
                             <Link
                                 key={d.id}
                                 to={`/app/players/${d.id}`}
@@ -91,7 +82,7 @@ export function DashboardPage() {
                             >
                                 <span className="num">#{d.rank}</span>
                                 <strong>{d.name}</strong>
-                                <span className="elo hide-sm">
+                                <span className="elo">
                                     {Math.round(d.elo)}
                                 </span>
                             </Link>
@@ -113,7 +104,6 @@ export function DashboardPage() {
                         <EmptyState
                             title="No graph yet"
                             body="Rankings will populate a trend once players exist."
-                            illustration={<EloCurveMotif size={80} tone="muted" />}
                         />
                     )}
                 </Card>
@@ -123,7 +113,6 @@ export function DashboardPage() {
                         <EmptyState
                             title="No teams yet"
                             body="Save partnerships on the Players page."
-                            illustration={<EmptyMatches size={80} />}
                         />
                     ) : (
                         topTeams.map((r) => (
@@ -133,21 +122,15 @@ export function DashboardPage() {
                             >
                                 <span className="num">#{r.rank}</span>
                                 <strong>{r.name}</strong>
-                                <span className="elo hide-sm">{Math.round(r.elo)}</span>
+                                <span className="elo">{Math.round(r.elo)}</span>
                             </div>
                         ))
                     )}
                 </Card>
-                <Card>
-                    <div className="card-title">Recent practice</div>
-                    {recentRounds.length === 0 ? (
-                        <EmptyState
-                            title="No matches"
-                            body="Record a practice round to see it here."
-                            illustration={<EmptyMatches size={80} />}
-                        />
-                    ) : (
-                        recentRounds.map((r) => (
+                {hasPractice && (
+                    <Card>
+                        <div className="card-title">Recent practice</div>
+                        {recentRounds.map((r) => (
                             <div key={r.id} className="match-row">
                                 <span className="num">{r.date}</span>
                                 <span>
@@ -161,9 +144,9 @@ export function DashboardPage() {
                                         .join(' / ')}
                                 </span>
                             </div>
-                        ))
-                    )}
-                </Card>
+                        ))}
+                    </Card>
+                )}
                 <Card>
                     <div className="card-title">Latest tournaments</div>
                     {tournaments.length === 0 ? (

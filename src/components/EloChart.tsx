@@ -425,7 +425,7 @@ export function EloChart({
                             disabled={!canPrev}
                             onClick={() => step(-1)}
                         >
-                            ‹
+                            <Chevron dir="left" />
                         </button>
                         <span className="chart-zoom__label" aria-live="polite">
                             <span className="chart-zoom__level">
@@ -440,7 +440,7 @@ export function EloChart({
                             disabled={!canNext}
                             onClick={() => step(1)}
                         >
-                            ›
+                            <Chevron dir="right" />
                         </button>
                     </span>
                 ) : (
@@ -517,17 +517,32 @@ export function EloChart({
                     ) : (
                         <>
                             <span className="hint-pointer">
-                                Click a point to zoom in · double-click to zoom out
-                                {lines.length > 1 ? ' · click a name to hide it' : ''}
+                                Click a point to zoom in, double-click to zoom out.
+                                {lines.length > 1 ? ' Click a name to hide it.' : ''}
                             </span>
                             <span className="hint-touch">
-                                Tap a point to zoom in
-                                {lines.length > 1 ? ' · tap a name to hide it' : ''}
+                                Tap a point to zoom in.
+                                {lines.length > 1 ? ' Tap a name to hide it.' : ''}
                             </span>
                         </>
                     )}
                 </p>
             </div>
         </div>
+    );
+}
+
+function Chevron({ dir }: { dir: 'left' | 'right' }) {
+    return (
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+            <path
+                d={dir === 'left' ? 'M8.5 3 4.5 7l4 4' : 'M5.5 3l4 4-4 4'}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
     );
 }

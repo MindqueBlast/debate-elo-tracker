@@ -30,7 +30,6 @@ import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { Card, EmptyState, PageHeader } from '../components/Card';
 import { Modal } from '../components/Modal';
-import { EmptyRoster } from '../components/illustrations';
 import { useAppData } from '../state/AppDataProvider';
 import { useToast } from '../state/ToastProvider';
 
@@ -55,9 +54,7 @@ export function PlayersPage() {
     return (
         <div>
             <PageHeader
-                kicker="Roster"
                 title="Players"
-                illustration={<EmptyRoster size={72} tone="accent" />}
                 actions={
                     <div className="segmented" role="group" aria-label="Show">
                         <button
@@ -249,7 +246,6 @@ function People() {
                     <EmptyState
                         title="No people"
                         body="Add someone to the roster."
-                        illustration={<EmptyRoster size={80} />}
                     />
                 ) : (
                     ranked.map((d) => (
@@ -352,7 +348,7 @@ function People() {
                     />
                 )}
                 {eloTarget && (
-                    <Modal key="set-elo" title={`Set Elo · ${eloTarget.name}`} onClose={() => setEloTarget(null)}>
+                    <Modal key="set-elo" title={`Set ${eloTarget.name}’s Elo`} onClose={() => setEloTarget(null)}>
                         <form
                             onSubmit={async (e) => {
                                 e.preventDefault();
@@ -412,7 +408,7 @@ function People() {
                                                     {a.amount >= 0 ? '+' : ''}
                                                     {a.amount.toFixed(1)}
                                                 </span>
-                                                {a.note && <span className="note"> · {a.note}</span>}
+                                                {a.note && <span className="note">, {a.note}</span>}
                                             </span>
                                             <Button
                                                 size="sm"
@@ -502,7 +498,7 @@ function EditPerson({ debater, onClose }: { debater: Debater; onClose: () => voi
                         value={division}
                         onChange={(e) => setDivision(e.target.value as Division | '')}
                     >
-                        <option value="">—</option>
+                        <option value="">None</option>
                         {DIVS.map((d) => (
                             <option key={d}>{d}</option>
                         ))}
@@ -624,7 +620,7 @@ function Teams() {
                                             disabled={d.id === members[1 - slot]}
                                         >
                                             {d.name}
-                                            {onActiveTeam.has(d.id) ? '' : ' · no team'}
+                                            {onActiveTeam.has(d.id) ? '' : ' (no team)'}
                                         </option>
                                     ))}
                                 </select>
@@ -637,7 +633,7 @@ function Teams() {
                                 value={division}
                                 onChange={(e) => setDivision(e.target.value as Division | '')}
                             >
-                                <option value="">—</option>
+                                <option value="">None</option>
                                 {DIVS.map((d) => (
                                     <option key={d}>{d}</option>
                                 ))}
@@ -685,7 +681,6 @@ function Teams() {
                     <EmptyState
                         title="No teams"
                         body="Save a partnership to see it here."
-                        illustration={<EmptyRoster size={80} />}
                     />
                 ) : (
                     ranked.map((r) => (
@@ -696,13 +691,13 @@ function Teams() {
                                 <div className="team-row__members">
                                     {r.members.map((m, i) => (
                                         <span key={m.id}>
-                                            {i > 0 && ' · '}
+                                            {i > 0 && ', '}
                                             <Link to={`/app/players/${m.id}`}>
                                                 {m.name} {Math.round(m.elo)}
                                             </Link>
                                         </span>
                                     ))}
-                                    {r.team.season && ` · ${r.team.season}`}
+                                    {r.team.season && `, ${r.team.season}`}
                                 </div>
                             </div>
                             <span className="chips">
@@ -860,7 +855,7 @@ function EditTeam({
                         value={division}
                         onChange={(e) => setDivision(e.target.value as Division | '')}
                     >
-                        <option value="">—</option>
+                        <option value="">None</option>
                         {DIVS.map((d) => (
                             <option key={d}>{d}</option>
                         ))}

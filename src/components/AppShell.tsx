@@ -4,7 +4,6 @@ import { useAuth } from '../auth/AuthProvider';
 import { Button } from './Button';
 import { Logo } from './Logo';
 import { AppBackground } from './AppBackground';
-import { EloCurveMotif } from './illustrations/EloCurveMotif';
 import { useTheme } from '../state/ThemeProvider';
 
 const LINKS = [
@@ -21,6 +20,18 @@ export function AppShell() {
     const { theme, toggle } = useTheme();
     const [open, setOpen] = useState(false);
     const roleLabel = isAdmin ? 'Admin' : isGuest ? 'Guest' : 'Viewer';
+    const extras = (
+        <>
+            {isDev && <span className="badge">Test mode</span>}
+            <span className="pill">{roleLabel}</span>
+            <Button variant="ghost" size="sm" onClick={toggle}>
+                {theme === 'dark' ? 'Light' : 'Dark'}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => void signOut()}>
+                {user?.email ? 'Log out' : isGuest ? 'Exit guest' : 'Exit'}
+            </Button>
+        </>
+    );
 
     return (
         <div className="app-shell">
@@ -32,7 +43,6 @@ export function AppShell() {
                 <NavLink to="/app" className="brand">
                     <Logo />
                     <span className="brand-text">Syosset Elo</span>
-                    <EloCurveMotif size={32} tone="muted" className="brand-motif" />
                 </NavLink>
                 <nav
                     className={`nav-links ${open ? 'open' : ''}`}
@@ -52,21 +62,12 @@ export function AppShell() {
                                 {l.label}
                             </NavLink>
                         ))}
+                        {/* on phones the account controls live in the menu */}
+                        <div className="nav-links__extra">{extras}</div>
                     </div>
                 </nav>
                 <div className="nav-actions">
-                    {isDev && <span className="badge">Test mode</span>}
-                    <span className="pill">{roleLabel}</span>
-                    <Button variant="ghost" size="sm" onClick={toggle}>
-                        {theme === 'dark' ? 'Light' : 'Dark'}
-                    </Button>
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => void signOut()}
-                    >
-                        {user?.email ? 'Log out' : isGuest ? 'Exit guest' : 'Exit'}
-                    </Button>
+                    <div className="nav-actions__extra">{extras}</div>
                     <Button
                         className="mobile-nav-toggle"
                         variant="ghost"

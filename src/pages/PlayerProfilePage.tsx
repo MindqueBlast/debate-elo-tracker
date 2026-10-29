@@ -19,11 +19,6 @@ import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Button } from '../components/Button';
 import { Card, EmptyState, PageHeader } from '../components/Card';
 import { EloChart } from '../components/EloChart';
-import {
-    EloCurveMotif,
-    EmptyMatches,
-    RankBadge,
-} from '../components/illustrations';
 import { useAuth } from '../auth/AuthProvider';
 import { useAppData } from '../state/AppDataProvider';
 
@@ -108,27 +103,16 @@ export function PlayerProfilePage() {
             <EmptyState
                 title="Player not found"
                 body="This person is missing or the link is invalid."
-                illustration={<EmptyMatches size={80} />}
             />
         );
     }
 
     const sd = eloStdDev(debater.history);
-    const rankTone =
-        rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'accent';
 
     return (
         <div>
             <PageHeader
-                kicker="Profile"
                 title={debater.name}
-                illustration={
-                    rank && rank <= 3 ? (
-                        <RankBadge size={56} rank={rank} tone={rankTone} />
-                    ) : (
-                        <EloCurveMotif size={64} tone="accent" />
-                    )
-                }
                 actions={
                     isAdmin ? (
                         <Link to="/app/players" className="btn btn-secondary btn-sm">
@@ -143,15 +127,12 @@ export function PlayerProfilePage() {
             />
             <div className="grid grid-2">
                 <Card className="profile-hero-card">
-                    <div className="profile-hero-motif" aria-hidden="true">
-                        <EloCurveMotif size={160} tone="muted" />
-                    </div>
-                    <div className="page-kicker">Current Elo</div>
+                    <div className="stat-label">Current Elo</div>
                     <div className="profile-elo">
                         <AnimatedNumber value={Math.round(debater.elo)} />
                     </div>
                     <div className="row" style={{ marginTop: 16 }}>
-                        <span className="pill">Rank #{rank ?? '—'}</span>
+                        {rank != null && <span className="pill">Rank #{rank}</span>}
                         {debater.division && <span className="pill">{debater.division}</span>}
                         {debater.class_year != null && (
                             <span className="pill">Class of {debater.class_year}</span>
@@ -231,14 +212,13 @@ export function PlayerProfilePage() {
                     )}
                 </Card>
             </div>
-            <div className="grid grid-2" style={{ marginTop: 16 }}>
+            <div className={`grid ${practiceRounds.length > 0 ? 'grid-2' : ''}`} style={{ marginTop: 16 }}>
                 <Card>
                     <div className="card-title">Tournament results</div>
                     {results.length === 0 ? (
                         <EmptyState
                             title="No tournaments yet"
                             body="Results show up here once they’re recorded."
-                            illustration={<EmptyMatches size={80} />}
                         />
                     ) : (
                         <>
@@ -248,9 +228,11 @@ export function PlayerProfilePage() {
                                     <span>
                                         <strong>{r.name}</strong>
                                         <div className="note">
-                                            {SHORT[r.division]} · with{' '}
-                                            {r.partnerId ? (byId.get(r.partnerId)?.name ?? 'Unknown') : 'partner not on record'}{' '}
-                                            · raw {r.raw}
+                                            {SHORT[r.division]}{' '}
+                                            {r.partnerId
+                                                ? `with ${byId.get(r.partnerId)?.name ?? 'Unknown'}`
+                                                : 'partner not on record'}
+                                            , raw {r.raw}
                                         </div>
                                     </span>
                                     <span className={`num ${r.change >= 0 ? 'delta-pos' : 'delta-neg'}`}>
@@ -273,49 +255,51 @@ export function PlayerProfilePage() {
                         </>
                     )}
                 </Card>
-                <Card>
-                    <div className="card-title">Recent practice</div>
-                    {recent.length === 0 ? (
-                        <EmptyState
-                            title="No practice rounds"
-                            body="This person hasn’t been in a recorded practice round."
-                            illustration={<EmptyMatches size={80} />}
-                        />
-                    ) : (
-                        recent.map((r) => {
-                            const won = practiceSide(r, id) === 'won';
-                            const mine = won
-                                ? [r.winner_id, r.winner_partner_id]
-                                : [r.loser_id, r.loser_partner_id];
-                            const theirs = won
-                                ? [r.loser_id, r.loser_partner_id]
-                                : [r.winner_id, r.winner_partner_id];
-                            const partner = mine.find((x) => x && x !== id);
-                            const delta = practiceChangeFor(r, id);
-                            return (
-                                <div key={r.id} className="match-row">
-                                    <span className="num">{r.date}</span>
-                                    <span>
-                                        <span className={won ? 'pill pill-win' : 'pill pill-loss'}>
-                                            {won ? 'Win' : 'Loss'}
-                                        </span>{' '}
-                                        vs {pairingLabel(theirs, byId)}
-                                        {partner && (
-                                            <span className="note">
-                                                {' '}
-                                                · with {byId.get(partner)?.name ?? 'Unknown'}
-                                            </span>
-                                        )}
-                                    </span>
-                                    <span className={delta >= 0 ? 'delta-pos' : 'delta-neg'}>
-                                        {delta >= 0 ? '+' : ''}
-                                        {delta.toFixed(1)}
-                                    </span>
-                                </div>
-                            );
-                        })
-                    )}
-                </Card>
+                {/* practice only once someone has recorded a practice round */}
+                {practiceRounds.length > 0 && (
+                    <Card>
+                        <div className="card-title">Recent practice</div>
+                        {recent.length === 0 ? (
+                            <EmptyState
+                                title="No practice rounds"
+                                body="This person hasn’t been in a recorded practice round."
+                            />
+                        ) : (
+                            recent.map((r) => {
+                                const won = practiceSide(r, id) === 'won';
+                                const mine = won
+                                    ? [r.winner_id, r.winner_partner_id]
+                                    : [r.loser_id, r.loser_partner_id];
+                                const theirs = won
+                                    ? [r.loser_id, r.loser_partner_id]
+                                    : [r.winner_id, r.winner_partner_id];
+                                const partner = mine.find((x) => x && x !== id);
+                                const delta = practiceChangeFor(r, id);
+                                return (
+                                    <div key={r.id} className="match-row">
+                                        <span className="num">{r.date}</span>
+                                        <span>
+                                            <span className={won ? 'pill pill-win' : 'pill pill-loss'}>
+                                                {won ? 'Win' : 'Loss'}
+                                            </span>{' '}
+                                            vs {pairingLabel(theirs, byId)}
+                                            {partner && (
+                                                <span className="note">
+                                                    {' '}
+                                                    with {byId.get(partner)?.name ?? 'Unknown'}
+                                                </span>
+                                            )}
+                                        </span>
+                                        <span className={delta >= 0 ? 'delta-pos' : 'delta-neg'}>
+                                            {delta >= 0 ? '+' : ''}
+                                            {delta.toFixed(1)}
+                                        </span>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </Card>
+                )}
             </div>
         </div>
     );
