@@ -460,7 +460,7 @@ export function AnalyticsPage() {
                             />
                         ) : (
                             [...annotations]
-                                .sort((a, b) => a.date.localeCompare(b.date))
+                                .sort((a, b) => b.date.localeCompare(a.date))
                                 .map((a) => (
                                     <div key={a.id} className="match-row">
                                         <span className="num">{a.date}</span>
