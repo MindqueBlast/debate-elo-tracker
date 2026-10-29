@@ -1,3 +1,8 @@
+/* Hallmark · checked: 2026-10-28 · genre: modern-minimal (inferred) · scope: app screens
+ * floor: 0 FAIL · fixed: 7a, 19, 24a, 24b, 34, 39a, 40, 48, 54, 63, 67, 80, F3, F6, F23, F24 · structural: 2 printed (Players row actions, login card centring)
+ * built: the project · redesign: polish · v2.0.0 */
+/* Hallmark · dismissed 26a · :focus-visible is set once at the root of this file and shows on every page; the linter reads some components apart from it */
+/* Hallmark · answered F7 · the pill radius sits on controls: nav links, toast actions, zoom steps, season buttons, chips */
 :root {
     --bg: #0c0e12;
     --bg-elevated: #12151c;
@@ -632,18 +637,6 @@ input[type='file']::file-selector-button:hover {
     background: color-mix(in srgb, var(--bg-elevated) 50%, transparent);
 }
 
-.feature__icon {
-    margin-bottom: 12px;
-    color: var(--accent);
-}
-
-.landing-root {
-    position: relative;
-    z-index: 0;
-    isolation: isolate;
-    min-height: 100dvh;
-}
-
 .login-page {
     position: relative;
     z-index: 0;
@@ -1039,135 +1032,8 @@ input[type='file']::file-selector-button:hover {
     margin-left: auto;
 }
 
-.hero {
-    position: relative;
-    overflow: hidden;
-    min-height: 100dvh;
-    display: grid;
-    grid-template-columns: 1.1fr 0.9fr;
-    gap: 48px;
-    align-items: center;
-    width: min(1180px, calc(100% - 48px));
-    margin: 0 auto;
-    padding: 96px 0 64px;
-}
-
-.hero h1 {
-    font-size: clamp(40px, 6vw, 72px);
-    line-height: 0.95;
-    letter-spacing: -0.055em;
-}
-
-.hero p.lede {
-    margin-top: 20px;
-    font-size: 18px;
-    color: var(--text-muted);
-    max-width: 42ch;
-}
-
-.landing-nav {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 28px;
-    z-index: 3;
-}
-
-.features {
-    position: relative;
-    z-index: 1;
-    width: min(1180px, calc(100% - 48px));
-    margin: 0 auto var(--space-7);
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-}
-
-.feature {
-    padding: 20px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-lg);
-    background: color-mix(in srgb, var(--bg-raised) 92%, transparent);
-    backdrop-filter: blur(8px);
-}
-
-.feature h3 {
-    margin-bottom: 8px;
-}
-
-.feature p {
-    color: var(--text-muted);
-    font-size: 14px;
-}
-
-.preview {
-    position: relative;
-    z-index: 1;
-    width: min(1180px, calc(100% - 48px));
-    margin: 0 auto 80px;
-    border: 1px solid var(--line);
-    border-radius: 20px;
-    background: var(--bg-raised);
-    box-shadow: var(--shadow);
-    overflow: hidden;
-}
-
-.preview-bar {
-    display: flex;
-    gap: 8px;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--line);
-    color: var(--text-faint);
-    font-size: 12px;
-}
-
-.preview-body {
-    display: grid;
-    grid-template-columns: 1.4fr 0.8fr;
-    min-height: 320px;
-}
-
-.preview-body--mock {
-    grid-template-columns: 1fr;
-    padding: 16px;
-}
-
-.preview-mock {
-    width: 100%;
-    height: auto;
-    color: var(--text);
-}
-
-.hero-mini-motifs {
-    display: flex;
-    gap: 16px;
-    align-items: center;
-    margin-top: 28px;
-    opacity: 0.7;
-}
-
-.hero-ctas {
-    display: flex;
-    gap: 12px;
-    margin-top: 28px;
-    flex-wrap: wrap;
-}
-
-.landing-footer {
-    border-top: 1px solid var(--line);
-    padding: 24px;
-    text-align: center;
-    color: var(--text-faint);
-    font-size: 13px;
-}
-
-.hero-visual {
-    position: relative;
-    height: 420px;
+.login-card .btn {
+    min-height: 44px;
 }
 
 .login-card {
@@ -1210,12 +1076,9 @@ input[type='file']::file-selector-button:hover {
 }
 
 @media (max-width: 960px) {
-    .hero,
-    .preview-body,
     .grid-2,
     .grid-3,
-    .grid-4,
-    .features {
+    .grid-4 {
         grid-template-columns: 1fr;
     }
 
@@ -1252,6 +1115,11 @@ input[type='file']::file-selector-button:hover {
         overflow: hidden;
         flex-direction: column;
         align-items: stretch;
+    }
+
+    /* a closed menu is out of the tab order, not just out of sight */
+    .nav-links:not(.open) .nav-links__inner {
+        visibility: hidden;
     }
 
     .nav-links.open .nav-links__inner {

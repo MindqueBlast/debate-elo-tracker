@@ -144,11 +144,13 @@ export function PlayerProfilePage() {
                                   ? 'graduated'
                                   : 'inactive'}
                         </span>
-                        <span className="pill">
-                            {record && record.played
-                                ? `Practice ${record.wins}–${record.losses} (${record.winRate?.toFixed(1)}%)`
-                                : 'No practice rounds'}
-                        </span>
+                        {practiceRounds.length > 0 && (
+                            <span className="pill">
+                                {record && record.played
+                                    ? `Practice ${record.wins} won, ${record.losses} lost (${record.winRate?.toFixed(1)}%)`
+                                    : 'No practice rounds'}
+                            </span>
+                        )}
                     </div>
                     <div className="grid grid-2" style={{ marginTop: 24 }}>
                         <div>
