@@ -1504,6 +1504,35 @@ p {
     gap: 6px;
 }
 
+.season-presets {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: -6px 0 14px;
+}
+
+.season-presets__btn {
+    border: 1px solid var(--line-strong);
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.season-presets__btn:hover {
+    color: var(--text);
+    background: var(--bg-hover);
+}
+
+.season-presets__btn[aria-pressed='true'] {
+    color: var(--text);
+    background: var(--bg-overlay);
+    border-color: var(--text-faint);
+}
+
 .compare-chips {
     align-items: center;
     margin: -4px 0 14px;

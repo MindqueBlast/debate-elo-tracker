@@ -7,6 +7,7 @@ import {
     isCalendarDate,
     lookup,
     seasonLabel,
+    seasonOf,
     snapshotFromSeries,
     teamElo,
     teamKey,
@@ -59,6 +60,15 @@ export function AnalyticsPage() {
         .filter((d) => showGraduated || activeIds.has(d.id))
         .sort((a, b) => a.name.localeCompare(b.name));
     const byId = useMemo(() => lookup(debaters), [debaters]);
+
+    // One button per season with results: July 1 through June 30
+    const seasonPresets = useMemo(() => {
+        const seasons = [...new Set(tournaments.map((t) => seasonOf(t.date)))].sort();
+        return seasons.map((s) => {
+            const y = Number(s.slice(0, 4));
+            return { key: s, label: seasonLabel(s), from: `${y}-07-01`, to: `${y + 1}-06-30` };
+        });
+    }, [tournaments]);
 
     // "Class of 2027", "Class of 2028", … for everyone listed (plus anyone with no year set)
     const classOptions = useMemo(() => {
@@ -300,6 +310,23 @@ export function AnalyticsPage() {
                                 onChange={(e) => setEndDate(e.target.value)}
                             />
                         </div>
+                    </div>
+                    <div className="season-presets" role="group" aria-label="Season">
+                        <span className="note">Season:</span>
+                        {[{ key: 'all', label: 'All time', from: '', to: '' }, ...seasonPresets].map((p) => (
+                            <button
+                                key={p.key}
+                                type="button"
+                                className="season-presets__btn"
+                                aria-pressed={startDate === p.from && endDate === p.to}
+                                onClick={() => {
+                                    setStartDate(p.from);
+                                    setEndDate(p.to);
+                                }}
+                            >
+                                {p.label}
+                            </button>
+                        ))}
                     </div>
                     {!isGroup && compareIds.length > 0 && (
                         <div className="chips compare-chips">
