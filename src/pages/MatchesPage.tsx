@@ -12,9 +12,11 @@ import {
     type Tournament,
     type TournamentParams,
 } from '../domain';
+import { TournamentEditor } from '../components/TournamentEditor';
 import {
     deletePracticeRound,
     deleteTournament,
+    draftFromTournament,
     MutationError,
     previewTournament,
     rawWinsOf,
@@ -56,9 +58,6 @@ const TYPES = [
 const errorText = (err: unknown, fallback: string) =>
     err instanceof MutationError ? err.message : fallback;
 
-const typeForBonus = (bonus: number | null | undefined) =>
-    TYPES.find((t) => t.bonus === bonus)?.id ?? 'custom';
-
 export function MatchesPage() {
     const { isAdmin } = useAuth();
     const data = useAppData();
@@ -98,14 +97,15 @@ export function MatchesPage() {
     const [pick, setPick] = useState<PairingValue>(EMPTY_PAIRING);
     const [pickDivision, setPickDivision] = useState<Division | ''>('');
     const [entries, setEntries] = useState<TournamentEntryDraft[]>([]);
-    // a new tournament's id (so its preview and save line up); editing uses the tournament's own
+    // a new tournament's id, so its preview and save line up
     const [draftId, setDraftId] = useState(() => crypto.randomUUID());
-    const [editing, setEditing] = useState<Tournament | null>(null);
-    const formRef = useRef<HTMLDivElement>(null);
-    // When editing, old results only have total (raw) wins, so the form asks for that
-    const rawMode = editing !== null;
-    const pickerPeople = editing ? debaters : active;
-    const pickerTeams = editing ? teams : activeTeams;
+    // the tournament being fixed in place in the list
+    const [editingId, setEditingId] = useState<string | null>(null);
+    // undo buttons run later, so they need the data as it is then
+    const dataRef = useRef(data);
+    dataRef.current = data;
+    const teamsRef = useRef(teams);
+    teamsRef.current = teams;
 
     const winnerPair = pairingOf(winner);
     const loserPair = pairingOf(loser);
@@ -134,7 +134,7 @@ export function MatchesPage() {
     }, [splitRounds, roundsBy]);
 
     const draft: TournamentDraft = {
-        id: editing?.id ?? draftId,
+        id: draftId,
         name: tName,
         date: tDate,
         params,
@@ -151,7 +151,7 @@ export function MatchesPage() {
         } catch {
             return null;
         }
-    }, [data, entries, n, b, k, maxGain, maxRounds, roundsByDivision, tDate, editing, draftId]);
+    }, [data, entries, n, b, k, maxGain, maxRounds, roundsByDivision, tDate, draftId]);
 
     const usedInEntries = entries.flatMap((e) => e.members.filter(Boolean) as string[]);
 
@@ -228,7 +228,6 @@ export function MatchesPage() {
     }
 
     function resetTournamentForm() {
-        setEditing(null);
         setEntries([]);
         setTName('');
         setTDate(getLocalDateString());
@@ -245,47 +244,31 @@ export function MatchesPage() {
         setDraftId(crypto.randomUUID());
     }
 
-    /** Load any tournament, however old, into the form to fix it. */
-    function startEdit(t: Tournament) {
-        const rounds = t.tournament_participants
-            .map((p) => p.rounds)
-            .filter((r): r is number => r != null && r > 0);
-        const most = rounds.length ? Math.max(...rounds) : 6;
-        const byDiv: Record<Division, string> = { Varsity: '', JV: '', Novice: '' };
-        for (const p of t.tournament_participants) {
-            if (p.rounds != null && !byDiv[p.division]) byDiv[p.division] = String(p.rounds);
+    /** Run an undo against the data as it is now. */
+    async function undo(action: () => Promise<unknown>, done: string) {
+        try {
+            await action();
+            toast.push(done, 'success');
+        } catch (err) {
+            toast.push(errorText(err, 'Could not undo. Refresh and fix it by hand.'), 'error');
         }
-        setEditing(t);
-        setTName(t.name ?? '');
-        setTDate(t.date);
-        setTType(typeForBonus(t.bonus));
-        setB(String(t.bonus ?? 0));
-        setK(String(t.affect ?? 45));
-        setMaxGain(String(t.max_gain ?? 300));
-        setMaxRounds(t.max_rounds == null ? '' : String(t.max_rounds));
-        setN(String(most));
-        setSplitRounds(new Set(rounds).size > 1);
-        setRoundsBy(byDiv);
-        setEntries(
-            t.tournament_participants.map((p) => ({
-                key: p.id ?? crypto.randomUUID(),
-                members: [p.debater_id, p.partner_id ?? null],
-                division: p.division,
-                prelimWins: p.raw_wins,
-                elimWins: 0,
-            }))
-        );
-        setPick(EMPTY_PAIRING);
-        setPickDivision('');
-        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        await refresh();
     }
+
+    /** Put a tournament back exactly as it was saved before. */
+    const restore = (before: Tournament) =>
+        undo(
+            () => saveTournament(dataRef.current, draftFromTournament(before), teamsRef.current),
+            `${before.name || 'Tournament'} is back the way it was.`
+        );
 
     async function submitTournament() {
         setBusy(true);
+        const id = draftId;
         try {
             const result = await saveTournament(data, draft, teams);
             toast.push(
-                `${editing ? 'Saved. Everyone after it was recalculated.' : 'Recorded.'} E_tourney ${result.eTourney.toFixed(3)}\n` +
+                `Recorded. E_tourney ${result.eTourney.toFixed(3)}\n` +
                     entries
                         .map((e) => {
                             const r = result.entries[e.key];
@@ -302,7 +285,19 @@ export function MatchesPage() {
                         .filter(Boolean)
                         .join('\n'),
                 'success',
-                8000
+                12000,
+                {
+                    label: 'Undo',
+                    onClick: () => {
+                        const saved = dataRef.current.tournaments.find((t) => t.id === id);
+                        if (saved) {
+                            void undo(
+                                () => deleteTournament(dataRef.current, saved),
+                                'Undone: the tournament was removed again.'
+                            );
+                        }
+                    },
+                }
             );
             resetTournamentForm();
             await refresh();
@@ -323,12 +318,26 @@ export function MatchesPage() {
         }
         try {
             await deleteTournament(data, t);
-            if (editing?.id === t.id) resetTournamentForm();
-            toast.push('Tournament deleted. Everyone was recalculated without it.', 'success');
+            if (editingId === t.id) setEditingId(null);
+            toast.push('Tournament deleted. Everyone was recalculated without it.', 'success', 12000, {
+                label: 'Undo',
+                onClick: () => void restore(t),
+            });
             await refresh();
         } catch (err) {
             toast.push(errorText(err, 'Failed to delete the tournament.'), 'error');
         }
+    }
+
+    async function afterEdit(before: Tournament) {
+        setEditingId(null);
+        toast.push(
+            `${before.name || 'Tournament'} saved. Everyone from ${before.date} on was recalculated.`,
+            'success',
+            12000,
+            { label: 'Undo', onClick: () => void restore(before) }
+        );
+        await refresh();
     }
 
     return (
@@ -396,22 +405,10 @@ export function MatchesPage() {
                         </form>
                     </Card>
                     <Card>
-                        <div ref={formRef} className="form-anchor" />
                         <h2 className="section-heading">
                             <TournamentTrophy size={32} tone="gold" />
-                            {editing ? 'Edit tournament' : 'Record tournament'}
+                            Record tournament
                         </h2>
-                        {editing && (
-                            <div className="editing-banner">
-                                <span>
-                                    Editing <strong>{editing.name || 'Unnamed'}</strong> ({editing.date}).
-                                    Saving recalculates everyone from this date on.
-                                </span>
-                                <Button size="sm" variant="secondary" onClick={resetTournamentForm}>
-                                    Cancel
-                                </Button>
-                            </div>
-                        )}
                         <div className="grid grid-2 tight">
                             <div className="field">
                                 <label htmlFor="tName">Name (for graph)</label>
@@ -512,8 +509,8 @@ export function MatchesPage() {
                                     setPick(v);
                                     setPickDivision('');
                                 }}
-                                debaters={pickerPeople}
-                                teams={pickerTeams}
+                                debaters={active}
+                                teams={activeTeams}
                                 exclude={usedInEntries}
                             />
                             <div className="row" style={{ alignItems: 'flex-end' }}>
@@ -570,24 +567,6 @@ export function MatchesPage() {
                                             · Elo {Math.round(pairingEloOf(entry.members, byId))}
                                         </div>
                                     </div>
-                                    {rawMode ? (
-                                        <label title="Prelim wins + 2 × elim wins">
-                                            Raw wins
-                                            <input
-                                                type="number"
-                                                min={0}
-                                                step={0.5}
-                                                value={entry.prelimWins}
-                                                style={{ width: 64, marginLeft: 6 }}
-                                                onChange={(e) =>
-                                                    set({
-                                                        prelimWins: Math.max(0, Number(e.target.value)),
-                                                        elimWins: 0,
-                                                    })
-                                                }
-                                            />
-                                        </label>
-                                    ) : (
                                         <>
                                             <label>
                                                 Prelim
@@ -618,7 +597,6 @@ export function MatchesPage() {
                                                 Raw {rawWinsOf(entry.prelimWins, entry.elimWins)}
                                             </span>
                                         </>
-                                    )}
                                     <span
                                         className="num"
                                         style={{ minWidth: 96, textAlign: 'right', whiteSpace: 'nowrap' }}
@@ -670,13 +648,8 @@ export function MatchesPage() {
                                 disabled={busy || entries.length === 0}
                                 onClick={() => void submitTournament()}
                             >
-                                {editing ? 'Save changes' : 'Record tournament'}
+                                Record tournament
                             </Button>
-                            {editing && (
-                                <Button variant="ghost" onClick={resetTournamentForm}>
-                                    Cancel
-                                </Button>
-                            )}
                         </div>
                     </Card>
                 </div>
@@ -791,7 +764,21 @@ export function MatchesPage() {
                             illustration={<TournamentTrophy size={64} tone="gold" />}
                         />
                     ) : (
-                        filteredTournaments.slice(0, tourneyShown).map((t) => (
+                        filteredTournaments.slice(0, tourneyShown).map((t) =>
+                            editingId === t.id ? (
+                                <div key={t.id} className="tourney-block tourney-block--editing">
+                                    <strong>
+                                        Editing {t.name || 'Unnamed'} — {t.date}
+                                    </strong>
+                                    <TournamentEditor
+                                        tournament={t}
+                                        data={data}
+                                        teams={teams}
+                                        onSaved={(before) => void afterEdit(before)}
+                                        onCancel={() => setEditingId(null)}
+                                    />
+                                </div>
+                            ) : (
                             <div key={t.id} className="tourney-block">
                                 <strong>
                                     {t.name || 'Unnamed'} — {t.date}
@@ -830,9 +817,9 @@ export function MatchesPage() {
                                             size="sm"
                                             variant="secondary"
                                             disabled={busy}
-                                            onClick={() => startEdit(t)}
+                                            onClick={() => setEditingId(t.id)}
                                         >
-                                            {editing?.id === t.id ? 'Editing…' : 'Edit'}
+                                            Edit
                                         </Button>
                                         <Button
                                             size="sm"
@@ -845,7 +832,8 @@ export function MatchesPage() {
                                     </div>
                                 )}
                             </div>
-                        ))
+                            )
+                        )
                     )}
                     {filteredTournaments.length > tourneyShown && (
                         <div className="pagination">

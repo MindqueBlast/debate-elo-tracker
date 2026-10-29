@@ -765,6 +765,23 @@ p {
     font-size: 14px;
 }
 
+.toast__action {
+    display: block;
+    margin-top: 8px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: transparent;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.toast__action:hover {
+    background: var(--bg-hover);
+}
+
 .toast-success {
     border-color: color-mix(in srgb, var(--win) 40%, var(--line));
 }
@@ -872,6 +889,121 @@ p {
     align-items: center;
     gap: 4px;
     margin-left: auto;
+}
+
+.tourney-block--editing {
+    border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+    border-radius: var(--radius);
+    padding: 12px;
+    background: color-mix(in srgb, var(--warn) 5%, transparent);
+}
+
+.t-editor {
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+.t-editor__top {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.t-editor__top label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.t-editor__more,
+.t-editor__add {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    padding: 4px 0;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.t-editor__add {
+    color: var(--text);
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.t-editor__rows {
+    margin: 8px 0;
+}
+
+.t-editor__head,
+.t-editor__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 1fr) 64px 92px 28px;
+    gap: 6px;
+    align-items: center;
+}
+
+.t-editor__head {
+    color: var(--text-faint);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+}
+
+.t-editor__row {
+    margin-bottom: 6px;
+}
+
+.t-editor__row select,
+.t-editor__row input,
+.t-editor__top input {
+    padding: 6px 8px;
+    font-size: 13px;
+    min-width: 0;
+}
+
+.t-editor__change {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.t-editor__remove {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.t-editor__remove:hover {
+    color: var(--loss);
+}
+
+.t-editor__effect {
+    margin: 8px 0;
+}
+
+.t-editor__error {
+    color: var(--loss);
+    margin: 6px 0;
+}
+
+@media (max-width: 720px) {
+    .t-editor__head {
+        display: none;
+    }
+
+    .t-editor__row {
+        grid-template-columns: 1fr 1fr;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--line);
+    }
 }
 
 .editing-banner {

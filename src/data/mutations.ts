@@ -439,6 +439,8 @@ export interface TournamentDraft {
     params: TournamentParams;
     roundsByDivision?: Partial<Record<Division, number>>;
     entries: TournamentEntryDraft[];
+    /** When it was first saved (keeps its place among same-day tournaments, e.g. after an undo). */
+    created_at?: string | null;
 }
 
 /** Break wins count double. */
@@ -454,7 +456,7 @@ function draftInput(data: AppSnapshot, draft: TournamentDraft): InputTournament 
         affect: draft.params.k,
         max_gain: draft.params.maxGain,
         max_rounds: draft.params.maxRounds,
-        created_at: existing?.created_at ?? null,
+        created_at: existing?.created_at ?? draft.created_at ?? null,
         entries: draft.entries.map((e) => {
             const kept = existing?.entries.find((x) => x.id === e.key);
             const sameMembers =
@@ -481,6 +483,40 @@ export interface TournamentPreview {
     eTourney: number;
     /** By draft entry key. */
     entries: Record<string, DerivedEntry>;
+    /** Everyone's current Elo if this were saved. */
+    elo: Record<string, number>;
+}
+
+/** A saved tournament as a draft, e.g. to edit it or put it back after an undo. */
+export function draftFromTournament(t: Tournament): TournamentDraft {
+    const rounds = t.tournament_participants
+        .map((p) => p.rounds)
+        .filter((r): r is number => r != null && r > 0);
+    const roundsByDivision: Partial<Record<Division, number>> = {};
+    for (const p of t.tournament_participants) {
+        if (p.rounds != null && roundsByDivision[p.division] == null) roundsByDivision[p.division] = p.rounds;
+    }
+    return {
+        id: t.id,
+        name: t.name ?? '',
+        date: t.date,
+        params: {
+            n: rounds.length ? Math.max(...rounds) : 6,
+            b: t.bonus ?? 0,
+            k: t.affect ?? 45,
+            maxGain: t.max_gain ?? 300,
+            maxRounds: t.max_rounds ?? null,
+        },
+        roundsByDivision,
+        created_at: t.created_at ?? null,
+        entries: t.tournament_participants.map((p) => ({
+            key: p.id ?? crypto.randomUUID(),
+            members: [p.debater_id, p.partner_id ?? null],
+            division: p.division,
+            prelimWins: p.raw_wins,
+            elimWins: 0,
+        })),
+    };
 }
 
 /**
@@ -494,7 +530,9 @@ export function previewTournament(data: AppSnapshot, draft: TournamentDraft): To
     for (const e of input.entries) {
         if (derived.entries[e.id]) entries[e.id] = derived.entries[e.id];
     }
-    return { eTourney: derived.tournaments[input.id]?.e_tourney ?? 0, entries };
+    const elo: Record<string, number> = {};
+    for (const [id, p] of Object.entries(derived.people)) elo[id] = p.elo;
+    return { eTourney: derived.tournaments[input.id]?.e_tourney ?? 0, entries, elo };
 }
 
 /** Record a new tournament or save changes to an existing one. */
@@ -551,7 +589,9 @@ export async function saveTournament(
     );
     const out: Record<string, DerivedEntry> = {};
     for (const e of entries) if (derived.entries[e.id]) out[e.id] = derived.entries[e.id];
-    return { eTourney: derived.tournaments[row.id]?.e_tourney ?? 0, entries: out };
+    const elo: Record<string, number> = {};
+    for (const [id, p] of Object.entries(derived.people)) elo[id] = p.elo;
+    return { eTourney: derived.tournaments[row.id]?.e_tourney ?? 0, entries: out, elo };
 }
 
 export async function deleteTournament(data: AppSnapshot, tournament: Tournament) {

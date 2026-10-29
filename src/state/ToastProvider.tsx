@@ -10,15 +10,22 @@ import {
 
 type ToastKind = 'success' | 'error' | 'warning' | 'info';
 
+/** A button on the toast, e.g. Undo. */
+export interface ToastAction {
+    label: string;
+    onClick: () => void;
+}
+
 interface Toast {
     id: number;
     message: string;
     kind: ToastKind;
+    action?: ToastAction;
 }
 
 const ToastContext = createContext<{
     toasts: Toast[];
-    push: (message: string, kind?: ToastKind, duration?: number) => void;
+    push: (message: string, kind?: ToastKind, duration?: number, action?: ToastAction) => void;
 } | null>(null);
 
 let nextId = 1;
@@ -29,9 +36,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     const transition = motionTransition(reduced, DURATIONS.fast);
 
     const push = useCallback(
-        (message: string, kind: ToastKind = 'info', duration = 3200) => {
+        (message: string, kind: ToastKind = 'info', duration = 3200, action?: ToastAction) => {
             const id = nextId++;
-            setToasts((prev) => [...prev, { id, message, kind }]);
+            setToasts((prev) => [...prev, { id, message, kind, action }]);
             window.setTimeout(() => {
                 setToasts((prev) => prev.filter((t) => t.id !== id));
             }, duration);
@@ -56,6 +63,18 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                             transition={transition}
                         >
                             {t.message}
+                            {t.action && (
+                                <button
+                                    type="button"
+                                    className="toast__action"
+                                    onClick={() => {
+                                        setToasts((prev) => prev.filter((x) => x.id !== t.id));
+                                        t.action?.onClick();
+                                    }}
+                                >
+                                    {t.action.label}
+                                </button>
+                            )}
                         </motion.div>
                     ))}
                 </AnimatePresence>
