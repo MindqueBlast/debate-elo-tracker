@@ -216,6 +216,7 @@ export function AnalyticsPage() {
                                 {view === 'people' ? (
                                     <>
                                         <optgroup label="Classes">
+                                            <option value="ALL">All classes ({pool.length})</option>
                                             {classOptions.map((c) => (
                                                 <option key={c.key} value={c.key}>
                                                     {c.label} ({c.count})
