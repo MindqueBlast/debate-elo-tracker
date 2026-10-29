@@ -220,9 +220,11 @@ describe('individual changes', () => {
         expect(eTourney).toBeCloseTo(solo.eTourney, 12);
         expect(results[0].W_adjusted).toBeCloseTo(solo.results[0].W_adjusted, 12);
         const [j, l] = results[0].members;
-        // each person's adjusted wins against what's expected of someone at their Elo (p × E)
-        const expected = (elo: number) =>
-            45 * (results[0].W_adjusted - Math.pow(elo / 700, 1.5) * eTourney) + 30;
+        // each person's adjusted wins against what's expected at their Elo (p × E), ÷ √p
+        const expected = (elo: number) => {
+            const p = Math.pow(elo / 700, 1.5);
+            return (45 * (results[0].W_adjusted - p * eTourney)) / Math.sqrt(p) + 30;
+        };
         expect(j.change).toBeCloseTo(expected(1300), 10);
         expect(l.change).toBeCloseTo(expected(1100), 10);
         expect(j.change).toBeLessThan(l.change);

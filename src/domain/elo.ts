@@ -96,17 +96,20 @@ export function adjustedWins(
  * how the spreadsheet blends divisions.
  */
 /**
- * How each person's change is worked out (p = (their Elo / 700)^1.5):
- * - 'expected' (in use): k × (adjusted wins − p × E_tourney) + b. What's
- *   expected of you grows with your Elo, so a higher-rated partner gains less
- *   and loses more for the same result.
- * - 'current' (the earlier one): k × (adjusted wins ÷ p − E_tourney) + b.
+ * How each person's change is worked out (p = (their Elo / 700)^1.5). All of
+ * them start from k × (adjusted wins − p × E_tourney): your wins against
+ * what's expected of someone at your Elo.
+ * - 'middle' (in use): that ÷ √p, then + b. Halfway between the two below:
+ *   a higher-rated partner gains less and loses more for the same result,
+ *   without big swings for the top of the board.
+ * - 'current' (the original): that ÷ p, then + b, i.e. k × (wins ÷ p − E) + b.
  *   Only gains shrink with Elo; a winless result costs everyone the same.
- * - 'pair': like 'expected' but divided by the pair's average p, which keeps
- *   a pair's combined change close to the earlier formula.
+ * - 'expected' (tried, too strong): no division, then + b.
+ * - 'blend': the average of 'current' and 'expected'.
+ * - 'pair': divided by the pair's average p instead.
  */
-export type TournamentFormula = 'current' | 'expected' | 'pair';
-let FORMULA: TournamentFormula = 'expected';
+export type TournamentFormula = 'current' | 'expected' | 'middle' | 'blend' | 'pair';
+let FORMULA: TournamentFormula = 'middle';
 /** For comparing versions; the app always uses the default above. */
 export function setTournamentFormula(f: TournamentFormula) {
     FORMULA = f;
@@ -138,12 +141,18 @@ export function calculateTournamentElo(
         const pAvg = people.reduce((sum, m) => sum + pOf(m.elo), 0) / people.length;
         const members = people.map((m) => {
             const p_value = pOf(m.elo);
+            // wins against what's expected at this person's Elo (p × E), scaled down by p^shrink
+            const vsExpected = k * (p.W_adjusted - p_value * eTourney);
             let C =
                 FORMULA === 'expected'
-                    ? k * (p.W_adjusted - p_value * eTourney) + b
-                    : FORMULA === 'pair'
-                      ? (k * (p.W_adjusted - p_value * eTourney)) / pAvg + b
-                      : k * (p.W_adjusted / p_value - eTourney) + b;
+                    ? vsExpected + b
+                    : FORMULA === 'middle'
+                      ? vsExpected / Math.sqrt(p_value) + b
+                      : FORMULA === 'blend'
+                        ? (vsExpected + vsExpected / p_value) / 2 + b
+                        : FORMULA === 'pair'
+                          ? vsExpected / pAvg + b
+                          : vsExpected / p_value + b;
             if (maxRounds !== null && p.W_raw === maxRounds && C < 0) {
                 C = 0;
             }
