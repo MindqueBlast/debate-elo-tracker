@@ -220,8 +220,9 @@ describe('individual changes', () => {
         expect(eTourney).toBeCloseTo(solo.eTourney, 12);
         expect(results[0].W_adjusted).toBeCloseTo(solo.results[0].W_adjusted, 12);
         const [j, l] = results[0].members;
+        // each person's adjusted wins against what's expected of someone at their Elo (p × E)
         const expected = (elo: number) =>
-            45 * (results[0].W_adjusted / Math.pow(elo / 700, 1.5) - eTourney) + 30;
+            45 * (results[0].W_adjusted - Math.pow(elo / 700, 1.5) * eTourney) + 30;
         expect(j.change).toBeCloseTo(expected(1300), 10);
         expect(l.change).toBeCloseTo(expected(1100), 10);
         expect(j.change).toBeLessThan(l.change);
@@ -241,10 +242,10 @@ describe('individual changes', () => {
                 },
                 { id: 'f', name: 'other', elo: 700, division: 'Novice', W_raw: 4 },
             ],
-            { n: 4, b: 15, k: 45, maxGain: 200, maxRounds: 4 }
+            { n: 4, b: 15, k: 45, maxGain: 150, maxRounds: 4 }
         );
         const [low, high] = results[0].members;
-        expect(low.change).toBe(200); // capped
+        expect(low.change).toBe(150); // capped
         expect(high.change).toBeGreaterThanOrEqual(0); // undefeated never loses Elo
     });
 

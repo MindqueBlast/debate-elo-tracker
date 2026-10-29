@@ -57,6 +57,7 @@ export {
     calculatePracticeElo,
     calculatePracticeEloForPairs,
     calculateTournamentElo,
+    setTournamentFormula,
     expectedScore,
     pairingElo,
     validatePracticeMatch,

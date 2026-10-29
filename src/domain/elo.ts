@@ -88,14 +88,30 @@ export function adjustedWins(
  *
  * What a result is worth belongs to the entry: adjusted wins come from the
  * entry's record, division and rounds, and E_tourney comes from all entries.
- * Each person's change then uses their own Elo (p = (elo / 700)^1.5), so for
- * the same result a higher-rated partner gains less than a lower-rated one.
+ * Each person's change then uses their own Elo (see TournamentFormula above).
  *
  * Entries can carry their own round count (e.g. novices had 5 prelims and
  * varsity had 6). Adjusted wins use the entry's own rounds, and the three
  * phantom teams in E_tourney use the average rounds across entries, which is
  * how the spreadsheet blends divisions.
  */
+/**
+ * How each person's change is worked out (p = (their Elo / 700)^1.5):
+ * - 'expected' (in use): k × (adjusted wins − p × E_tourney) + b. What's
+ *   expected of you grows with your Elo, so a higher-rated partner gains less
+ *   and loses more for the same result.
+ * - 'current' (the earlier one): k × (adjusted wins ÷ p − E_tourney) + b.
+ *   Only gains shrink with Elo; a winless result costs everyone the same.
+ * - 'pair': like 'expected' but divided by the pair's average p, which keeps
+ *   a pair's combined change close to the earlier formula.
+ */
+export type TournamentFormula = 'current' | 'expected' | 'pair';
+let FORMULA: TournamentFormula = 'expected';
+/** For comparing versions; the app always uses the default above. */
+export function setTournamentFormula(f: TournamentFormula) {
+    FORMULA = f;
+}
+
 export function calculateTournamentElo(
     participants: TournamentParticipantInput[],
     params: TournamentParams
@@ -118,9 +134,16 @@ export function calculateTournamentElo(
     const results: TournamentResult[] = withAdjusted.map((p) => {
         const people =
             p.members && p.members.length > 0 ? p.members : [{ id: p.id, elo: p.elo }];
+        const pOf = (elo: number) => Math.pow(elo / TOURNAMENT_FIELD_ELO, 1.5);
+        const pAvg = people.reduce((sum, m) => sum + pOf(m.elo), 0) / people.length;
         const members = people.map((m) => {
-            const p_value = Math.pow(m.elo / TOURNAMENT_FIELD_ELO, 1.5);
-            let C = k * (p.W_adjusted / p_value - eTourney) + b;
+            const p_value = pOf(m.elo);
+            let C =
+                FORMULA === 'expected'
+                    ? k * (p.W_adjusted - p_value * eTourney) + b
+                    : FORMULA === 'pair'
+                      ? (k * (p.W_adjusted - p_value * eTourney)) / pAvg + b
+                      : k * (p.W_adjusted / p_value - eTourney) + b;
             if (maxRounds !== null && p.W_raw === maxRounds && C < 0) {
                 C = 0;
             }

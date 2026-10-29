@@ -639,8 +639,8 @@ export function MatchesPage() {
                         {projected && (
                             <p className="note" style={{ marginTop: 8 }}>
                                 E_tourney {projected.eTourney.toFixed(3)}. Each partner’s change
-                                uses their own Elo, so the higher-rated partner gains less for the
-                                same result.
+                                uses their own Elo, so the higher-rated partner gains less (and loses
+                                more) for the same result.
                             </p>
                         )}
                         <div className="row" style={{ marginTop: 12 }}>
