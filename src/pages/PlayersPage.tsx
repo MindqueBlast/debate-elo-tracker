@@ -222,8 +222,8 @@ function People() {
                         </div>
                     </form>
                     <p className="note">
-                        New people start at {BASE_ELO.Novice} (Novice), {BASE_ELO.JV} (JV) or{' '}
-                        {BASE_ELO.Varsity} (Varsity) unless you enter a number. Class of = the year
+                        Everyone starts at {BASE_ELO.Novice}, whatever their division, unless you
+                        enter a number. Class of = the year
                         they graduate (the first two digits of their student ID).
                     </p>
                 </Card>
