@@ -1,5 +1,11 @@
 import { supabase } from './supabase';
-import { computeAll, getLocalDateString, sanitizeDebaters } from '../domain';
+import {
+    competedIn,
+    computeAll,
+    getLocalDateString,
+    latestSeason,
+    sanitizeDebaters,
+} from '../domain';
 import type {
     Annotation,
     Debater,
@@ -33,6 +39,10 @@ export interface AppSnapshot {
     stored: Derived;
     /** Goes up with every save; a save based on older data is refused. */
     revision: number;
+    /** The latest season with results ("2025-26"). */
+    season: string;
+    /** Everyone who competed in that season: who counts as active. */
+    activeIds: ReadonlySet<string>;
 }
 
 export const EMPTY_SNAPSHOT: AppSnapshot = {
@@ -45,6 +55,8 @@ export const EMPTY_SNAPSHOT: AppSnapshot = {
     inputs: { people: [], tournaments: [], practice: [], adjustments: [] },
     stored: { people: {}, entries: {}, tournaments: {}, practice: {} },
     revision: 0,
+    season: '',
+    activeIds: new Set(),
 };
 
 export async function loadSnapshot(): Promise<AppSnapshot> {
@@ -79,7 +91,9 @@ export async function loadSnapshot(): Promise<AppSnapshot> {
         adjustments: asAdjustments(adjustmentsRes.data ?? []),
     };
     const inputs = toInputs(rows);
-    const fresh = withResults(rows, computeAll(inputs, getLocalDateString()));
+    const today = getLocalDateString();
+    const fresh = withResults(rows, computeAll(inputs, today));
+    const season = latestSeason(fresh.tournaments, today);
 
     return {
         ...fresh,
@@ -88,5 +102,7 @@ export async function loadSnapshot(): Promise<AppSnapshot> {
         inputs,
         stored: storedResults(rows),
         revision: Number(stateRes.data?.revision ?? 0),
+        season,
+        activeIds: competedIn(fresh.tournaments, season),
     };
 }

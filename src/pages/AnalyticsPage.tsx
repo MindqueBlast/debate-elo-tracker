@@ -6,6 +6,7 @@ import {
     isClassKey,
     isCalendarDate,
     lookup,
+    seasonLabel,
     snapshotFromSeries,
     teamElo,
     teamKey,
@@ -29,8 +30,16 @@ import type { ChartSeries } from '../domain';
 
 export function AnalyticsPage() {
     const { isAdmin } = useAuth();
-    const { debaters, teams, annotations, tournaments, practiceRounds, refresh } =
-        useAppData();
+    const {
+        debaters,
+        teams,
+        annotations,
+        tournaments,
+        practiceRounds,
+        season,
+        activeIds,
+        refresh,
+    } = useAppData();
     const toast = useToast();
     const wrapRef = useRef<HTMLDivElement>(null);
     const [view, setView] = useState<'people' | 'teams'>('people');
@@ -40,13 +49,14 @@ export function AnalyticsPage() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [showAnnotations, setShowAnnotations] = useState(true);
+    // Off = only people who competed in the latest season, and teams that haven't disbanded
     const [showGraduated, setShowGraduated] = useState(false);
     const [eventDate, setEventDate] = useState('');
     const [eventName, setEventName] = useState('');
     const [uploaded, setUploaded] = useState<ChartSeries[] | null>(null);
 
     const pool = debaters
-        .filter((d) => showGraduated || d.status === 'active')
+        .filter((d) => showGraduated || activeIds.has(d.id))
         .sort((a, b) => b.elo - a.elo);
     const byId = useMemo(() => lookup(debaters), [debaters]);
 
@@ -139,6 +149,7 @@ export function AnalyticsPage() {
                 startDate: startDate || null,
                 endDate: endDate || null,
                 showGraduated,
+                activeIds,
                 annotations,
                 showAnnotations,
                 tournaments,
@@ -155,6 +166,7 @@ export function AnalyticsPage() {
             startDate,
             endDate,
             showGraduated,
+            activeIds,
             annotations,
             showAnnotations,
         ]
@@ -221,7 +233,7 @@ export function AnalyticsPage() {
                                 ) : (
                                     <>
                                         <option value={ALL_TEAMS}>
-                                            {showGraduated ? 'All teams' : 'All active teams'}
+                                            {showGraduated ? 'All teams' : 'All current teams'}
                                         </option>
                                         {teamPool.map((t) => (
                                             <option key={t.key} value={t.key}>
@@ -337,10 +349,11 @@ export function AnalyticsPage() {
                     <label className="row" style={{ marginBottom: 12 }}>
                         <input
                             type="checkbox"
-                            checked={showGraduated}
-                            onChange={(e) => setShowGraduated(e.target.checked)}
+                            checked={!showGraduated}
+                            onChange={(e) => setShowGraduated(!e.target.checked)}
                         />
-                        Include graduated people and past teams
+                        Show active only{season ? ` (competed in ${seasonLabel(season)})` : ''} and
+                        current teams
                     </label>
                     <div ref={wrapRef} className="chart-fullscreen-host">
                         <EloChart

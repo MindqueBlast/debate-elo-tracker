@@ -6,9 +6,10 @@ import {
     getLocalDateString,
     lookup,
     parseEloInput,
-    seasonOf,
     rankDebaters,
     rankTeams,
+    seasonLabel,
+    seasonOf,
     type Debater,
     type Division,
     type Team,
@@ -84,10 +85,12 @@ export function PlayersPage() {
 function People() {
     const { isAdmin } = useAuth();
     const data = useAppData();
-    const { debaters, teams, practiceRounds, tournaments, adjustments, refresh } = data;
+    const { debaters, teams, practiceRounds, tournaments, adjustments, season, activeIds, refresh } =
+        data;
     const toast = useToast();
     const [q, setQ] = useState('');
-    const [showGraduated, setShowGraduated] = useState(false);
+    // Active = competed in the latest season with results
+    const [activeOnly, setActiveOnly] = useState(true);
     const [name, setName] = useState('');
     const [division, setDivision] = useState<Division>('Novice');
     const [elo, setElo] = useState('');
@@ -107,8 +110,13 @@ function People() {
         );
 
     const ranked = useMemo(
-        () => rankDebaters(debaters, practiceRounds, { showGraduated, search: q }),
-        [debaters, practiceRounds, showGraduated, q]
+        () =>
+            rankDebaters(debaters, practiceRounds, {
+                only: activeOnly ? activeIds : undefined,
+                showGraduated: true,
+                search: q,
+            }),
+        [debaters, practiceRounds, activeOnly, activeIds, q]
     );
     const teamCount = useMemo(() => {
         const counts = new Map<string, number>();
@@ -230,10 +238,10 @@ function People() {
                 <label className="row check" style={{ marginBottom: 0 }}>
                     <input
                         type="checkbox"
-                        checked={showGraduated}
-                        onChange={(e) => setShowGraduated(e.target.checked)}
+                        checked={activeOnly}
+                        onChange={(e) => setActiveOnly(e.target.checked)}
                     />
-                    Show graduated
+                    Show active only{season ? ` (competed in ${seasonLabel(season)})` : ''}
                 </label>
             </div>
             <Card>
@@ -256,8 +264,12 @@ function People() {
                                     {shortClass(d.class_year)}
                                 </span>
                             )}
-                            {d.status === 'graduated' && <span className="pill">graduated</span>}
-                            {d.status === 'active' && !teamCount.get(d.id) && (
+                            {!activeIds.has(d.id) && (
+                                <span className="pill">
+                                    {d.status === 'graduated' ? 'graduated' : 'inactive'}
+                                </span>
+                            )}
+                            {activeIds.has(d.id) && !teamCount.get(d.id) && (
                                 <span className="pill" title="Not on an active team">
                                     no team
                                 </span>
@@ -665,7 +677,7 @@ function Teams() {
                         checked={showInactive}
                         onChange={(e) => setShowInactive(e.target.checked)}
                     />
-                    Show past teams
+                    Show disbanded teams
                 </label>
             </div>
             <Card>
@@ -695,7 +707,7 @@ function Teams() {
                             </div>
                             <span className="chips">
                                 {r.team.division && <span className="pill">{r.team.division}</span>}
-                                {!r.team.active && <span className="pill">past</span>}
+                                {!r.team.active && <span className="pill">disbanded</span>}
                             </span>
                             <span className="elo" style={{ textAlign: 'right' }}>
                                 {Math.round(r.elo)}
@@ -708,16 +720,25 @@ function Teams() {
                                     <Button
                                         size="sm"
                                         variant="secondary"
+                                        title={
+                                            r.team.active
+                                                ? 'They’re no longer partners. Results stay on each person’s record.'
+                                                : 'Put this partnership back together'
+                                        }
                                         onClick={async () => {
                                             try {
                                                 await updateTeam(r.team, { active: !r.team.active }, teams);
+                                                toast.push(
+                                                    r.team.active ? `${r.name} disbanded.` : `${r.name} re-formed.`,
+                                                    'success'
+                                                );
                                                 await refresh();
                                             } catch (err) {
                                                 toast.push(errorText(err, 'Failed to update.'), 'error');
                                             }
                                         }}
                                     >
-                                        {r.team.active ? 'Retire team' : 'Make active'}
+                                        {r.team.active ? 'Disband' : 'Re-form'}
                                     </Button>
                                     <Button
                                         size="sm"

@@ -11,6 +11,7 @@ import {
     practiceRecord,
     practiceSide,
     rankDebaters,
+    seasonLabel,
     teamName,
     type Division,
 } from '../domain';
@@ -31,14 +32,17 @@ const SHORT: Record<Division, string> = { Varsity: 'V', JV: 'JV', Novice: 'N' };
 export function PlayerProfilePage() {
     const { id } = useParams();
     const { isAdmin } = useAuth();
-    const { debaters, teams, practiceRounds, tournaments } = useAppData();
+    const { debaters, teams, practiceRounds, tournaments, season, activeIds } = useAppData();
+    const isActive = !!id && activeIds.has(id);
     const byId = useMemo(() => lookup(debaters), [debaters]);
     const debater = id ? byId.get(id) : undefined;
     const [shownResults, setShownResults] = useState(8);
 
+    // Ranked among this season's active people (or everyone, for someone who isn't active)
     const ranked = useMemo(
-        () => rankDebaters(debaters, practiceRounds, { showGraduated: true }),
-        [debaters, practiceRounds]
+        () =>
+            rankDebaters(debaters, practiceRounds, isActive ? { only: activeIds } : { showGraduated: true }),
+        [debaters, practiceRounds, isActive, activeIds]
     );
     const rank = ranked.find((d) => d.id === id)?.rank;
     const record = debater ? practiceRecord(debater.id, practiceRounds) : null;
@@ -152,7 +156,13 @@ export function PlayerProfilePage() {
                         {debater.class_year != null && (
                             <span className="pill">Class of {debater.class_year}</span>
                         )}
-                        <span className="pill">{debater.status}</span>
+                        <span className="pill">
+                            {isActive
+                                ? `Active ${seasonLabel(season)}`
+                                : debater.status === 'graduated'
+                                  ? 'graduated'
+                                  : 'inactive'}
+                        </span>
                         <span className="pill">
                             {record && record.played
                                 ? `Practice ${record.wins}–${record.losses} (${record.winRate?.toFixed(1)}%)`

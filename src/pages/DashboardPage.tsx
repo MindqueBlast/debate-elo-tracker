@@ -6,6 +6,7 @@ import {
     pairingLabel,
     rankDebaters,
     rankTeams,
+    seasonLabel,
 } from '../domain';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Card, EmptyState, PageHeader, StatCard } from '../components/Card';
@@ -18,12 +19,13 @@ import {
 import { useAppData } from '../state/AppDataProvider';
 
 export function DashboardPage() {
-    const { debaters, teams, practiceRounds, tournaments, loading, error } =
+    const { debaters, teams, practiceRounds, tournaments, season, activeIds, loading, error } =
         useAppData();
-    const ranked = rankDebaters(debaters, practiceRounds);
+    // Active = competed in the latest season with results
+    const ranked = rankDebaters(debaters, practiceRounds, { only: activeIds });
     const topTeams = rankTeams(teams, debaters).slice(0, 5);
     const byId = lookup(debaters);
-    const active = debaters.filter((d) => d.status === 'active');
+    const active = debaters.filter((d) => activeIds.has(d.id));
     const avg = averageElo(active.map((d) => d.elo));
     const recentRounds = [...practiceRounds]
         .sort((a, b) => (a.date < b.date ? 1 : -1))
@@ -52,7 +54,7 @@ export function DashboardPage() {
             {loading && <p className="page-kicker">Refreshing…</p>}
             <div className="grid grid-4" style={{ marginBottom: 20 }}>
                 <StatCard
-                    label="Active people"
+                    label={season ? `Active in ${seasonLabel(season)}` : 'Active people'}
                     value={<AnimatedNumber value={active.length} />}
                     accent={<EloCurveMotif size={36} tone="muted" />}
                 />

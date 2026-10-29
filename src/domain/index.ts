@@ -120,6 +120,8 @@ export {
     validatePlayerName,
 } from './sanitize';
 
+export { competedIn, latestSeason, seasonLabel } from './activity';
+
 export {
     computeAll,
     DEFAULT_PARAMS,

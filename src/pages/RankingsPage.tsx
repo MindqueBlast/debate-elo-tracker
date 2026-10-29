@@ -1,22 +1,29 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { rankDebaters, rankTeams } from '../domain';
+import { rankDebaters, rankTeams, seasonLabel } from '../domain';
 import { Card, EmptyState, PageHeader } from '../components/Card';
 import { EmptyRoster, ScalesMotif } from '../components/illustrations';
 import { useAppData } from '../state/AppDataProvider';
 
 export function RankingsPage() {
-    const { debaters, teams, practiceRounds } = useAppData();
+    const { debaters, teams, practiceRounds, season, activeIds } = useAppData();
     const [view, setView] = useState<'people' | 'teams'>('people');
     const [q, setQ] = useState('');
-    const [showPast, setShowPast] = useState(false);
+    // Active = competed in the latest season with results
+    const [activeOnly, setActiveOnly] = useState(true);
+    const [showDisbanded, setShowDisbanded] = useState(false);
     const ranked = useMemo(
-        () => rankDebaters(debaters, practiceRounds, { showGraduated: showPast, search: q }),
-        [debaters, practiceRounds, showPast, q]
+        () =>
+            rankDebaters(debaters, practiceRounds, {
+                only: activeOnly ? activeIds : undefined,
+                showGraduated: true,
+                search: q,
+            }),
+        [debaters, practiceRounds, activeOnly, activeIds, q]
     );
     const rankedTeams = useMemo(
-        () => rankTeams(teams, debaters, { showInactive: showPast, search: q }),
-        [teams, debaters, showPast, q]
+        () => rankTeams(teams, debaters, { showInactive: showDisbanded, search: q }),
+        [teams, debaters, showDisbanded, q]
     );
 
     return (
@@ -51,14 +58,25 @@ export function RankingsPage() {
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                 />
-                <label className="row check" style={{ marginBottom: 0 }}>
-                    <input
-                        type="checkbox"
-                        checked={showPast}
-                        onChange={(e) => setShowPast(e.target.checked)}
-                    />
-                    {view === 'people' ? 'Show graduated' : 'Show past teams'}
-                </label>
+                {view === 'people' ? (
+                    <label className="row check" style={{ marginBottom: 0 }}>
+                        <input
+                            type="checkbox"
+                            checked={activeOnly}
+                            onChange={(e) => setActiveOnly(e.target.checked)}
+                        />
+                        Show active only{season ? ` (competed in ${seasonLabel(season)})` : ''}
+                    </label>
+                ) : (
+                    <label className="row check" style={{ marginBottom: 0 }}>
+                        <input
+                            type="checkbox"
+                            checked={showDisbanded}
+                            onChange={(e) => setShowDisbanded(e.target.checked)}
+                        />
+                        Show disbanded teams
+                    </label>
+                )}
             </div>
             <Card>
                 {view === 'people' ? (
@@ -86,7 +104,11 @@ export function RankingsPage() {
                                     <span className="num">#{d.rank}</span>
                                     <strong>
                                         {d.name}
-                                        {d.status === 'graduated' ? ' · Grad' : ''}
+                                        {activeIds.has(d.id)
+                                            ? ''
+                                            : d.status === 'graduated'
+                                              ? ' · Grad'
+                                              : ' · Inactive'}
                                     </strong>
                                     <span className="hide-sm num">
                                         {d.played ? `${d.wins}–${d.losses}` : '—'}
@@ -122,7 +144,7 @@ export function RankingsPage() {
                                 <span className="num">#{r.rank}</span>
                                 <strong>
                                     {r.name}
-                                    {r.team.active ? '' : ' · Past'}
+                                    {r.team.active ? '' : ' · Disbanded'}
                                 </strong>
                                 <span className="hide-sm">{r.team.division ?? '—'}</span>
                                 <span className="hide-sm num">

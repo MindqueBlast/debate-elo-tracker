@@ -24,9 +24,14 @@ export function practiceRecord(
 export function rankDebaters(
     debaters: Debater[],
     rounds: PracticeRound[],
-    options: { showGraduated?: boolean; search?: string } = {}
+    options: {
+        showGraduated?: boolean;
+        search?: string;
+        /** Only these people (e.g. everyone who competed this season). */
+        only?: ReadonlySet<string>;
+    } = {}
 ): RankedDebater[] {
-    const { showGraduated = false, search = '' } = options;
+    const { showGraduated = false, search = '', only } = options;
     const q = search.trim().toLowerCase();
 
     const sorted = [...debaters].sort((a, b) => {
@@ -35,7 +40,11 @@ export function rankDebaters(
     });
 
     const visible = sorted.filter((d) => {
-        if (!showGraduated && d.status === 'graduated') return false;
+        if (only) {
+            if (!only.has(d.id)) return false;
+        } else if (!showGraduated && d.status === 'graduated') {
+            return false;
+        }
         if (q && !d.name.toLowerCase().includes(q)) return false;
         return true;
     });

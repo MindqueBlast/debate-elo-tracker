@@ -33,7 +33,10 @@ export interface BuildEloSeriesOptions {
     compareIds?: string[];
     startDate?: string | null;
     endDate?: string | null;
+    /** Show everyone (otherwise only active people and current teams). */
     showGraduated?: boolean;
+    /** Who counts as active (competed this season); defaults to anyone not graduated. */
+    activeIds?: ReadonlySet<string>;
     annotations?: Annotation[];
     showAnnotations?: boolean;
     /** With these, points are labelled with what happened (tournament name and change). */
@@ -145,6 +148,7 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         startDate,
         endDate,
         showGraduated = false,
+        activeIds,
         annotations = [],
         showAnnotations = false,
         tournaments,
@@ -161,7 +165,7 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         const cls = isClassKey(selectedId) ? selectedId.slice('class:'.length) : null;
         const pool = debaters.filter(
             (d) =>
-                (showGraduated || d.status === 'active') &&
+                (showGraduated || (activeIds ? activeIds.has(d.id) : d.status === 'active')) &&
                 (cls === null ||
                     (cls === 'none' ? d.class_year == null : d.class_year === Number(cls)))
         );
