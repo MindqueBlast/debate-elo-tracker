@@ -57,7 +57,7 @@ export function AnalyticsPage() {
 
     const pool = debaters
         .filter((d) => showGraduated || activeIds.has(d.id))
-        .sort((a, b) => b.elo - a.elo);
+        .sort((a, b) => a.name.localeCompare(b.name));
     const byId = useMemo(() => lookup(debaters), [debaters]);
 
     // "Class of 2027", "Class of 2028", … for everyone listed (plus anyone with no year set)
@@ -92,7 +92,7 @@ export function AnalyticsPage() {
                     name: teamName(t, byId),
                     elo: teamElo(t, byId),
                 }))
-                .sort((a, b) => b.elo - a.elo),
+                .sort((a, b) => a.name.localeCompare(b.name)),
         [teams, showGraduated, byId]
     );
 
