@@ -323,6 +323,18 @@ export function EloChart({
                         });
                     },
                     labels: {
+                        // names A–Z (colours stay with each person); important dates last
+                        sort: (a, b, chartData) => {
+                            const anno = (i?: number) =>
+                                (chartData.datasets[i ?? -1] as { id?: string } | undefined)?.id ===
+                                ANNOTATIONS
+                                    ? 1
+                                    : 0;
+                            return (
+                                anno(a.datasetIndex) - anno(b.datasetIndex) ||
+                                a.text.localeCompare(b.text, undefined, { sensitivity: 'base' })
+                            );
+                        },
                         boxWidth: 10,
                         color: getComputedStyle(document.documentElement)
                             .getPropertyValue('--text-muted')
