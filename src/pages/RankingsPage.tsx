@@ -1,25 +1,24 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { rankDebaters, rankTeams, seasonLabel } from '../domain';
+import { rankDebaters, rankTeams } from '../domain';
 import { Card, EmptyState, PageHeader } from '../components/Card';
 import { EmptyRoster, ScalesMotif } from '../components/illustrations';
 import { useAppData } from '../state/AppDataProvider';
 
 export function RankingsPage() {
-    const { debaters, teams, practiceRounds, season, activeIds } = useAppData();
+    const { debaters, teams, practiceRounds } = useAppData();
     const [view, setView] = useState<'people' | 'teams'>('people');
     const [q, setQ] = useState('');
-    // Active = competed in the latest season with results
-    const [activeOnly, setActiveOnly] = useState(true);
+    // The main board shows everyone still on the team; graduates only when asked for
+    const [showGrads, setShowGrads] = useState(false);
     const [showDisbanded, setShowDisbanded] = useState(false);
     const ranked = useMemo(
         () =>
             rankDebaters(debaters, practiceRounds, {
-                only: activeOnly ? activeIds : undefined,
-                showGraduated: true,
+                showGraduated: showGrads,
                 search: q,
             }),
-        [debaters, practiceRounds, activeOnly, activeIds, q]
+        [debaters, practiceRounds, showGrads, q]
     );
     const rankedTeams = useMemo(
         () => rankTeams(teams, debaters, { showInactive: showDisbanded, search: q }),
@@ -62,10 +61,10 @@ export function RankingsPage() {
                     <label className="row check" style={{ marginBottom: 0 }}>
                         <input
                             type="checkbox"
-                            checked={activeOnly}
-                            onChange={(e) => setActiveOnly(e.target.checked)}
+                            checked={showGrads}
+                            onChange={(e) => setShowGrads(e.target.checked)}
                         />
-                        Show active only{season ? ` (competed in ${seasonLabel(season)})` : ''}
+                        Show graduates
                     </label>
                 ) : (
                     <label className="row check" style={{ marginBottom: 0 }}>
@@ -104,11 +103,7 @@ export function RankingsPage() {
                                     <span className="num">#{d.rank}</span>
                                     <strong>
                                         {d.name}
-                                        {activeIds.has(d.id)
-                                            ? ''
-                                            : d.status === 'graduated'
-                                              ? ' · Grad'
-                                              : ' · Inactive'}
+                                        {d.status === 'graduated' ? ' (grad)' : ''}
                                     </strong>
                                     <span className="hide-sm num">
                                         {d.played ? `${d.wins}–${d.losses}` : '—'}
