@@ -9,6 +9,7 @@ import {
     pairingLabel,
     rankDebaters,
     rankTeams,
+    teamKey,
 } from '../domain';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Card, EmptyState, PageHeader, StatCard } from '../components/Card';
@@ -39,15 +40,20 @@ export function DashboardPage() {
     const recentRounds = [...practiceRounds]
         .sort((a, b) => (a.date < b.date ? 1 : -1))
         .slice(0, 6);
-    const top = ranked[0];
-    const series = top
-        ? buildEloSeries({
-              debaters,
-              selectedId: top.id,
-              tournaments,
-              practiceRounds,
-          })
-        : null;
+    // the top three teams' lines (each the average of both partners), side by side
+    const topThree = topTeams.slice(0, 3);
+    const series =
+        topThree.length > 0
+            ? buildEloSeries({
+                  debaters,
+                  teams,
+                  selectedId: teamKey(topThree[0].team.id),
+                  compareIds: topThree.slice(1).map((r) => teamKey(r.team.id)),
+                  tournaments,
+                  practiceRounds,
+                  extendTeams: true,
+              })
+            : null;
 
     if (error) {
         return <EmptyState title="Could not load data" body={error} />;
@@ -105,10 +111,13 @@ export function DashboardPage() {
                 </Card>
                 <Card>
                     <div className="card-title">
-                        {top ? `${top.name}’s Elo` : 'Elo trend'}
-                        {top && (
-                            <Link to={`/app/players/${top.id}`} className="card-title__meta">
-                                Profile
+                        {topThree.length > 1 ? `Top ${topThree.length} teams` : 'Top team'}
+                        {topThree.length > 1 && (
+                            <Link
+                                to={`/app/matchup?a=${teamKey(topThree[0].team.id)}&b=${teamKey(topThree[1].team.id)}`}
+                                className="card-title__meta"
+                            >
+                                Matchup
                             </Link>
                         )}
                     </div>
@@ -122,7 +131,7 @@ export function DashboardPage() {
                     ) : (
                         <EmptyState
                             title="No graph yet"
-                            body="Rankings will populate a trend once players exist."
+                            body="Save partnerships on the Players page to chart the top teams."
                         />
                     )}
                 </Card>

@@ -602,7 +602,8 @@ export function EloChart({
                     </span>
                 )}
                 <span className="chart-zoom__actions">
-                    {lines.length > 1 && (
+                    {/* finding and hiding lines pays off on a crowded chart; a few lines toggle from the legend */}
+                    {lines.length > 4 && (
                         <>
                             <LineFinder lines={finderLines} hidden={hidden} onToggle={toggleLine} />
                             <button
