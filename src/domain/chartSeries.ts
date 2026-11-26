@@ -70,6 +70,8 @@ export interface BuildEloSeriesOptions {
     /** With these, points are labelled with what happened (tournament name and change). */
     tournaments?: Tournament[];
     practiceRounds?: PracticeRound[];
+    /** Team lines start with whichever partner came first, showing just them until both are on the team. */
+    extendTeams?: boolean;
 }
 
 function pointsFromHistory(
@@ -113,13 +115,14 @@ function teamSeries(
     debaters: Debater[],
     index: EventIndex | null,
     startDate?: string | null,
-    endDate?: string | null
+    endDate?: string | null,
+    extend = false
 ): ChartSeries {
     const byId = lookup(debaters);
     const members = pairingMembers([team.member1_id, team.member2_id], byId).map(
         (m) => ({ ...m, history: sanitizeHistory(m.history) })
     );
-    const all = pairingHistory(members);
+    const all = pairingHistory(members, extend);
     const firstDate = all[0]?.x;
     const data = all
         .filter((p) => (!startDate || p.x >= startDate) && (!endDate || p.x <= endDate))
@@ -139,11 +142,12 @@ function seriesFor(
     teams: Team[],
     index: EventIndex | null,
     startDate?: string | null,
-    endDate?: string | null
+    endDate?: string | null,
+    extend = false
 ): ChartSeries | null {
     if (id.startsWith('team:')) {
         const team = teams.find((t) => teamKey(t.id) === id);
-        return team ? teamSeries(team, debaters, index, startDate, endDate) : null;
+        return team ? teamSeries(team, debaters, index, startDate, endDate, extend) : null;
     }
     const debater = debaters.find((d) => d.id === id);
     if (!debater) return null;
@@ -182,6 +186,7 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         showAnnotations = false,
         tournaments,
         practiceRounds,
+        extendTeams = false,
     } = options;
 
     const index =
@@ -209,15 +214,15 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
     } else if (selectedId === ALL_TEAMS) {
         const byId = lookup(debaters);
         for (const team of teams.filter((t) => chartIncludesTeam(t, who, byId))) {
-            series.push(teamSeries(team, debaters, index, startDate, endDate));
+            series.push(teamSeries(team, debaters, index, startDate, endDate, extendTeams));
         }
     } else {
-        const primary = seriesFor(selectedId, debaters, teams, index, startDate, endDate);
+        const primary = seriesFor(selectedId, debaters, teams, index, startDate, endDate, extendTeams);
         if (primary) series.push(primary);
         const others = [...compareIds, ...(compareId ? [compareId] : [])];
         for (const id of new Set(others)) {
             if (id === selectedId) continue;
-            const other = seriesFor(id, debaters, teams, index, startDate, endDate);
+            const other = seriesFor(id, debaters, teams, index, startDate, endDate, extendTeams);
             if (other) series.push(other);
         }
     }

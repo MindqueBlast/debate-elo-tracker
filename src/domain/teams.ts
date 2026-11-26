@@ -151,9 +151,11 @@ export function practiceSide(
 
 /**
  * Team Elo over time: at every date either partner has a point, the average
- * of each partner's latest Elo up to that date.
+ * of each partner's latest Elo up to that date. Normally it starts once both
+ * partners are on the team; with extend, it starts with whoever came first
+ * and shows just their Elo until the other arrives.
  */
-export function pairingHistory(members: Debater[]): ChartPoint[] {
+export function pairingHistory(members: Debater[], extend = false): ChartPoint[] {
     if (members.length === 0) return [];
     const histories = members.map((m) =>
         [...m.history].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
@@ -172,8 +174,8 @@ export function pairingHistory(members: Debater[]): ChartPoint[] {
             latest.push(last.elo);
             if (last.date === date && last.event) event = last.event;
         }
-        // Only plot once both partners have started (or the only partner has)
-        if (latest.length < histories.length) continue;
+        // Only plot once both partners have started (or, extended, once either has)
+        if (latest.length < (extend ? 1 : histories.length)) continue;
         points.push({ x: date, y: pairingElo(latest), event });
     }
     return points;

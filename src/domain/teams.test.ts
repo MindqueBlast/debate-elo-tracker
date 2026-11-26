@@ -88,6 +88,30 @@ describe('pairings and teams', () => {
         ]);
     });
 
+    it('starts with the first partner when extended', () => {
+        const a = person('a', 'Aaditya', 0, {
+            history: [
+                { date: '2023-08-01', elo: 400 },
+                { date: '2023-10-01', elo: 600 },
+            ],
+        });
+        const c = person('c', 'Chloe', 0, {
+            history: [
+                { date: '2024-08-01', elo: 400 },
+                { date: '2024-10-01', elo: 500 },
+            ],
+        });
+        // normally the line waits for both
+        expect(pairingHistory([a, c]).map((p) => p.x)).toEqual(['2024-08-01', '2024-10-01']);
+        // extended, Aaditya's own Elo comes first, then the average
+        expect(pairingHistory([a, c], true).map((p) => [p.x, p.y])).toEqual([
+            ['2023-08-01', 400],
+            ['2023-10-01', 600],
+            ['2024-08-01', 500],
+            ['2024-10-01', 550],
+        ]);
+    });
+
     it('counts practice wins and losses for partners too', () => {
         const rounds: PracticeRound[] = [
             {

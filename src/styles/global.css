@@ -990,6 +990,10 @@ input[type='file']::file-selector-button:hover {
     scroll-margin-top: calc(var(--nav-h) + 16px);
 }
 
+.chart-extend {
+    margin-left: auto;
+}
+
 .line-finder {
     position: relative;
 }

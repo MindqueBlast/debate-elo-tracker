@@ -55,6 +55,8 @@ export function AnalyticsPage() {
     const [showAnnotations, setShowAnnotations] = useState(true);
     // "All individuals": everyone in each class who's still on the team, competed this season or not
     const [allPeople, setAllPeople] = useState(false);
+    // Teams: before both partners were on the team, show whoever was
+    const [extendRecords, setExtendRecords] = useState(true);
     const who: ChartWho = view === 'people' && allPeople ? 'team' : 'active';
     // Individuals: anyone still on the team who competed this season or last
     const activeIds = useMemo(() => {
@@ -181,6 +183,7 @@ export function AnalyticsPage() {
                 showAnnotations,
                 tournaments,
                 practiceRounds,
+                extendTeams: extendRecords,
             }),
         [
             debaters,
@@ -196,6 +199,7 @@ export function AnalyticsPage() {
             activeIds,
             annotations,
             showAnnotations,
+            extendRecords,
         ]
     );
 
@@ -455,6 +459,19 @@ export function AnalyticsPage() {
                     >
                         Export JSON
                     </Button>
+                    {view === 'teams' && (
+                        <label
+                            className="row check chart-extend"
+                            title="Before both partners were on the team, show whoever was"
+                        >
+                            <input
+                                type="checkbox"
+                                checked={extendRecords}
+                                onChange={(e) => setExtendRecords(e.target.checked)}
+                            />
+                            Extend records
+                        </label>
+                    )}
                 </div>
             </Card>
             <div className="grid grid-2 analytics-below">
