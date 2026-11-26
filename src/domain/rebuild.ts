@@ -40,8 +40,8 @@ export interface InputEntry {
     raw_wins: number;
     /** Prelim rounds for this entry's division. */
     rounds: number | null;
-    /** Rounds lost, prelims and elims (null: not recorded). Zero losses means no Elo lost. */
-    losses: number | null;
+    /** Lost at least one round, prelims or elims (null: not recorded). Undefeated means no Elo lost. */
+    lost: boolean | null;
 }
 
 export interface InputTournament {
@@ -215,7 +215,7 @@ export function computeAll(inputs: Inputs, today: string): Derived {
                 division: e.division,
                 rawWins: e.raw_wins,
                 rounds: e.rounds ?? undefined,
-                losses: e.losses,
+                lost: e.lost,
             })),
         };
     });

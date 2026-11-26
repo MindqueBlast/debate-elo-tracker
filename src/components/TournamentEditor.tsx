@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { lookup, type Debater, type Division, type Team, type Tournament } from '../domain';
+import { defaultLost, lookup, type Debater, type Division, type Team, type Tournament } from '../domain';
 import {
     draftFromTournament,
     MutationError,
@@ -19,8 +19,8 @@ interface Row {
     b: string;
     division: Division;
     wins: string;
-    /** Blank: not recorded. */
-    losses: string;
+    /** Lost a round. Null: follow the default for the tournament and wins. */
+    lost: boolean | null;
 }
 
 /**
@@ -63,20 +63,26 @@ export function TournamentEditor({
         return out;
     });
     const [rows, setRows] = useState<Row[]>(() =>
-        original.entries.map((e) => ({
-            key: e.key,
-            a: e.members[0],
-            b: e.members[1] ?? '',
-            division: e.division,
-            wins: String(e.prelimWins),
-            losses: e.losses == null ? '' : String(e.losses),
-        }))
+        original.entries.map((e) => {
+            const rounds = original.roundsByDivision?.[e.division] ?? original.params.n;
+            const usual = defaultLost(original.params.b, e.prelimWins, rounds);
+            return {
+                key: e.key,
+                a: e.members[0],
+                b: e.members[1] ?? '',
+                division: e.division,
+                wins: String(e.prelimWins),
+                lost: e.lost == null || e.lost === usual ? null : e.lost,
+            };
+        })
     );
     const [more, setMore] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const n = Math.max(original.params.n, ...DIVS.map((d) => Number(rounds[d]) || 0));
+    const lostOf = (r: Row) =>
+        r.lost ?? defaultLost(Number(bonus), Number(r.wins), Number(rounds[r.division]) || n);
     const draft: TournamentDraft = {
         id: tournament.id,
         name,
@@ -99,7 +105,7 @@ export function TournamentEditor({
                 division: r.division,
                 prelimWins: Number(r.wins),
                 elimWins: 0,
-                losses: r.losses.trim() === '' ? null : Number(r.losses),
+                lost: lostOf(r),
             })),
     };
 
@@ -210,9 +216,7 @@ export function TournamentEditor({
                     <span>Partner</span>
                     <span>Division</span>
                     <span title="Prelim wins + 2 × elim wins">Wins</span>
-                    <span title="Rounds lost, prelims and elims (byes aren't losses). With no losses, nobody in the entry loses Elo. Blank: not recorded.">
-                        Losses
-                    </span>
+                    <span title="Lost" />
                     <span>Change</span>
                     <span />
                 </div>
@@ -250,12 +254,12 @@ export function TournamentEditor({
                                 onChange={(e) => set(r.key, { wins: e.target.value })}
                             />
                             <input
-                                aria-label="Losses"
-                                type="number"
-                                min={0}
-                                step={0.5}
-                                value={r.losses}
-                                onChange={(e) => set(r.key, { losses: e.target.value })}
+                                type="checkbox"
+                                className="lost-check"
+                                aria-label="Lost"
+                                title="Lost"
+                                checked={lostOf(r)}
+                                onChange={(e) => set(r.key, { lost: e.target.checked })}
                             />
                             <span className="num t-editor__change">
                                 {res ? (
@@ -299,7 +303,7 @@ export function TournamentEditor({
                                 b: '',
                                 division: prev[prev.length - 1]?.division ?? 'Varsity',
                                 wins: '0',
-                                losses: '',
+                                lost: null,
                             },
                         ])
                     }
