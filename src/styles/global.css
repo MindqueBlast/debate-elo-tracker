@@ -941,7 +941,7 @@ p {
 .t-editor__head,
 .t-editor__row {
     display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 1fr) 64px 64px 92px 28px;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 1fr) 50px 50px 108px 28px;
     gap: 6px;
     align-items: center;
 }
