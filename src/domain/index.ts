@@ -60,6 +60,7 @@ export {
     defaultLost,
     setTournamentFormula,
     setTournamentSteps,
+    setDivisionTuning,
     expectedScore,
     pairingElo,
     validatePracticeMatch,

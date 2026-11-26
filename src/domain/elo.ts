@@ -70,6 +70,22 @@ export function validatePracticeMatch(
     return null;
 }
 
+/** For comparing versions: scales the JV/varsity extra in adjusted wins (1 = as designed). */
+let DIVISION_EXTRA = 1;
+/** For comparing versions: multiplies each change by division (all 1 = as designed). */
+let DIVISION_WEIGHT: Record<string, number> = { Novice: 1, JV: 1, Varsity: 1 };
+/** For comparing versions: the Elo a division's expectations are measured against (default 700 for all). */
+let DIVISION_FIELD: Record<string, number> = {};
+export function setDivisionTuning(
+    extra: number,
+    weight: Record<string, number>,
+    field: Record<string, number> = {}
+) {
+    DIVISION_EXTRA = extra;
+    DIVISION_WEIGHT = weight;
+    DIVISION_FIELD = field;
+}
+
 export function adjustedWins(
     division: TournamentParticipantInput['division'],
     W_raw: number,
@@ -78,9 +94,9 @@ export function adjustedWins(
     if (division === 'Novice') return W_raw;
     const winPercent = n > 0 ? (W_raw / n) * 100 : 0;
     if (division === 'JV') {
-        return ((-200 / (winPercent + 6.7) + 30) / 100) * n + W_raw;
+        return DIVISION_EXTRA * ((-200 / (winPercent + 6.7) + 30) / 100) * n + W_raw;
     }
-    return ((-200 / (winPercent + 4) + 50) / 100) * n + W_raw;
+    return DIVISION_EXTRA * ((-200 / (winPercent + 4) + 50) / 100) * n + W_raw;
 }
 
 /**
@@ -149,10 +165,13 @@ export function calculateTournamentElo(
     const results: TournamentResult[] = withAdjusted.map((p) => {
         const people =
             p.members && p.members.length > 0 ? p.members : [{ id: p.id, elo: p.elo }];
-        const pOf = (elo: number) => Math.pow(elo / TOURNAMENT_FIELD_ELO, 1.5);
+        const fieldElo = DIVISION_FIELD[p.division] ?? TOURNAMENT_FIELD_ELO;
+        const pOf = (elo: number) => Math.pow(elo / fieldElo, 1.5);
         const pAvg = people.reduce((sum, m) => sum + pOf(m.elo), 0) / people.length;
         // what the result is worth to someone at this Elo
-        const worth = (elo: number) => {
+        const weight = DIVISION_WEIGHT[p.division] ?? 1;
+        const worth = (elo: number) => weight * worthAt(elo);
+        const worthAt = (elo: number) => {
             const pv = pOf(elo);
             // wins against what's expected at this Elo (p × E), scaled down by p^shrink
             const vsExpected = k * (p.W_adjusted - pv * eTourney);
