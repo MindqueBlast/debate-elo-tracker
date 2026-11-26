@@ -133,9 +133,9 @@ export function LandingPage() {
             {/* the hero is the club's colour, in both themes */}
             <div className="l-hero">
                 <header className="l-nav">
-                    <div className="l-container l-nav__inner">
+                    <div className="l-nav__inner">
                         <Link to="/" className="l-wordmark" aria-label="Syosset Debate Elo Tracker, home">
-                            <Logo size={28} />
+                            <Logo />
                             <span className="l-wordmark__full">Syosset Debate Elo Tracker</span>
                             <span className="l-wordmark__short">Syosset Elo</span>
                         </Link>

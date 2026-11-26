@@ -59,6 +59,8 @@
     --space-6: 32px;
     --space-7: 48px;
     --nav-h: 56px;
+    /* one content width for the app and the home page, so moving between them doesn't jump */
+    --page-max: 1320px;
     --font: 'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, sans-serif;
     --font-display: 'Big Shoulders Display', 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
     /* figures: Archivo pulled to its narrowest, heaviest cut, like a jersey number */
@@ -355,7 +357,7 @@ p {
 .page {
     position: relative;
     z-index: 1;
-    width: min(1200px, calc(100% - 48px));
+    width: min(var(--page-max), calc(100% - 48px));
     margin: 0 auto;
     padding: 40px 0 72px;
 }
@@ -2120,7 +2122,7 @@ a.pill:hover {
     }
 
     .page {
-        width: min(1200px, calc(100% - 32px));
+        width: min(var(--page-max), calc(100% - 32px));
         padding-top: 28px;
     }
 
