@@ -51,7 +51,7 @@ const SHORT: Record<Division, string> = { Varsity: 'V', JV: 'JV', Novice: 'N' };
 const TYPES = [
     { id: 'invitational', label: 'Invitational (5–6+ rounds)', bonus: 30 },
     { id: 'local', label: 'Local / NYSFL / NCFL / NSDA elims', bonus: 15 },
-    { id: 'haftr', label: 'HAFTR / Citron / BDL', bonus: 10 },
+    { id: 'citron', label: 'Citron / BDL', bonus: 10 },
 ] as const;
 
 const errorText = (err: unknown, fallback: string) =>
