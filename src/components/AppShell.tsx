@@ -1,8 +1,10 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useState } from 'react';
+import { motion } from 'motion/react';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from './Button';
 import { Logo } from './Logo';
+import { QuickSearch } from './QuickSearch';
 import { AppBackground } from './AppBackground';
 import { useTheme } from '../state/ThemeProvider';
 
@@ -13,10 +15,12 @@ const LINKS = [
     // only people who can edit see the roster
     { to: '/app/players', label: 'Players', editorsOnly: true },
     { to: '/app/analytics', label: 'Analytics' },
+    { to: '/app/matchup', label: 'Matchup' },
 ];
 
 export function AppShell() {
     const { user, isAdmin, isDev, isGuest, signOut } = useAuth();
+    const { pathname } = useLocation();
     const { theme, toggle } = useTheme();
     const [open, setOpen] = useState(false);
     const roleLabel = isAdmin ? 'Admin' : isGuest ? 'Guest' : 'Viewer';
@@ -59,7 +63,19 @@ export function AppShell() {
                                 }
                                 onClick={() => setOpen(false)}
                             >
-                                {l.label}
+                                {({ isActive }) => (
+                                    <>
+                                        {l.label}
+                                        {isActive && (
+                                            // the scarlet bar slides from the last page's tab to this one
+                                            <motion.span
+                                                layoutId="nav-bar"
+                                                className="nav-link__bar"
+                                                transition={{ type: 'spring', stiffness: 520, damping: 42 }}
+                                            />
+                                        )}
+                                    </>
+                                )}
                             </NavLink>
                         ))}
                         {/* on phones the account controls live in the menu */}
@@ -67,6 +83,7 @@ export function AppShell() {
                     </div>
                 </nav>
                 <div className="nav-actions">
+                    <QuickSearch />
                     <div className="nav-actions__extra">{extras}</div>
                     <Button
                         className="mobile-nav-toggle"
@@ -80,7 +97,8 @@ export function AppShell() {
                     </Button>
                 </div>
             </header>
-            <main id="main" className="page">
+            {/* keyed by page, so each page's title plays its entrance once */}
+            <main id="main" className="page" key={pathname}>
                 <Outlet />
             </main>
         </div>

@@ -11,6 +11,7 @@ import {
     practiceRecord,
     practiceSide,
     rankDebaters,
+    seasonBreakdown,
     seasonLabel,
     teamName,
     type Division,
@@ -108,11 +109,19 @@ export function PlayerProfilePage() {
     }
 
     const sd = eloStdDev(debater.history);
+    const seasons = seasonBreakdown(debater.history, debater.start_elo, results);
 
     return (
         <div>
             <PageHeader
                 title={debater.name}
+                sub={
+                    rank != null
+                        ? `Rank ${rank} of ${ranked.length}${isActive ? ' active debaters' : ''}.`
+                        : debater.status === 'graduated'
+                          ? 'Graduated.'
+                          : 'Not ranked this season.'
+                }
                 actions={
                     isAdmin ? (
                         <Link to="/app/players" className="btn btn-secondary btn-sm">
@@ -126,13 +135,23 @@ export function PlayerProfilePage() {
                 }
             />
             <div className="grid grid-2">
-                <Card className="profile-hero-card">
-                    <div className="stat-label">Current Elo</div>
-                    <div className="profile-elo">
-                        <AnimatedNumber value={Math.round(debater.elo)} />
+                {/* the player's plate: their number large, their place beside it */}
+                <Card className="profile-plate">
+                    <div className="profile-plate__top">
+                        <div>
+                            <div className="stat-label">Current Elo</div>
+                            <div className="profile-elo figure">
+                                <AnimatedNumber value={Math.round(debater.elo)} duration={700} />
+                            </div>
+                        </div>
+                        {rank != null && (
+                            <div className={`profile-rank${rank <= 3 ? ` profile-rank--${rank}` : ''}`}>
+                                <span className="stat-label">Rank</span>
+                                <span className="figure">{rank}</span>
+                            </div>
+                        )}
                     </div>
-                    <div className="row" style={{ marginTop: 16 }}>
-                        {rank != null && <span className="pill">Rank #{rank}</span>}
+                    <div className="chips profile-plate__tags">
                         {debater.division && <span className="pill">{debater.division}</span>}
                         {debater.class_year != null && (
                             <span className="pill">Class of {debater.class_year}</span>
@@ -141,8 +160,8 @@ export function PlayerProfilePage() {
                             {isActive
                                 ? `Active ${seasonLabel(season)}`
                                 : debater.status === 'graduated'
-                                  ? 'graduated'
-                                  : 'inactive'}
+                                  ? 'Graduated'
+                                  : 'Inactive'}
                         </span>
                         {practiceRounds.length > 0 && (
                             <span className="pill">
@@ -152,28 +171,26 @@ export function PlayerProfilePage() {
                             </span>
                         )}
                     </div>
-                    <div className="grid grid-2" style={{ marginTop: 24 }}>
+                    <dl className="profile-facts">
                         <div>
-                            <div className="stat-label">Peak Elo</div>
-                            <div className="elo">
-                                {Math.round(peakElo(debater.history, debater.elo))}
-                            </div>
+                            <dt>Peak Elo</dt>
+                            <dd className="figure">{Math.round(peakElo(debater.history, debater.elo))}</dd>
                         </div>
                         <div>
-                            <div className="stat-label">Tournaments</div>
-                            <div className="elo">{results.length}</div>
+                            <dt>Tournaments</dt>
+                            <dd className="figure">{results.length}</dd>
                         </div>
                         <div>
-                            <div className="stat-label">Graduation</div>
-                            <div>{debater.graduation_date || 'N/A'}</div>
+                            <dt>Consistency (SD)</dt>
+                            <dd className="figure">{sd == null ? 'N/A' : sd.toFixed(1)}</dd>
                         </div>
                         <div>
-                            <div className="stat-label">Consistency (SD)</div>
-                            <div>{sd == null ? 'N/A' : sd.toFixed(1)}</div>
+                            <dt>Graduation</dt>
+                            <dd>{debater.graduation_date || 'N/A'}</dd>
                         </div>
-                    </div>
+                    </dl>
                     {(myTeams.length > 0 || partners.length > 0) && (
-                        <div style={{ marginTop: 24 }}>
+                        <div className="profile-plate__people">
                             {myTeams.length > 0 && (
                                 <>
                                     <div className="stat-label">Teams</div>
@@ -214,6 +231,60 @@ export function PlayerProfilePage() {
                     )}
                 </Card>
             </div>
+            {seasons.length > 0 && (
+                <Card className="seasons-card">
+                    <div className="card-title">Season by season</div>
+                    <div className="seasons" role="table" aria-label="Season by season">
+                        <div className="seasons__row seasons__row--head" role="row">
+                            <span role="columnheader">Season</span>
+                            <span role="columnheader">Started</span>
+                            <span role="columnheader">Finished</span>
+                            <span role="columnheader">Change</span>
+                            <span role="columnheader" className="hide-sm">
+                                Peak
+                            </span>
+                            <span role="columnheader" className="hide-sm">
+                                Tournaments
+                            </span>
+                            <span role="columnheader" className="hide-sm">
+                                Best result
+                            </span>
+                        </div>
+                        {seasons.map((r) => (
+                            <div key={r.season} className="seasons__row" role="row">
+                                <span role="cell" className="seasons__season">
+                                    {seasonLabel(r.season)}
+                                </span>
+                                <span role="cell" className="figure">
+                                    {Math.round(r.start)}
+                                </span>
+                                <span role="cell" className="figure">
+                                    {Math.round(r.end)}
+                                </span>
+                                <span role="cell" className={`figure ${r.change >= 0 ? 'delta-pos' : 'delta-neg'}`}>
+                                    {r.change >= 0 ? '+' : '−'}
+                                    {Math.abs(Math.round(r.change))}
+                                </span>
+                                <span role="cell" className="figure hide-sm">
+                                    {Math.round(r.peak)}
+                                </span>
+                                <span role="cell" className="num hide-sm">
+                                    {r.tournaments}
+                                </span>
+                                <span role="cell" className="hide-sm seasons__best">
+                                    {r.best ? (
+                                        <>
+                                            {r.best.name} <span className="delta-pos">+{r.best.change.toFixed(1)}</span>
+                                        </>
+                                    ) : (
+                                        <span className="muted">No gains</span>
+                                    )}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+            )}
             <div className={`grid ${practiceRounds.length > 0 ? 'grid-2' : ''}`} style={{ marginTop: 16 }}>
                 <Card>
                     <div className="card-title">Tournament results</div>
@@ -237,9 +308,9 @@ export function PlayerProfilePage() {
                                             , raw {r.raw}
                                         </div>
                                     </span>
-                                    <span className={`num ${r.change >= 0 ? 'delta-pos' : 'delta-neg'}`}>
-                                        {r.change >= 0 ? '+' : ''}
-                                        {r.change.toFixed(1)}
+                                    <span className={`delta ${r.change >= 0 ? 'delta-pos' : 'delta-neg'}`}>
+                                        {r.change >= 0 ? '+' : '−'}
+                                        {Math.abs(r.change).toFixed(1)}
                                     </span>
                                 </div>
                             ))}
@@ -292,9 +363,9 @@ export function PlayerProfilePage() {
                                                 </span>
                                             )}
                                         </span>
-                                        <span className={delta >= 0 ? 'delta-pos' : 'delta-neg'}>
-                                            {delta >= 0 ? '+' : ''}
-                                            {delta.toFixed(1)}
+                                        <span className={`delta ${delta >= 0 ? 'delta-pos' : 'delta-neg'}`}>
+                                            {delta >= 0 ? '+' : '−'}
+                                            {Math.abs(delta).toFixed(1)}
                                         </span>
                                     </div>
                                 );

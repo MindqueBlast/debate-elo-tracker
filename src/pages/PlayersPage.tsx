@@ -55,6 +55,11 @@ export function PlayersPage() {
         <div>
             <PageHeader
                 title="Players"
+                sub={
+                    tab === 'people'
+                        ? 'Add people, set their class and starting Elo, or mark graduates.'
+                        : 'Save partnerships so results can be entered as teams.'
+                }
                 actions={
                     <div className="segmented" role="group" aria-label="Show">
                         <button

@@ -3,9 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 export function AnimatedNumber({
     value,
     digits = 0,
+    duration = 220,
 }: {
     value: number;
     digits?: number;
+    /** How long a change takes to count over, in ms. */
+    duration?: number;
 }) {
     const [shown, setShown] = useState(value);
     const from = useRef(value);
@@ -22,7 +25,6 @@ export function AnimatedNumber({
         const start = from.current;
         const delta = value - start;
         if (delta === 0) return;
-        const duration = 220;
         let frame: number;
         const t0 = performance.now();
         const tick = (now: number) => {
@@ -34,7 +36,7 @@ export function AnimatedNumber({
         };
         frame = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(frame);
-    }, [value]);
+    }, [value, duration]);
 
     return <span className="num">{shown.toFixed(digits)}</span>;
 }

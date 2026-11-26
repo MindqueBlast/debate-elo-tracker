@@ -350,6 +350,7 @@ export function MatchesPage() {
         <div>
             <PageHeader
                 title="Matches"
+                sub="Every tournament and practice round, newest first, with each person’s change."
             />
             {isAdmin && (
                 <div className="grid grid-2" style={{ marginBottom: 20 }}>
@@ -670,9 +671,116 @@ export function MatchesPage() {
                 </div>
             )}
 
-            <div className="grid grid-2">
+            <div className="grid matches-grid">
                 <Card>
-                    <h2 style={{ fontSize: 18, marginBottom: 12 }}>Practice rounds</h2>
+                    <h2 className="card-title">
+                        Tournaments
+                        <span className="card-title__meta">{tournaments.length} recorded</span>
+                    </h2>
+                    <input
+                        className="input"
+                        placeholder="Search tournaments or people…"
+                        value={tourneyQ}
+                        onChange={(e) => {
+                            setTourneyQ(e.target.value);
+                            setTourneyShown(TOURNEY_PAGE);
+                        }}
+                        style={{ marginBottom: 12 }}
+                    />
+                    {filteredTournaments.length === 0 ? (
+                        <EmptyState
+                            title="No tournaments"
+                            body="Tournament results will appear here."
+                        />
+                    ) : (
+                        filteredTournaments.slice(0, tourneyShown).map((t) =>
+                            editingId === t.id ? (
+                                <div key={t.id} className="tourney-block tourney-block--editing">
+                                    <strong>
+                                        Editing {t.name || 'Unnamed'}, {t.date}
+                                    </strong>
+                                    <TournamentEditor
+                                        tournament={t}
+                                        data={data}
+                                        teams={teams}
+                                        onSaved={(before) => void afterEdit(before)}
+                                        onCancel={() => setEditingId(null)}
+                                    />
+                                </div>
+                            ) : (
+                            <div key={t.id} className="tourney-block">
+                                <div className="tourney-head">
+                                    <h3>{t.name || 'Unnamed'}</h3>
+                                    <span className="num muted">{t.date}</span>
+                                </div>
+                                <div className="tourney-meta">
+                                    <span className="num" title="The tournament’s average wins, what each result is measured against">
+                                        E_tourney {t.e_tourney.toFixed(2)}
+                                    </span>
+                                    {t.bonus != null && <span className="num">Bonus {t.bonus}</span>}
+                                </div>
+                                {[...t.tournament_participants]
+                                    .sort(
+                                        (a, b) =>
+                                            DIVS.indexOf(a.division) - DIVS.indexOf(b.division) ||
+                                            avgChange(b) - avgChange(a)
+                                    )
+                                    .map((p) => (
+                                        <div key={p.id ?? p.debater_id} className="note entry-line">
+                                            <span className="pill pill-div">{SHORT[p.division]}</span>
+                                            <span className="entry-line__name">
+                                                <Deltas
+                                                    items={[p.debater_id, p.partner_id]
+                                                        .filter((x): x is string => !!x)
+                                                        .map((id) => ({
+                                                            id,
+                                                            name: nameOf(id),
+                                                            change: entryChangeFor(p, id),
+                                                        }))}
+                                                />
+                                                {!p.partner_id && <span className="muted"> + ?</span>}
+                                            </span>
+                                            <span className="num muted">raw {p.raw_wins}</span>
+                                        </div>
+                                    ))}
+                                {isAdmin && (
+                                    <div className="row" style={{ marginTop: 8 }}>
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            disabled={busy}
+                                            onClick={() => setEditingId(t.id)}
+                                        >
+                                            Edit
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="danger"
+                                            disabled={busy}
+                                            onClick={() => void removeTournament(t)}
+                                        >
+                                            Delete
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                            )
+                        )
+                    )}
+                    {filteredTournaments.length > tourneyShown && (
+                        <div className="pagination">
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setTourneyShown((s) => s + TOURNEY_PAGE)}
+                            >
+                                Show more ({filteredTournaments.length - tourneyShown} left)
+                            </Button>
+                        </div>
+                    )}
+                </Card>
+                <Card>
+                    <h2 className="card-title">Practice rounds</h2>
                     <select
                         aria-label="Filter by person"
                         className="select"
@@ -758,108 +866,6 @@ export function MatchesPage() {
                             Next
                         </Button>
                     </div>
-                </Card>
-                <Card>
-                    <h2 style={{ fontSize: 18, marginBottom: 12 }}>Tournaments</h2>
-                    <input
-                        className="input"
-                        placeholder="Search tournaments or people…"
-                        value={tourneyQ}
-                        onChange={(e) => {
-                            setTourneyQ(e.target.value);
-                            setTourneyShown(TOURNEY_PAGE);
-                        }}
-                        style={{ marginBottom: 12 }}
-                    />
-                    {filteredTournaments.length === 0 ? (
-                        <EmptyState
-                            title="No tournaments"
-                            body="Tournament results will appear here."
-                        />
-                    ) : (
-                        filteredTournaments.slice(0, tourneyShown).map((t) =>
-                            editingId === t.id ? (
-                                <div key={t.id} className="tourney-block tourney-block--editing">
-                                    <strong>
-                                        Editing {t.name || 'Unnamed'}, {t.date}
-                                    </strong>
-                                    <TournamentEditor
-                                        tournament={t}
-                                        data={data}
-                                        teams={teams}
-                                        onSaved={(before) => void afterEdit(before)}
-                                        onCancel={() => setEditingId(null)}
-                                    />
-                                </div>
-                            ) : (
-                            <div key={t.id} className="tourney-block">
-                                <div className="tourney-head">
-                                    <strong>{t.name || 'Unnamed'}</strong>
-                                    <span className="num muted">{t.date}</span>
-                                </div>
-                                <div className="tourney-meta note">
-                                    <span className="num">E_tourney {t.e_tourney.toFixed(2)}</span>
-                                    {t.bonus != null && <span className="num">Bonus {t.bonus}</span>}
-                                </div>
-                                {[...t.tournament_participants]
-                                    .sort(
-                                        (a, b) =>
-                                            DIVS.indexOf(a.division) - DIVS.indexOf(b.division) ||
-                                            avgChange(b) - avgChange(a)
-                                    )
-                                    .map((p) => (
-                                        <div key={p.id ?? p.debater_id} className="note entry-line">
-                                            <span className="pill pill-div">{SHORT[p.division]}</span>
-                                            <span className="entry-line__name">
-                                                <Deltas
-                                                    items={[p.debater_id, p.partner_id]
-                                                        .filter((x): x is string => !!x)
-                                                        .map((id) => ({
-                                                            id,
-                                                            name: nameOf(id),
-                                                            change: entryChangeFor(p, id),
-                                                        }))}
-                                                />
-                                                {!p.partner_id && <span className="muted"> + ?</span>}
-                                            </span>
-                                            <span className="num muted">raw {p.raw_wins}</span>
-                                        </div>
-                                    ))}
-                                {isAdmin && (
-                                    <div className="row" style={{ marginTop: 8 }}>
-                                        <Button
-                                            size="sm"
-                                            variant="secondary"
-                                            disabled={busy}
-                                            onClick={() => setEditingId(t.id)}
-                                        >
-                                            Edit
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="danger"
-                                            disabled={busy}
-                                            onClick={() => void removeTournament(t)}
-                                        >
-                                            Delete
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                            )
-                        )
-                    )}
-                    {filteredTournaments.length > tourneyShown && (
-                        <div className="pagination">
-                            <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => setTourneyShown((s) => s + TOURNEY_PAGE)}
-                            >
-                                Show more ({filteredTournaments.length - tourneyShown} left)
-                            </Button>
-                        </div>
-                    )}
                 </Card>
             </div>
         </div>

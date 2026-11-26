@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { MotionConfig } from 'motion/react';
 import { AuthProvider } from './auth/AuthProvider';
 import { EditorsOnly } from './auth/EditorsOnly';
 import { ThemeProvider } from './state/ThemeProvider';
@@ -12,12 +13,15 @@ import { MatchesPage } from './pages/MatchesPage';
 import { PlayersPage } from './pages/PlayersPage';
 import { PlayerProfilePage } from './pages/PlayerProfilePage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { MatchupPage } from './pages/MatchupPage';
 
 const basename =
     import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 
 export function App() {
     return (
+        // layout animations (the sliding tab bar) follow the reduced-motion setting
+        <MotionConfig reducedMotion="user">
         <ThemeProvider>
             <ToastProvider>
                 <AuthProvider>
@@ -42,6 +46,7 @@ export function App() {
                                     element={<PlayerProfilePage />}
                                 />
                                 <Route path="analytics" element={<AnalyticsPage />} />
+                                <Route path="matchup" element={<MatchupPage />} />
                             </Route>
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
@@ -49,5 +54,6 @@ export function App() {
                 </AuthProvider>
             </ToastProvider>
         </ThemeProvider>
+        </MotionConfig>
     );
 }

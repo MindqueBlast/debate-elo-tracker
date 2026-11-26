@@ -29,6 +29,7 @@ import {
 import { EmptyChart } from './illustrations/EmptyChart';
 import { LineFinder } from './LineFinder';
 import { DURATIONS, useReducedMotion } from '../lib/motion';
+import { useTheme } from '../state/ThemeProvider';
 
 ChartJS.register(
     TimeScale,
@@ -40,18 +41,28 @@ ChartJS.register(
     Filler
 );
 
-const HEX = [
-    '#dc3b3b',
-    '#6ea8fe',
-    '#3ecf8e',
-    '#e2c36b',
-    '#c084fc',
-    '#67e8f9',
-    '#f472b6',
-    '#a3e635',
-    '#fb923c',
-    '#818cf8',
-];
+/** Line colours, bright on the graphite floor and deeper on white; scarlet leads. */
+const PALETTE = {
+    dark: ['#ff5a68', '#6ea8fe', '#3ddc97', '#f0b429', '#c084fc', '#67e8f9', '#f472b6', '#a3e635', '#fb923c', '#818cf8'],
+    light: ['#c8102e', '#2f6fdb', '#128556', '#a77900', '#8b3fd9', '#0e8aa6', '#c2337a', '#5b8a00', '#d0601b', '#5a55d6'],
+} as const;
+
+/**
+ * The chart's ink for each theme (the same values as --chart-grid and
+ * --chart-tick in global.css), so grid, ticks and tooltips match the page.
+ * Set here rather than read from the page, which still has the old theme
+ * for a moment after the switch.
+ */
+const FONT = "'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, sans-serif";
+function chartInk(theme: 'dark' | 'light') {
+    return {
+        palette: PALETTE[theme],
+        grid: theme === 'light' ? 'rgba(14, 14, 20, 0.07)' : 'rgba(255, 255, 255, 0.06)',
+        tick: theme === 'light' ? '#575a63' : '#a6a8b0',
+        scarlet: theme === 'light' ? '#c8102e' : '#ff5a68',
+        font: FONT,
+    };
+}
 
 const ANNOTATIONS = '__annotations__';
 const DAY = 86_400_000;
@@ -203,6 +214,8 @@ export function EloChart({
     framed?: boolean;
 }) {
     const reduced = useReducedMotion();
+    const { theme } = useTheme();
+    const ink = useMemo(() => chartInk(theme), [theme]);
     const clickRef = useRef(onPointClick);
     clickRef.current = onPointClick;
 
@@ -322,9 +335,9 @@ export function EloChart({
     const finderLines = useMemo(
         () =>
             series
-                .map((s, i) => ({ id: s.id, label: s.label, color: HEX[i % HEX.length] }))
+                .map((s, i) => ({ id: s.id, label: s.label, color: ink.palette[i % ink.palette.length] }))
                 .filter((l) => l.id !== ANNOTATIONS),
-        [series]
+        [series, ink]
     );
     const toggleLine = (id: string) =>
         setHidden((prev) => {
@@ -369,7 +382,7 @@ export function EloChart({
         return {
             datasets: series.map((s, i) => {
                 const isAnno = s.id === ANNOTATIONS;
-                const color = HEX[i % HEX.length];
+                const color = ink.palette[i % ink.palette.length];
                 const radius = s.data.length === 1 || zoom.level >= 3 ? 4 : 2;
                 // dots only where they actually played; skipped tournaments are just line
                 const noDot = (p: ChartSeries['data'][number]) =>
@@ -384,8 +397,8 @@ export function EloChart({
                         date: p.x,
                         event: p.event,
                     })),
-                    borderColor: isAnno ? '#c0392b' : color,
-                    backgroundColor: isAnno ? '#c0392b' : `${color}22`,
+                    borderColor: isAnno ? ink.scarlet : color,
+                    backgroundColor: isAnno ? ink.scarlet : `${color}22`,
                     fill: !isAnno && series.length <= 2,
                     hidden: hidden.has(s.id),
                     tension: 0.25,
@@ -399,13 +412,13 @@ export function EloChart({
                     pointRotation: isAnno ? 90 : 0,
                     pointBorderWidth: isAnno ? 2 : 1,
                     pointHoverBorderWidth: isAnno ? 3 : 1,
-                    pointBorderColor: isAnno ? 'rgba(220, 59, 59, 0.75)' : color,
+                    pointBorderColor: isAnno ? `${ink.scarlet}bf` : color,
                     showLine: !isAnno,
                     spanGaps: false,
                 };
             }),
         };
-    }, [series, viewMin, zoom.level, hidden]);
+    }, [series, viewMin, zoom.level, hidden, ink]);
 
     const chartDuration = reduced ? 0 : DURATIONS.chart * 1000;
 
@@ -469,17 +482,22 @@ export function EloChart({
                             );
                         },
                         boxWidth: 10,
-                        color: getComputedStyle(document.documentElement)
-                            .getPropertyValue('--text-muted')
-                            .trim() || '#9aa3b5',
+                        boxHeight: 10,
+                        color: ink.tick,
+                        font: { family: ink.font, size: 12, weight: 500 },
                     },
                 },
+                // tooltips are posted on the scoreboard: black in both themes
                 tooltip: {
-                    backgroundColor: 'rgba(12, 14, 18, 0.94)',
-                    borderColor: 'rgba(255,255,255,0.08)',
+                    backgroundColor: '#000',
+                    borderColor: 'rgba(255,255,255,0.14)',
                     borderWidth: 1,
-                    titleColor: '#fff',
-                    bodyColor: '#fff',
+                    cornerRadius: 4,
+                    padding: 10,
+                    titleColor: '#a6a8b0',
+                    bodyColor: '#f3f3f1',
+                    titleFont: { family: ink.font, size: 12, weight: 500 },
+                    bodyFont: { family: ink.font, size: 13, weight: 600 },
                     callbacks: {
                         title: (items) => {
                             const raw = items[0]?.raw as { date?: string } | undefined;
@@ -510,21 +528,23 @@ export function EloChart({
                         tooltipFormat: 'MMM d, yyyy',
                         displayFormats: { [axis.unit]: axis.format },
                     },
-                    grid: { color: 'rgba(255,255,255,0.04)' },
-                    ticks: { maxRotation: 0, color: '#9aa3b5' },
+                    grid: { color: ink.grid },
+                    border: { color: ink.grid },
+                    ticks: { maxRotation: 0, color: ink.tick, font: { family: ink.font, size: 12 } },
                     title: { display: false },
                 },
                 y: {
                     min: viewMin ?? undefined,
                     max: viewMax ?? undefined,
-                    grid: { color: 'rgba(255,255,255,0.06)' },
+                    grid: { color: ink.grid },
+                    border: { display: false },
                     // only round numbers on the axis, not the padded ends
-                    ticks: { color: '#9aa3b5', includeBounds: false },
-                    title: { display: true, text: 'Elo', color: '#9aa3b5' },
+                    ticks: { color: ink.tick, includeBounds: false, font: { family: ink.font, size: 12 } },
+                    title: { display: true, text: 'Elo', color: ink.tick, font: { family: ink.font, size: 12 } },
                 },
             },
         }),
-        [series, viewMin, viewMax, chartDuration, viewStart, viewEnd, axis.unit, axis.format]
+        [series, viewMin, viewMax, chartDuration, viewStart, viewEnd, axis.unit, axis.format, ink]
     );
 
     if (isEmpty) {

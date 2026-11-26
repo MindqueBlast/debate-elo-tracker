@@ -16,10 +16,22 @@ export function Card({
     );
 }
 
-export function PageHeader({ title, actions }: { title: string; actions?: ReactNode }) {
+/** A page's title in the display face over a heavy rule, with an optional line under it. */
+export function PageHeader({
+    title,
+    sub,
+    actions,
+}: {
+    title: string;
+    sub?: ReactNode;
+    actions?: ReactNode;
+}) {
     return (
         <header className="page-header">
-            <h1>{title}</h1>
+            <div className="page-header__titles">
+                <h1>{title}</h1>
+                {sub && <p className="page-header__sub">{sub}</p>}
+            </div>
             {actions}
         </header>
     );
@@ -34,11 +46,12 @@ export function EmptyState({ title, body }: { title: string; body: string }) {
     );
 }
 
+/** One figure on the scoreboard strip (sits inside .stat-grid). */
 export function StatCard({ label, value }: { label: string; value: ReactNode }) {
     return (
-        <Card className="stat-card">
+        <div className="stat">
             <div className="stat-label">{label}</div>
             <div className="stat-value num">{value}</div>
-        </Card>
+        </div>
     );
 }

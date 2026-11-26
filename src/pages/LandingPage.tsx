@@ -1,33 +1,33 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 import { useTheme } from '../state/ThemeProvider';
 import { useAuth } from '../auth/AuthProvider';
-import { useReducedMotion } from '../lib/motion';
+import { SeasonReplay } from '../components/SeasonReplay';
 import '../styles/landing.css';
 
 /** Screens captured from the tracker itself (guest view), one per theme. */
 const SHOTS = {
-    chart: { w: 1400, h: 1048, alt: 'Elo history chart for the class of 2027, four seasons of lines, one per debater, with tournament dates marked along the bottom' },
-    rankings: { w: 1152, h: 944, alt: 'The rankings board: active debaters ordered by Elo' },
-    teams: { w: 1600, h: 787, alt: 'Team rankings: each partnership with its division, both partners and their average Elo' },
-    profile: { w: 1600, h: 933, alt: 'A debater’s profile: current and peak Elo, tournaments, partners and an Elo history chart' },
-    tournaments: { w: 1600, h: 1153, alt: 'The tournament list with its search box: each tournament’s entries and rating changes' },
-    tournament: { w: 1300, h: 580, alt: 'NYSFL States results: every pair’s raw wins and each person’s rating change' },
-    phone: { w: 780, h: 1688, alt: 'The dashboard on a phone: three figures across and the top of the board' },
-    compare: { w: 1500, h: 953, alt: 'Analytics comparing two debaters’ Elo across four seasons' },
+    chart: { w: 1400, h: 805, alt: 'Elo history chart for the class of 2027, one line per debater across four seasons, with tournament dates marked along the bottom' },
+    rankings: { w: 1600, h: 899, alt: 'The rankings board: each debater’s place, name, a bar for where their rating stands, and their Elo' },
+    teams: { w: 1600, h: 966, alt: 'Team rankings: each partnership’s place and the average Elo of both partners' },
+    profile: { w: 1600, h: 941, alt: 'A debater’s profile: current Elo and rank, peak, tournaments, partners and an Elo history chart' },
+    tournaments: { w: 1202, h: 1200, alt: 'The tournament list with its search box: each tournament’s entries and rating changes' },
+    tournament: { w: 1158, h: 956, alt: 'NYSFL States results: every pair’s raw wins and each person’s rating change' },
+    phone: { w: 780, h: 1688, alt: 'The dashboard on a phone: three figures on the scoreboard and the top of the board' },
+    compare: { w: 1500, h: 863, alt: 'Analytics with two debaters’ Elo lines shown and the rest of their class hidden' },
 } as const;
 type ShotName = keyof typeof SHOTS;
 
 /** A tighter crop for phones, where the full chart's labels would be too small to read. */
 const PHONE_CROPS: Partial<Record<ShotName, { file: string; w: number; h: number }>> = {
-    chart: { file: 'chart-phone', w: 760, h: 770 },
-    rankings: { file: 'rankings-phone', w: 720, h: 771 },
-    teams: { file: 'teams-phone', w: 720, h: 771 },
-    profile: { file: 'profile-phone', w: 720, h: 1139 },
-    tournament: { file: 'tournament-phone', w: 720, h: 737 },
-    tournaments: { file: 'tournaments-phone', w: 720, h: 1495 },
-    compare: { file: 'compare-phone', w: 720, h: 730 },
+    chart: { file: 'chart-phone', w: 624, h: 642 },
+    rankings: { file: 'rankings-phone', w: 716, h: 1234 },
+    teams: { file: 'teams-phone', w: 716, h: 1234 },
+    profile: { file: 'profile-phone', w: 716, h: 1814 },
+    tournament: { file: 'tournament-phone', w: 672, h: 956 },
+    tournaments: { file: 'tournaments-phone', w: 716, h: 1520 },
+    compare: { file: 'compare-phone', w: 624, h: 642 },
 };
 
 const shotUrl = (file: string, theme: string) =>
@@ -77,93 +77,6 @@ function Shot({
     );
 }
 
-/**
- * A head that types itself once, the first time it scrolls into view. The full
- * text is always laid out (the untyped part is invisible), so nothing jumps, and
- * screen readers get the whole head at once. Reduced motion shows it finished.
- */
-function Typed({
-    lines,
-    as: Tag = 'h2',
-    id,
-    speed = 34,
-    now = false,
-}: {
-    lines: string[];
-    as?: 'h1' | 'h2';
-    id?: string;
-    speed?: number;
-    now?: boolean;
-}) {
-    const reduced = useReducedMotion();
-    const full = lines.join(' ');
-    const total = lines.reduce((n, l) => n + l.length, 0);
-    const ref = useRef<HTMLHeadingElement>(null);
-    const [started, setStarted] = useState(now);
-    const [count, setCount] = useState(0);
-
-    useEffect(() => {
-        if (started || reduced) return;
-        const el = ref.current;
-        if (!el || typeof IntersectionObserver === 'undefined') {
-            setStarted(true);
-            return;
-        }
-        const io = new IntersectionObserver(
-            (entries) => {
-                if (entries.some((e) => e.isIntersecting)) {
-                    setStarted(true);
-                    io.disconnect();
-                }
-            },
-            { rootMargin: '0px 0px -15% 0px' }
-        );
-        io.observe(el);
-        return () => io.disconnect();
-    }, [started, reduced]);
-
-    useEffect(() => {
-        if (!started || reduced) return;
-        let n = 0;
-        const timer = window.setInterval(() => {
-            n += 1;
-            setCount(n);
-            if (n >= total) window.clearInterval(timer);
-        }, speed);
-        return () => window.clearInterval(timer);
-    }, [started, reduced, total, speed]);
-
-    const shown = reduced ? total : count;
-    const done = shown >= total;
-    // where each line starts in the typed run; the caret sits in the line being typed
-    const starts = lines.map((_, i) => lines.slice(0, i).reduce((n, l) => n + l.length, 0));
-    let caretLine = 0;
-    starts.forEach((start, i) => {
-        if (start < shown) caretLine = i;
-    });
-    const showCaret = started && !reduced;
-    return (
-        <Tag ref={ref} id={id}>
-            <span className="l-visually-hidden">{full}</span>
-            <span aria-hidden="true">
-                {lines.map((line, i) => {
-                    const take = Math.max(0, Math.min(line.length, shown - starts[i]));
-                    return (
-                        <span key={i}>
-                            {i > 0 && <br />}
-                            {line.slice(0, take)}
-                            {showCaret && i === caretLine && (
-                                <span className={`l-typed__caret ${done ? 'l-typed__caret--done' : ''}`} />
-                            )}
-                            <span className="l-typed__rest">{line.slice(take)}</span>
-                        </span>
-                    );
-                })}
-            </span>
-        </Tag>
-    );
-}
-
 const VIEWS: { key: 'rankings' | 'teams' | 'profile' | 'tournaments'; label: string; note: string }[] = [
     { key: 'rankings', label: 'Rankings', note: 'Everyone active this season, ordered by Elo.' },
     { key: 'teams', label: 'Teams', note: 'Partnerships ranked by the average of both partners.' },
@@ -199,35 +112,38 @@ export function LandingPage() {
             <a className="l-skip" href="#landing-main">
                 Skip to content
             </a>
-            <header className="l-nav">
-                <div className="l-container l-nav__inner">
-                    <Link to="/" className="l-wordmark" aria-label="Syosset Debate Elo Tracker, home">
-                        <Logo />
-                        <span className="l-wordmark__full">Syosset Debate Elo Tracker</span>
-                        <span className="l-wordmark__short">Syosset Elo</span>
-                    </Link>
-                    <div className="l-nav__actions">
-                        <button type="button" className="l-text-btn" onClick={toggle}>
-                            {theme === 'dark' ? 'Light' : 'Dark'}
-                        </button>
-                        {role ? (
-                            <Link to="/app" className="l-btn l-btn--quiet l-btn--small">
-                                Open Tracker
-                            </Link>
-                        ) : (
-                            <Link to="/login" className="l-btn l-btn--quiet l-btn--small">
-                                Enter Tracker
-                            </Link>
-                        )}
+            {/* the hero is the club's colour, in both themes */}
+            <div className="l-hero">
+                <header className="l-nav">
+                    <div className="l-container l-nav__inner">
+                        <Link to="/" className="l-wordmark" aria-label="Syosset Debate Elo Tracker, home">
+                            <Logo size={28} />
+                            <span className="l-wordmark__full">Syosset Debate Elo Tracker</span>
+                            <span className="l-wordmark__short">Syosset Elo</span>
+                        </Link>
+                        <div className="l-nav__actions">
+                            <button type="button" className="l-text-btn" onClick={toggle}>
+                                {theme === 'dark' ? 'Light' : 'Dark'}
+                            </button>
+                            {role ? (
+                                <Link to="/app" className="l-btn l-btn--line l-btn--small">
+                                    Open Tracker
+                                </Link>
+                            ) : (
+                                <Link to="/login" className="l-btn l-btn--line l-btn--small">
+                                    Enter Tracker
+                                </Link>
+                            )}
+                        </div>
                     </div>
-                </div>
-            </header>
+                </header>
 
-            <main id="landing-main">
-                <section className="l-hero" aria-labelledby="landing-title">
-                    <div className="l-container l-hero__grid">
+                <main id="landing-main">
+                    <section className="l-container l-hero__grid" aria-labelledby="landing-title">
                         <div className="l-hero__text">
-                            <Typed as="h1" id="landing-title" lines={['Syosset PF,', 'ranked by Elo.']} speed={55} now />
+                            <h1 id="landing-title">
+                                <span>Syosset PF,</span> <span>ranked by Elo.</span>
+                            </h1>
                             <p className="l-hero__line">
                                 Every tournament result moves each debater’s Elo, charted season by season.
                             </p>
@@ -235,7 +151,7 @@ export function LandingPage() {
                                 <button type="button" className="l-btn" onClick={browseAsGuest}>
                                     Browse as guest
                                 </button>
-                                <Link to="/login" className="l-btn l-btn--quiet">
+                                <Link to="/login" className="l-btn l-btn--line">
                                     Sign in
                                 </Link>
                             </div>
@@ -244,16 +160,18 @@ export function LandingPage() {
                                 By <strong>Aaditya Sahu</strong> and <strong>Jiayi Meng</strong>
                             </p>
                         </div>
-                        <div className="l-hero__visual">
-                            <Shot name="chart" theme={theme} eager edge />
+                        <div className="l-hero__board">
+                            <SeasonReplay fallback={<Shot name="chart" theme={theme} eager edge />} />
                         </div>
-                    </div>
-                </section>
+                    </section>
+                </main>
+            </div>
 
-                <section className="l-section l-section--first l-does" aria-labelledby="landing-does">
+            <div className="l-body">
+                <section className="l-section l-does" aria-labelledby="landing-does">
                     <div className="l-container">
                         <div className="l-head">
-                            <Typed id="landing-does" lines={['What the tracker does,', 'and doesn’t']} />
+                            <h2 id="landing-does">What the tracker does, and doesn’t</h2>
                             <p className="l-lead">One rating per debater, built from every recorded result.</p>
                         </div>
                         <div className="l-ledger">
@@ -280,10 +198,10 @@ export function LandingPage() {
                     </div>
                 </section>
 
-                <section className="l-section l-section--wide-gap" aria-labelledby="landing-look">
+                <section className="l-section" aria-labelledby="landing-look">
                     <div className="l-container l-split l-split--4-8">
                         <div className="l-head">
-                            <Typed id="landing-look" lines={['Every screen guests can open']} />
+                            <h2 id="landing-look">Every screen guests can open</h2>
                             <div className="l-tabs" role="tablist" aria-label="Screens" onKeyDown={onTabKey}>
                                 {VIEWS.map((v, i) => (
                                     <button
@@ -314,7 +232,7 @@ export function LandingPage() {
                 <section className="l-section" aria-labelledby="landing-counts">
                     <div className="l-container l-split l-split--6-6">
                         <div>
-                            <Typed id="landing-counts" lines={['How a tournament moves your Elo']} />
+                            <h2 id="landing-counts">How a tournament moves your Elo</h2>
                             <dl className="l-rows">
                                 <div>
                                     <dt>Graded by division</dt>
@@ -343,10 +261,10 @@ export function LandingPage() {
                     </div>
                 </section>
 
-                <section className="l-section l-section--wide-gap" aria-labelledby="landing-phone">
+                <section className="l-section" aria-labelledby="landing-phone">
                     <div className="l-container l-split l-split--7-5">
                         <div>
-                            <Typed id="landing-phone" lines={['Guests read, admins record']} />
+                            <h2 id="landing-phone">Guests read, admins record</h2>
                             <dl className="l-rows">
                                 <div>
                                     <dt>Guests</dt>
@@ -365,24 +283,24 @@ export function LandingPage() {
                         <Shot name="phone" theme={theme} edge className="l-phone" caption="The dashboard on a phone." />
                     </div>
                 </section>
+            </div>
 
-                <section className="l-close" aria-labelledby="landing-stand">
-                    <div className="l-container l-split l-split--5-7">
-                        <div className="l-head">
-                            <Typed id="landing-stand" lines={['Find your name on the board']} />
-                            <div className="l-counter">
-                                <button type="button" className="l-btn" onClick={browseAsGuest}>
-                                    Browse as guest
-                                </button>
-                                <Link to="/login" className="l-btn l-btn--quiet">
-                                    Sign in
-                                </Link>
-                            </div>
+            <section className="l-close" aria-labelledby="landing-stand">
+                <div className="l-container l-split l-split--5-7">
+                    <div className="l-head">
+                        <h2 id="landing-stand">Find your name on the board</h2>
+                        <div className="l-counter">
+                            <button type="button" className="l-btn" onClick={browseAsGuest}>
+                                Browse as guest
+                            </button>
+                            <Link to="/login" className="l-btn l-btn--line">
+                                Sign in
+                            </Link>
                         </div>
-                        <Shot name="compare" theme={theme} edge caption="Analytics: any two debaters, side by side." />
                     </div>
-                </section>
-            </main>
+                    <Shot name="compare" theme={theme} edge caption="Analytics: any two debaters, side by side." />
+                </div>
+            </section>
 
             <footer className="l-footer">
                 <div className="l-container">

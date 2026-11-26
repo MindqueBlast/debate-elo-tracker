@@ -185,7 +185,10 @@ export function AnalyticsPage() {
 
     return (
         <div>
-            <PageHeader title="Analytics" />
+            <PageHeader
+                title="Analytics"
+                sub="Every rating line, by class or by team. Click a point to zoom in."
+            />
             <Card className="analytics-chart">
                 <div className="chart-toolbar">
                     <div className="segmented" role="group" aria-label="Chart by">

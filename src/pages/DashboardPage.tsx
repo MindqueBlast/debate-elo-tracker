@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
 import {
+    atPersonalBest,
     averageElo,
     buildEloSeries,
+    seasonLabel,
+    seasonMovers,
     lookup,
     pairingLabel,
     rankDebaters,
@@ -10,11 +13,19 @@ import {
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Card, EmptyState, PageHeader, StatCard } from '../components/Card';
 import { EloChart } from '../components/EloChart';
+import { Standings } from '../components/Standings';
 import { useAppData } from '../state/AppDataProvider';
 
 export function DashboardPage() {
-    const { debaters, teams, practiceRounds, tournaments, activeIds, loading, error } =
+    const { debaters, teams, practiceRounds, tournaments, activeIds, season, loading, error } =
         useAppData();
+    // this season so far: who climbed most, and who is at their best right now
+    const climbers = season
+        ? seasonMovers(debaters, activeIds, season)
+              .filter((m) => m.change > 0.05)
+              .slice(0, 5)
+        : [];
+    const atBest = atPersonalBest(debaters, activeIds).slice(0, 5);
     // Active = competed in the latest season with results
     const ranked = rankDebaters(debaters, practiceRounds, { only: activeIds });
     const topTeams = rankTeams(teams, debaters).slice(0, 5);
@@ -44,52 +55,62 @@ export function DashboardPage() {
 
     return (
         <div>
-            <PageHeader title="Dashboard" />
-            {loading && <p className="note">Refreshing…</p>}
+            <PageHeader
+                title="Dashboard"
+                sub={loading ? 'Refreshing the board…' : 'Where the team stands today.'}
+            />
             <div className={`grid ${hasPractice ? 'grid-4' : 'grid-3'} stat-grid`}>
-                <StatCard label="Total" value={<AnimatedNumber value={onTeam} />} />
+                <StatCard label="Total" value={<AnimatedNumber value={onTeam} duration={700} />} />
                 <StatCard
                     label="Average Elo"
-                    value={<AnimatedNumber value={Math.round(avg)} />}
+                    value={<AnimatedNumber value={Math.round(avg)} duration={700} />}
                 />
                 {hasPractice && (
                     <StatCard
                         label="Practice rounds"
-                        value={<AnimatedNumber value={practiceRounds.length} />}
+                        value={<AnimatedNumber value={practiceRounds.length} duration={700} />}
                     />
                 )}
                 <StatCard
                     label="Tournaments"
-                    value={<AnimatedNumber value={tournaments.length} />}
+                    value={<AnimatedNumber value={tournaments.length} duration={700} />}
                 />
             </div>
             <div className="grid grid-2">
                 <Card>
-                    <div className="card-title">Top individuals</div>
+                    <div className="card-title">
+                        Top individuals
+                        <Link to="/app/rankings" className="card-title__meta">
+                            Full rankings
+                        </Link>
+                    </div>
                     {ranked.length === 0 ? (
                         <EmptyState
                             title="No players yet"
                             body="Add debaters to start the board."
                         />
                     ) : (
-                        ranked.slice(0, 10).map((d) => (
-                            <Link
-                                key={d.id}
-                                to={`/app/players/${d.id}`}
-                                className={`list-row list-row--compact ${d.rank <= 3 ? `rank-${d.rank}` : ''}`}
-                            >
-                                <span className="num">#{d.rank}</span>
-                                <strong>{d.name}</strong>
-                                <span className="elo">
-                                    {Math.round(d.elo)}
-                                </span>
-                            </Link>
-                        ))
+                        <Standings
+                            label="Top ten individuals"
+                            head={false}
+                            rows={ranked.slice(0, 10).map((d) => ({
+                                key: d.id,
+                                rank: d.rank,
+                                name: d.name,
+                                elo: d.elo,
+                                to: `/app/players/${d.id}`,
+                            }))}
+                        />
                     )}
                 </Card>
                 <Card>
                     <div className="card-title">
-                        {top ? `${top.name}'s Elo` : 'Elo trend'}
+                        {top ? `${top.name}’s Elo` : 'Elo trend'}
+                        {top && (
+                            <Link to={`/app/players/${top.id}`} className="card-title__meta">
+                                Profile
+                            </Link>
+                        )}
                     </div>
                     {series ? (
                         <EloChart
@@ -113,16 +134,16 @@ export function DashboardPage() {
                             body="Save partnerships on the Players page."
                         />
                     ) : (
-                        topTeams.map((r) => (
-                            <div
-                                key={r.team.id}
-                                className={`list-row list-row--compact ${r.rank <= 3 ? `rank-${r.rank}` : ''}`}
-                            >
-                                <span className="num">#{r.rank}</span>
-                                <strong>{r.name}</strong>
-                                <span className="elo">{Math.round(r.elo)}</span>
-                            </div>
-                        ))
+                        <Standings
+                            label="Top five teams"
+                            head={false}
+                            rows={topTeams.map((r) => ({
+                                key: r.team.id,
+                                rank: r.rank,
+                                name: r.name,
+                                elo: r.elo,
+                            }))}
+                        />
                     )}
                 </Card>
                 {hasPractice && (
@@ -157,13 +178,64 @@ export function DashboardPage() {
                             .sort((a, b) => (a.date < b.date ? 1 : -1))
                             .slice(0, 5)
                             .map((t) => (
-                                <div key={t.id} className="match-row">
+                                <Link key={t.id} to="/app/matches" className="match-row match-row--link">
                                     <span className="num">{t.date}</span>
                                     <strong>{t.name || 'Unnamed tournament'}</strong>
-                                </div>
+                                    <span className="match-row__count num">
+                                        {t.tournament_participants.length} {t.tournament_participants.length === 1 ? 'entry' : 'entries'}
+                                    </span>
+                                </Link>
                             ))
                     )}
                 </Card>
+                {(climbers.length > 0 || atBest.length > 0) && (
+                    <Card className="season-card">
+                        <div className="card-title">
+                            This season
+                            <span className="card-title__meta">{seasonLabel(season)}, active debaters</span>
+                        </div>
+                        <div className="season-card__cols">
+                            <div>
+                                <h3 className="season-card__head">Biggest climbs</h3>
+                                {climbers.length === 0 ? (
+                                    <p className="note">Nobody has climbed yet this season.</p>
+                                ) : (
+                                    <ol className="movers">
+                                        {climbers.map((m) => (
+                                            <li key={m.id}>
+                                                <Link to={`/app/players/${m.id}`} className="mover">
+                                                    <strong>{m.name}</strong>
+                                                    <span className="mover__path num">
+                                                        {Math.round(m.from)} to {Math.round(m.to)}
+                                                    </span>
+                                                    <span className="delta delta-pos">+{Math.round(m.change)}</span>
+                                                </Link>
+                                            </li>
+                                        ))}
+                                    </ol>
+                                )}
+                            </div>
+                            <div>
+                                <h3 className="season-card__head">At a personal best</h3>
+                                {atBest.length === 0 ? (
+                                    <p className="note">Nobody is at their peak right now.</p>
+                                ) : (
+                                    <ol className="movers">
+                                        {atBest.map((d) => (
+                                            <li key={d.id}>
+                                                <Link to={`/app/players/${d.id}`} className="mover">
+                                                    <strong>{d.name}</strong>
+                                                    <span className="mover__path">Peak today</span>
+                                                    <span className="delta">{Math.round(d.elo)}</span>
+                                                </Link>
+                                            </li>
+                                        ))}
+                                    </ol>
+                                )}
+                            </div>
+                        </div>
+                    </Card>
+                )}
             </div>
         </div>
     );
