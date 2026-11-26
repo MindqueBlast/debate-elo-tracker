@@ -19,6 +19,8 @@ interface Row {
     b: string;
     division: Division;
     wins: string;
+    /** Blank: not recorded. */
+    losses: string;
 }
 
 /**
@@ -67,6 +69,7 @@ export function TournamentEditor({
             b: e.members[1] ?? '',
             division: e.division,
             wins: String(e.prelimWins),
+            losses: e.losses == null ? '' : String(e.losses),
         }))
     );
     const [more, setMore] = useState(false);
@@ -96,6 +99,7 @@ export function TournamentEditor({
                 division: r.division,
                 prelimWins: Number(r.wins),
                 elimWins: 0,
+                losses: r.losses.trim() === '' ? null : Number(r.losses),
             })),
     };
 
@@ -206,6 +210,9 @@ export function TournamentEditor({
                     <span>Partner</span>
                     <span>Division</span>
                     <span title="Prelim wins + 2 × elim wins">Wins</span>
+                    <span title="Rounds lost, prelims and elims (byes aren't losses). With no losses, nobody in the entry loses Elo. Blank: not recorded.">
+                        Losses
+                    </span>
                     <span>Change</span>
                     <span />
                 </div>
@@ -241,6 +248,14 @@ export function TournamentEditor({
                                 step={0.5}
                                 value={r.wins}
                                 onChange={(e) => set(r.key, { wins: e.target.value })}
+                            />
+                            <input
+                                aria-label="Losses"
+                                type="number"
+                                min={0}
+                                step={0.5}
+                                value={r.losses}
+                                onChange={(e) => set(r.key, { losses: e.target.value })}
                             />
                             <span className="num t-editor__change">
                                 {res ? (
@@ -282,6 +297,7 @@ export function TournamentEditor({
                                 b: '',
                                 division: prev[prev.length - 1]?.division ?? 'Varsity',
                                 wins: '0',
+                                losses: '',
                             },
                         ])
                     }

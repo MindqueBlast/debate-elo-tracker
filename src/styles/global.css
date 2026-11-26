@@ -894,7 +894,7 @@ input[type='file']::file-selector-button:hover {
 .t-editor__head,
 .t-editor__row {
     display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 1fr) 64px 92px 32px;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 1fr) 50px 50px 108px 32px;
     gap: var(--space-2);
     align-items: center;
 }

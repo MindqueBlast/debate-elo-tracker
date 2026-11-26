@@ -93,6 +93,8 @@ export interface TournamentParticipant {
     division: Division;
     team_elo?: number | null;
     rounds?: number | null;
+    /** Rounds lost, prelims and elims (byes aren't losses). Null when not recorded. */
+    losses?: number | null;
 }
 
 export interface Tournament {
@@ -137,6 +139,8 @@ export interface TournamentParticipantInput {
     W_raw: number;
     /** Prelim rounds for this entry's division, when it differs from params.n. */
     n?: number;
+    /** Rounds lost at the tournament. Zero means nobody in the entry can lose Elo for it. */
+    losses?: number | null;
 }
 
 export interface TournamentParams {

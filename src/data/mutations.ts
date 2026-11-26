@@ -429,6 +429,8 @@ export interface TournamentEntryDraft {
     division: Division;
     prelimWins: number;
     elimWins: number;
+    /** Rounds lost, prelims and elims. Null: not recorded. */
+    losses: number | null;
 }
 
 export interface TournamentDraft {
@@ -470,6 +472,7 @@ function draftInput(data: AppSnapshot, draft: TournamentDraft): InputTournament 
                 division: e.division,
                 raw_wins: rawWinsOf(e.prelimWins, e.elimWins),
                 rounds: draft.roundsByDivision?.[e.division] ?? draft.params.n,
+                losses: e.losses,
             };
         }),
     };
@@ -515,6 +518,7 @@ export function draftFromTournament(t: Tournament): TournamentDraft {
             division: p.division,
             prelimWins: p.raw_wins,
             elimWins: 0,
+            losses: p.losses ?? null,
         })),
     };
 }
@@ -548,12 +552,13 @@ export async function saveTournament(
     checkKnown(data, draft.entries.flatMap((e) => e.members));
     for (const e of draft.entries) {
         if (
+            (e.losses != null && (!Number.isFinite(e.losses) || e.losses < 0)) ||
             !Number.isFinite(e.prelimWins) ||
             !Number.isFinite(e.elimWins) ||
             e.prelimWins < 0 ||
             e.elimWins < 0
         ) {
-            throw new MutationError('Please enter valid wins for every entry.');
+            throw new MutationError('Please enter valid wins and losses for every entry.');
         }
     }
 
