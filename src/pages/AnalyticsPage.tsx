@@ -5,6 +5,7 @@ import {
     chartIncludes,
     chartIncludesTeam,
     classKey,
+    classOf,
     competedInAny,
     previousSeason,
     type ChartWho,
@@ -53,7 +54,8 @@ export function AnalyticsPage() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [showAnnotations, setShowAnnotations] = useState(true);
-    // "All individuals": everyone in each class who's still on the team, competed this season or not
+    // "All individuals": everyone in each class who's still on the team, competed this season or not,
+    // with graduates listed separately
     const [allPeople, setAllPeople] = useState(false);
     // Teams: before both partners were on the team, show whoever was
     const [extendRecords, setExtendRecords] = useState(true);
@@ -75,6 +77,17 @@ export function AnalyticsPage() {
         .filter((d) => chartIncludes(d, who, activeIds))
         .sort((a, b) => a.name.localeCompare(b.name));
     const byId = useMemo(() => lookup(debaters), [debaters]);
+    // graduates only show under All individuals, in their own groups
+    const graduates = useMemo(
+        () =>
+            who === 'team'
+                ? debaters
+                      .filter((d) => d.status === 'graduated')
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                : [],
+        [debaters, who]
+    );
+    const listed = [...pool, ...graduates];
 
 
     // One button per season with results: July 1 through June 30
@@ -87,10 +100,10 @@ export function AnalyticsPage() {
     }, [tournaments]);
 
     // "Class of 2027", "Class of 2028", … for everyone listed (plus anyone with no year set)
-    const classOptions = useMemo(() => {
+    const classGroups = (people: typeof debaters) => {
         const counts = new Map<number | null, number>();
-        for (const d of pool) {
-            const y = d.class_year ?? null;
+        for (const d of people) {
+            const y = classOf(d);
             counts.set(y, (counts.get(y) ?? 0) + 1);
         }
         return [...counts.entries()]
@@ -100,10 +113,19 @@ export function AnalyticsPage() {
                 label: year == null ? 'Class year not set' : `Class of ${year}`,
                 count,
             }));
-    }, [pool]);
-    const defaultSelection = classOptions[0]?.key ?? 'ALL';
+    };
+    // a class with someone still on the team is current; one with only graduates is listed apart
+    // (and needs a year to be picked out)
+    const currentKeys = new Set(pool.map((d) => classKey(classOf(d))));
+    const allClasses = classGroups(listed);
+    const currentClasses = allClasses.filter((c) => currentKeys.has(c.key));
+    const graduatedClasses = allClasses.filter(
+        (c) => !currentKeys.has(c.key) && c.key !== classKey(null)
+    );
+    const classOptions = [...currentClasses, ...graduatedClasses];
+    const defaultSelection = currentClasses[0]?.key ?? 'ALL';
     // a class or person that's no longer listed (e.g. back from All individuals) falls back to the default
-    const listedPerson = (id: string) => pool.some((d) => d.id === id);
+    const listedPerson = (id: string) => listed.some((d) => d.id === id);
     const selectedId =
         !chosenId ||
         (isClassKey(chosenId) && !classOptions.some((c) => c.key === chosenId)) ||
@@ -112,6 +134,7 @@ export function AnalyticsPage() {
                 ? ALL_TEAMS
                 : defaultSelection
             : chosenId;
+    const canCompare = (d: { id: string }) => d.id !== selectedId && !compareIds.includes(d.id);
     const teamPool = useMemo(
         () =>
             teams
@@ -260,12 +283,21 @@ export function AnalyticsPage() {
                                 <>
                                     <optgroup label="Classes">
                                         <option value="ALL">All classes ({pool.length})</option>
-                                        {classOptions.map((c) => (
+                                        {currentClasses.map((c) => (
                                             <option key={c.key} value={c.key}>
                                                 {c.label} ({c.count})
                                             </option>
                                         ))}
                                     </optgroup>
+                                    {graduatedClasses.length > 0 && (
+                                        <optgroup label="Graduated classes">
+                                            {graduatedClasses.map((c) => (
+                                                <option key={c.key} value={c.key}>
+                                                    {c.label} ({c.count})
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    )}
                                     <optgroup label="People">
                                         {pool.map((d) => (
                                             <option key={d.id} value={d.id}>
@@ -273,6 +305,15 @@ export function AnalyticsPage() {
                                             </option>
                                         ))}
                                     </optgroup>
+                                    {graduates.length > 0 && (
+                                        <optgroup label="Graduates">
+                                            {graduates.map((d) => (
+                                                <option key={d.id} value={d.id}>
+                                                    {d.name} ({Math.round(d.elo)})
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    )}
                                 </>
                             ) : (
                                 <>
@@ -308,21 +349,32 @@ export function AnalyticsPage() {
                                         ? 'Add a person…'
                                         : 'Add a team…'}
                             </option>
-                            {view === 'people'
-                                ? pool
-                                      .filter((d) => d.id !== selectedId && !compareIds.includes(d.id))
-                                      .map((d) => (
-                                          <option key={d.id} value={d.id}>
-                                              {d.name}
-                                          </option>
-                                      ))
-                                : teamPool
-                                      .filter((t) => t.key !== selectedId && !compareIds.includes(t.key))
-                                      .map((t) => (
-                                          <option key={t.key} value={t.key}>
-                                              {t.name}
-                                          </option>
-                                      ))}
+                            {view === 'people' ? (
+                                <>
+                                    {pool.filter(canCompare).map((d) => (
+                                        <option key={d.id} value={d.id}>
+                                            {d.name}
+                                        </option>
+                                    ))}
+                                    {graduates.some(canCompare) && (
+                                        <optgroup label="Graduates">
+                                            {graduates.filter(canCompare).map((d) => (
+                                                <option key={d.id} value={d.id}>
+                                                    {d.name}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    )}
+                                </>
+                            ) : (
+                                teamPool
+                                    .filter((t) => t.key !== selectedId && !compareIds.includes(t.key))
+                                    .map((t) => (
+                                        <option key={t.key} value={t.key}>
+                                            {t.name}
+                                        </option>
+                                    ))
+                            )}
                         </select>
                     </div>
                     <div className="field">

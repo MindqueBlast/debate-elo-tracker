@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildEloSeries, chartIncludes, chartIncludesTeam } from './chartSeries';
+import { buildEloSeries, chartIncludes, chartIncludesTeam, classOf } from './chartSeries';
 import type { Debater, Team } from './types';
 
-const person = (id: string, status: Debater['status'], class_year = 2027): Debater => ({
+const person = (id: string, status: Debater['status'], class_year: number | null = 2027): Debater => ({
     id,
     name: id,
     elo: 800,
@@ -16,7 +16,7 @@ const person = (id: string, status: Debater['status'], class_year = 2027): Debat
 
 const competed = person('competed', 'active');
 const inactive = person('inactive', 'active'); // on the team, didn't compete this season
-const grad = person('grad', 'graduated');
+const grad = person('grad', 'graduated', null); // class of 2025 by graduation date
 const people = [competed, inactive, grad];
 const activeIds = new Set(['competed']);
 
@@ -34,6 +34,31 @@ describe('who a chart lists', () => {
             buildEloSeries({ debaters: people, selectedId: 'class:2027', who, activeIds }).series.map((s) => s.id);
         expect(ids('active')).toEqual(['competed']);
         expect(ids('team')).toEqual(['competed', 'inactive']);
+    });
+
+    it('puts graduates in the class they graduated with, shown only with the whole team', () => {
+        expect(classOf(grad)).toBe(2025);
+        expect(classOf(inactive)).toBe(2027);
+        expect(classOf({ class_year: null, status: 'active', graduation_date: null })).toBeNull();
+        const ids = (selectedId: string, who: 'active' | 'team') =>
+            buildEloSeries({ debaters: people, selectedId, who, activeIds }).series.map((s) => s.id);
+        expect(ids('class:2025', 'team')).toEqual(['grad']);
+        expect(ids('class:2025', 'active')).toEqual([]);
+        // all classes stays the current team
+        expect(ids('ALL', 'team')).toEqual(['competed', 'inactive']);
+        // a graduate can still be picked on their own
+        expect(ids('grad', 'team')).toEqual(['grad']);
+    });
+
+    it('keeps important dates within the lines shown', () => {
+        const done = { ...grad, history: [{ date: '2024-09-01', elo: 700 }, { date: '2025-05-01', elo: 800 }] };
+        const annotations = ['2024-08-01', '2024-10-01', '2025-05-01', '2026-10-01'].map((date, i) => ({
+            id: String(i), date, name: `t${i}`,
+        }));
+        const { series } = buildEloSeries({
+            debaters: [done], selectedId: 'grad', annotations, showAnnotations: true,
+        });
+        expect(series.find((s) => s.id === '__annotations__')!.data.map((p) => p.x)).toEqual(['2024-10-01', '2025-05-01']);
     });
 
     it('keeps an old pairing when both people are still on the team', () => {

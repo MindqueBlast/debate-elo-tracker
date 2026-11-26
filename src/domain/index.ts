@@ -101,6 +101,7 @@ export {
     ALL_TEAMS,
     buildEloSeries,
     chartIncludes,
+    classOf,
     chartIncludesTeam,
     classKey,
     type ChartWho,

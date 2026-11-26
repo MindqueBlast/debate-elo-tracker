@@ -23,6 +23,15 @@ export const teamKey = (id: string) => `team:${id}`;
 /** Everyone graduating in a year ('class:2027'), or with no class year set ('class:none'). */
 export const classKey = (year: number | null) => `class:${year ?? 'none'}`;
 export const isClassKey = (id: string) => id.startsWith('class:');
+/** Someone's class: their class year, or for a graduate with none set, the year they graduated. */
+export function classOf(d: Pick<Debater, 'class_year' | 'status' | 'graduation_date'>): number | null {
+    if (d.class_year != null) return d.class_year;
+    if (d.status === 'graduated' && d.graduation_date) {
+        const y = Number(d.graduation_date.slice(0, 4));
+        return Number.isFinite(y) ? y : null;
+    }
+    return null;
+}
 
 /**
  * Who a chart lists: people who competed this season, everyone still on the
@@ -197,12 +206,15 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
 
     if (selectedId === 'ALL' || isClassKey(selectedId)) {
         const cls = isClassKey(selectedId) ? selectedId.slice('class:'.length) : null;
-        const pool = debaters.filter(
-            (d) =>
-                chartIncludes(d, who, activeIds) &&
-                (cls === null ||
-                    (cls === 'none' ? d.class_year == null : d.class_year === Number(cls)))
-        );
+        const pool = debaters.filter((d) => {
+            if (cls === null) return chartIncludes(d, who, activeIds);
+            const inClass = cls === 'none' ? classOf(d) == null : classOf(d) === Number(cls);
+            // with the whole team listed, a class view is everyone in that class, graduates too
+            const listed =
+                chartIncludes(d, who, activeIds) ||
+                (who === 'team' && d.status === 'graduated' && cls !== 'none');
+            return inClass && listed;
+        });
         for (const debater of pool) {
             const history = prepareHistory(debater, startDate, endDate);
             series.push({
@@ -231,10 +243,14 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
     const hasPoints = series.some((s) => s.data.length > 0);
 
     if (showAnnotations && hasPoints && domain.min !== null) {
+        // only dates within the lines shown, so a graduated class's chart ends when they did
+        const xs = series.flatMap((s) => s.data.map((p) => p.x));
+        const first = xs.reduce((a, b) => (b < a ? b : a));
+        const last = xs.reduce((a, b) => (b > a ? b : a));
         const inRange = annotations.filter((a) => {
             if (startDate && a.date < startDate) return false;
             if (endDate && a.date > endDate) return false;
-            return true;
+            return a.date >= first && a.date <= last;
         });
         series.push({
             id: '__annotations__',
