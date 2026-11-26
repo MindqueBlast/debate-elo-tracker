@@ -4,11 +4,11 @@ export type Division = 'Novice' | 'JV' | 'Varsity';
 
 export const DIVISIONS: Division[] = ['Varsity', 'JV', 'Novice'];
 
-/** Starting Elo for someone new: 400 whatever division they start in. */
+/** Starting Elo for someone new, by the division they first debate in. */
 export const BASE_ELO: Record<Division, number> = {
     Novice: 400,
-    JV: 400,
-    Varsity: 400,
+    JV: 600,
+    Varsity: 800,
 };
 
 export interface HistoryPoint {
