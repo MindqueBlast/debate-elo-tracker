@@ -1,0 +1,31 @@
+[
+ {
+  "mode": "redesign",
+  "depth": "full",
+  "scope": "page",
+  "shape": "Split Studio",
+  "theme": "brand",
+  "axes": "dark/grotesk-sans/chromatic-red",
+  "hero": "Counter",
+  "nav": "slab",
+  "footer": "mast",
+  "imagery": "screenshots 13 (Playwright, guest view)",
+  "photos": [],
+  "entry": "typed heads, once each",
+  "fingerprint": "split-studio/counter/slab/mast/switcher/rows",
+  "sections": [
+   "hero: counter beside the class Elo chart",
+   "ledger: does and doesnt",
+   "switcher: rankings, teams, profiles, tournaments",
+   "rows: how a tournament moves your Elo beside one tournament",
+   "rows: who can do what beside the phone view",
+   "band: close beside a two-person comparison",
+   "footer: mast with the makers"
+  ],
+  "signature": "the team real Elo chart beside the two actions",
+  "waived": [],
+  "prompt": "Elo rating tracker for a high school Public Forum debate team",
+  "draw": "aa337e",
+  "date": "2026-10-29"
+ }
+]

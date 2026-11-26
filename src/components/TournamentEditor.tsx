@@ -170,7 +170,7 @@ export function TournamentEditor({
                     Date
                     <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                 </label>
-                <label title="30 invitational · 15 local / NYSFL / NCFL elims · 10 Citron / BDL">
+                <label title="30 for invitationals; 15 for locals, NYSFL and NCFL elims; 10 for Citron and BDL">
                     Bonus
                     <input inputMode="decimal" value={bonus} onChange={(e) => setBonus(e.target.value)} />
                 </label>
@@ -276,9 +276,7 @@ export function TournamentEditor({
                                             </>
                                         )}
                                     </>
-                                ) : (
-                                    '—'
-                                )}
+                                ) : null}
                             </span>
                             <button
                                 type="button"
@@ -322,12 +320,12 @@ export function TournamentEditor({
                                 Current Elo after saving:{' '}
                                 {movers.slice(0, 6).map((m, i) => (
                                     <span key={m.d.id} style={{ whiteSpace: 'nowrap' }}>
-                                        {i > 0 && ' · '}
+                                        {i > 0 && ', '}
                                         {byId.get(m.d.id)?.name}{' '}
                                         <span className={m.delta < 0 ? 'delta-neg' : 'delta-pos'}>{signed(m.delta)}</span>
                                     </span>
                                 ))}
-                                {movers.length > 6 && ` · ${movers.length - 6} more`}
+                                {movers.length > 6 && `, and ${movers.length - 6} more`}
                             </>
                         )}
             </p>
