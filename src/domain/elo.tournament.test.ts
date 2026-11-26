@@ -3,6 +3,8 @@ import {
     adjustedWins,
     calculateTournamentElo,
     defaultLost,
+    setTournamentSteps,
+    TOURNAMENT_STEPS,
     validateTournamentParams,
 } from './elo';
 
@@ -80,6 +82,20 @@ describe('tournament Elo', () => {
         const withZero = calculateTournamentElo([{ ...entry, lost: false }], params).results[0].change;
         expect(without).toBeGreaterThan(0);
         expect(withZero).toBe(without);
+    });
+
+    it('takes a big result in steps, so it is worth less as it lifts you', () => {
+        const entry = { id: 'a', name: 'A', elo: 400, division: 'Novice' as const, W_raw: 4, n: 4 };
+        const field = { id: 'b', name: 'B', elo: 400, division: 'Novice' as const, W_raw: 0, n: 4 };
+        const params = { n: 4, b: 0, k: 45, maxGain: null, maxRounds: null };
+        const stepped = calculateTournamentElo([entry, field], params).results;
+        setTournamentSteps(1);
+        const once = calculateTournamentElo([entry, field], params).results;
+        setTournamentSteps(TOURNAMENT_STEPS);
+        expect(stepped[0].change).toBeGreaterThan(0);
+        expect(stepped[0].change).toBeLessThan(once[0].change); // the big gain shrinks
+        expect(once[1].change).toBeLessThan(0);
+        expect(stepped[1].change).toBeGreaterThan(once[1].change); // and the loss is gentler
     });
 
     it('has no cap when maxGain is empty', () => {

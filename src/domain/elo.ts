@@ -116,12 +116,13 @@ export function setTournamentFormula(f: TournamentFormula) {
 }
 
 /**
- * Steps: 1 works a result out once from the Elo going in. More splits it into
- * that many equal slices, each worked out from the Elo after the slices before
- * it, so a big result is worth a little less as it lifts you (and a bad one
- * costs a little less as it drops you).
+ * Each result is split into STEPS equal slices, each worked out from the Elo
+ * after the slices before it, so a big result is worth a little less as it
+ * lifts you (and a bad one costs a little less as it drops you). This tames
+ * spikes without a hard cap. 1 would work a result out once from the Elo going in.
  */
-let STEPS = 1;
+export const TOURNAMENT_STEPS = 100;
+let STEPS = TOURNAMENT_STEPS;
 export function setTournamentSteps(n: number) {
     STEPS = Math.max(1, Math.round(n));
 }

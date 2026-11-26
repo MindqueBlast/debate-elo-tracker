@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculatePracticeEloForPairs, calculateTournamentElo } from './elo';
+import { calculatePracticeEloForPairs, calculateTournamentElo, TOURNAMENT_STEPS } from './elo';
 import { practiceRecord } from './ranking';
 import { replay, seasonOf } from './replay';
 import {
@@ -220,10 +220,16 @@ describe('individual changes', () => {
         expect(eTourney).toBeCloseTo(solo.eTourney, 12);
         expect(results[0].W_adjusted).toBeCloseTo(solo.results[0].W_adjusted, 12);
         const [j, l] = results[0].members;
-        // each person's adjusted wins against what's expected at their Elo (p × E), ÷ √p
-        const expected = (elo: number) => {
+        // each person's adjusted wins against what's expected at their Elo (p × E), ÷ √p,
+        // taken in slices, each from the Elo after the slices before it
+        const worth = (elo: number) => {
             const p = Math.pow(elo / 700, 1.5);
             return (45 * (results[0].W_adjusted - p * eTourney)) / Math.sqrt(p) + 30;
+        };
+        const expected = (elo: number) => {
+            let e = elo;
+            for (let i = 0; i < TOURNAMENT_STEPS; i++) e += worth(e) / TOURNAMENT_STEPS;
+            return e - elo;
         };
         expect(j.change).toBeCloseTo(expected(1300), 10);
         expect(l.change).toBeCloseTo(expected(1100), 10);
