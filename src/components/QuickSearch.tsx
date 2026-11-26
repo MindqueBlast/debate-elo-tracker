@@ -20,6 +20,7 @@ const PAGES: (Item & { editorsOnly?: boolean })[] = [
     { key: 'p-players', label: 'Players', kind: 'Page', to: '/app/players', editorsOnly: true },
     { key: 'p-analytics', label: 'Analytics', kind: 'Page', to: '/app/analytics' },
     { key: 'p-matchup', label: 'Matchup', kind: 'Page', to: '/app/matchup' },
+    { key: 'p-settings', label: 'Settings', kind: 'Page', to: '/app/settings', editorsOnly: true },
 ];
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);

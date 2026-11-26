@@ -27,7 +27,26 @@ export function AppShell() {
     const extras = (
         <>
             {isDev && <span className="badge">Test mode</span>}
-            <span className="pill">{roleLabel}</span>
+            {isAdmin ? (
+                // admins open Settings from their role tag
+                <NavLink
+                    to="/app/settings"
+                    className={({ isActive }) => `pill pill--link${isActive ? ' is-active' : ''}`}
+                    title="Settings: who has access"
+                    onClick={() => setOpen(false)}
+                >
+                    <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+                        <path
+                            d="M8 5.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Zm6 3.6-1.5.3a4.8 4.8 0 0 1-.5 1.2l.9 1.3-1.3 1.3-1.3-.9a4.8 4.8 0 0 1-1.2.5L8.8 14H7.2l-.3-1.5a4.8 4.8 0 0 1-1.2-.5l-1.3.9-1.3-1.3.9-1.3a4.8 4.8 0 0 1-.5-1.2L2 8.8V7.2l1.5-.3c.1-.4.3-.8.5-1.2l-.9-1.3 1.3-1.3 1.3.9c.4-.2.8-.4 1.2-.5L7.2 2h1.6l.3 1.5c.4.1.8.3 1.2.5l1.3-.9 1.3 1.3-.9 1.3c.2.4.4.8.5 1.2L14 7.2Z"
+                            fill="currentColor"
+                        />
+                    </svg>
+                    {roleLabel}
+                    <span className="sr-only">: settings</span>
+                </NavLink>
+            ) : (
+                <span className="pill">{roleLabel}</span>
+            )}
             <Button variant="ghost" size="sm" onClick={toggle}>
                 {theme === 'dark' ? 'Light' : 'Dark'}
             </Button>

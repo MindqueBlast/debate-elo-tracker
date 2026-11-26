@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
-import { roleForEmail, type UserRole } from './allowlist';
+import type { UserRole } from './allowlist';
+import { fetchRole } from './access';
 import { signInWithGoogle, signOutUser, subscribeAuth } from './firebase';
 
 const GUEST_KEY = 'det-guest';
@@ -66,7 +67,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setGuestMode(false);
                 writeGuestFlag(false);
             }
-            const nextRole = roleForEmail(next.email);
+            // who has access is kept in the database (Settings, for admins)
+            let nextRole: UserRole | null = null;
+            try {
+                nextRole = await fetchRole(next.email);
+            } catch {
+                setError('Couldn’t check your access just now. Try signing in again.');
+                await signOutUser();
+                setUser(null);
+                setRole(null);
+                setLoading(false);
+                return;
+            }
             if (!nextRole) {
                 setError('Access denied. Your account is not authorized.');
                 await signOutUser();

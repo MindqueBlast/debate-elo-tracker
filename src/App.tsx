@@ -14,6 +14,7 @@ import { PlayersPage } from './pages/PlayersPage';
 import { PlayerProfilePage } from './pages/PlayerProfilePage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { MatchupPage } from './pages/MatchupPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 const basename =
     import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
@@ -47,6 +48,14 @@ export function App() {
                                 />
                                 <Route path="analytics" element={<AnalyticsPage />} />
                                 <Route path="matchup" element={<MatchupPage />} />
+                                <Route
+                                    path="settings"
+                                    element={
+                                        <EditorsOnly>
+                                            <SettingsPage />
+                                        </EditorsOnly>
+                                    }
+                                />
                             </Route>
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>

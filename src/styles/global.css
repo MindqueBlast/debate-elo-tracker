@@ -3183,3 +3183,116 @@ a.pill:hover {
         display: none;
     }
 }
+
+/* ---- the admin tag opens Settings ---- */
+.topnav .pill--link {
+    gap: 5px;
+    cursor: pointer;
+}
+
+.topnav .pill--link:hover,
+.topnav .pill--link.is-active {
+    background: rgba(255, 255, 255, 0.18);
+    color: var(--bar-text);
+}
+
+.topnav .pill--link.is-active {
+    box-shadow: inset 0 -2px 0 var(--scarlet);
+}
+
+/* ---- Settings: access ---- */
+.access-add {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto;
+    align-items: end;
+    gap: var(--space-3);
+    padding-bottom: var(--space-5);
+    margin-bottom: var(--space-5);
+    border-bottom: 1px solid var(--line);
+}
+
+.access-add .field {
+    margin-bottom: 0;
+}
+
+.access-add .btn {
+    min-height: 40px;
+}
+
+.access-groups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-6);
+}
+
+.access-group__head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 26px;
+    line-height: 1;
+}
+
+.access-group__count {
+    font-family: var(--font-figure);
+    font-stretch: 62%;
+    font-size: 22px;
+    color: var(--text-faint);
+}
+
+.access-group__note {
+    margin: 6px 0 var(--space-3);
+}
+
+.access-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--line-strong);
+}
+
+.access-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 48px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.access-row__email {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.access-row__by {
+    font-size: 12px;
+}
+
+.access-error {
+    margin: 0 0 12px;
+    color: var(--loss);
+}
+
+@media (max-width: 760px) {
+    .access-add,
+    .access-groups {
+        grid-template-columns: 1fr;
+    }
+
+    .access-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .access-row__by {
+        display: none;
+    }
+}
