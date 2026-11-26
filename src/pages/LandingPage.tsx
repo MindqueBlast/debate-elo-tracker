@@ -14,7 +14,7 @@ const SHOTS = {
     profile: { w: 1600, h: 933, alt: 'A debater’s profile: current and peak Elo, tournaments, partners and an Elo history chart' },
     tournaments: { w: 1600, h: 1153, alt: 'The tournament list with its search box: each tournament’s entries and rating changes' },
     tournament: { w: 1300, h: 580, alt: 'NYSFL States results: every pair’s raw wins and each person’s rating change' },
-    phone: { w: 780, h: 1688, alt: 'The dashboard on a phone: four figures in two rows and the top of the board' },
+    phone: { w: 780, h: 1688, alt: 'The dashboard on a phone: three figures across and the top of the board' },
     compare: { w: 1500, h: 953, alt: 'Analytics comparing two debaters’ Elo across four seasons' },
 } as const;
 type ShotName = keyof typeof SHOTS;

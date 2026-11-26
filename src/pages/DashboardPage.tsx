@@ -6,7 +6,6 @@ import {
     pairingLabel,
     rankDebaters,
     rankTeams,
-    seasonLabel,
 } from '../domain';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Card, EmptyState, PageHeader, StatCard } from '../components/Card';
@@ -14,7 +13,7 @@ import { EloChart } from '../components/EloChart';
 import { useAppData } from '../state/AppDataProvider';
 
 export function DashboardPage() {
-    const { debaters, teams, practiceRounds, tournaments, season, activeIds, loading, error } =
+    const { debaters, teams, practiceRounds, tournaments, activeIds, loading, error } =
         useAppData();
     // Active = competed in the latest season with results
     const ranked = rankDebaters(debaters, practiceRounds, { only: activeIds });
@@ -47,12 +46,8 @@ export function DashboardPage() {
         <div>
             <PageHeader title="Dashboard" />
             {loading && <p className="note">Refreshing…</p>}
-            <div className={`grid ${hasPractice ? 'grid-5' : 'grid-4'} stat-grid`}>
+            <div className={`grid ${hasPractice ? 'grid-4' : 'grid-3'} stat-grid`}>
                 <StatCard label="Total" value={<AnimatedNumber value={onTeam} />} />
-                <StatCard
-                    label={season ? `Active in ${seasonLabel(season)}` : 'Active people'}
-                    value={<AnimatedNumber value={active.length} />}
-                />
                 <StatCard
                     label="Average Elo"
                     value={<AnimatedNumber value={Math.round(avg)} />}
