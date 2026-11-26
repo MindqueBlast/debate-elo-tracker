@@ -86,7 +86,8 @@ export function MatchesPage() {
     const [n, setN] = useState('6');
     const [b, setB] = useState('30');
     const [k, setK] = useState('45');
-    const [maxGain, setMaxGain] = useState('300');
+    // blank: no cap on gains
+    const [maxGain, setMaxGain] = useState('');
     const [maxRounds, setMaxRounds] = useState('');
     const [splitRounds, setSplitRounds] = useState(false);
     const [roundsBy, setRoundsBy] = useState<Record<Division, string>>({
@@ -120,7 +121,7 @@ export function MatchesPage() {
         n: parseFloat(n),
         b: parseFloat(b),
         k: parseFloat(k),
-        maxGain: parseFloat(maxGain),
+        maxGain: maxGain.trim() === '' ? null : parseFloat(maxGain),
         maxRounds: maxRounds.trim() === '' ? null : parseFloat(maxRounds),
     };
     const roundsByDivision = useMemo(() => {
@@ -148,7 +149,8 @@ export function MatchesPage() {
     // Exactly what saving would do, worked out from everyone's Elo going into this date
     const projected = useMemo(() => {
         if (entries.length === 0 || !Number.isFinite(params.n) || params.n <= 0) return null;
-        if (![params.b, params.k, params.maxGain].every(Number.isFinite)) return null;
+        if (![params.b, params.k].every(Number.isFinite)) return null;
+        if (params.maxGain !== null && !Number.isFinite(params.maxGain)) return null;
         try {
             return previewTournament(data, draft);
         } catch {
@@ -239,7 +241,7 @@ export function MatchesPage() {
         setN('6');
         setB('30');
         setK('45');
-        setMaxGain('300');
+        setMaxGain('');
         setMaxRounds('');
         setSplitRounds(false);
         setRoundsBy({ Varsity: '', JV: '', Novice: '' });
@@ -464,6 +466,7 @@ export function MatchesPage() {
                                     <input
                                         id={`param-${id}`}
                                         inputMode="decimal"
+                                        placeholder={id === 'g' ? 'No cap' : id === 'm' ? 'None' : undefined}
                                         value={val}
                                         onChange={(e) => {
                                             set(e.target.value);

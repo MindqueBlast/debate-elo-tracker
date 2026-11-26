@@ -111,7 +111,8 @@ export interface Derived {
     practice: Record<string, DerivedPractice>;
 }
 
-export const DEFAULT_PARAMS = { b: 0, k: 45, maxGain: 300, n: 6 } as const;
+/** No cap on gains unless a tournament sets one. */
+export const DEFAULT_PARAMS = { b: 0, k: 45, maxGain: null, n: 6 } as const;
 
 const signed = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}`;
 

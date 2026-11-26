@@ -507,7 +507,7 @@ export function draftFromTournament(t: Tournament): TournamentDraft {
             n: rounds.length ? Math.max(...rounds) : 6,
             b: t.bonus ?? 0,
             k: t.affect ?? 45,
-            maxGain: t.max_gain ?? 300,
+            maxGain: t.max_gain ?? null,
             maxRounds: t.max_rounds ?? null,
         },
         roundsByDivision,

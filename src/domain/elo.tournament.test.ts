@@ -82,6 +82,15 @@ describe('tournament Elo', () => {
         expect(withZero).toBe(without);
     });
 
+    it('has no cap when maxGain is empty', () => {
+        const entry = { id: 'a', name: 'A', elo: 400, division: 'Novice' as const, W_raw: 12 };
+        const capped = calculateTournamentElo([entry], { n: 6, b: 0, k: 45, maxGain: 5, maxRounds: null });
+        const open = calculateTournamentElo([entry], { n: 6, b: 0, k: 45, maxGain: null, maxRounds: null });
+        expect(capped.results[0].change).toBe(5);
+        expect(open.results[0].change).toBeGreaterThan(5);
+        expect(validateTournamentParams({ n: 6, b: 0, k: 45, maxGain: null, maxRounds: null }, 1, 1)).toBeNull();
+    });
+
     it('zeroes a loss when max-rounds undefeated', () => {
         const { results } = calculateTournamentElo(
             [

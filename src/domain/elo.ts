@@ -160,7 +160,7 @@ export function calculateTournamentElo(
             if (p.lost === false && C < 0) {
                 C = 0;
             }
-            if (C > maxGain) {
+            if (maxGain !== null && C > maxGain) {
                 C = maxGain;
             }
             return { id: m.id, oldElo: m.elo, newElo: m.elo + C, change: C, p_value };
@@ -217,8 +217,8 @@ export function validateTournamentParams(
     if (!Number.isFinite(k)) {
         return 'Please enter a valid affect value (k).';
     }
-    if (!Number.isFinite(maxGain) || maxGain < 0) {
-        return 'Please enter a valid max Elo gain.';
+    if (maxGain !== null && (!Number.isFinite(maxGain) || maxGain < 0)) {
+        return 'Please enter a valid max Elo gain, or leave it empty for no cap.';
     }
     if (participantCount < 1) {
         return 'Please add at least one participant.';

@@ -50,7 +50,9 @@ export function TournamentEditor({
     const [date, setDate] = useState(original.date);
     const [bonus, setBonus] = useState(String(original.params.b));
     const [affect, setAffect] = useState(String(original.params.k));
-    const [maxGain, setMaxGain] = useState(String(original.params.maxGain));
+    const [maxGain, setMaxGain] = useState(
+        original.params.maxGain == null ? '' : String(original.params.maxGain)
+    );
     const [maxRounds, setMaxRounds] = useState(
         original.params.maxRounds == null ? '' : String(original.params.maxRounds)
     );
@@ -91,7 +93,7 @@ export function TournamentEditor({
             n,
             b: Number(bonus),
             k: Number(affect),
-            maxGain: Number(maxGain),
+            maxGain: maxGain.trim() === '' ? null : Number(maxGain),
             maxRounds: maxRounds.trim() === '' ? null : Number(maxRounds),
         },
         roundsByDivision: Object.fromEntries(
@@ -113,7 +115,8 @@ export function TournamentEditor({
     const preview = useMemo(() => {
         try {
             if (!date || draft.entries.length === 0) return null;
-            if (![draft.params.b, draft.params.k, draft.params.maxGain].every(Number.isFinite)) return null;
+            if (![draft.params.b, draft.params.k].every(Number.isFinite)) return null;
+            if (draft.params.maxGain !== null && !Number.isFinite(draft.params.maxGain)) return null;
             if (draft.entries.some((e) => !Number.isFinite(e.prelimWins))) return null;
             return previewTournament(data, draft);
         } catch {
@@ -197,7 +200,12 @@ export function TournamentEditor({
                     </label>
                     <label>
                         Max gain
-                        <input inputMode="decimal" value={maxGain} onChange={(e) => setMaxGain(e.target.value)} />
+                        <input
+                            inputMode="decimal"
+                            placeholder="No cap"
+                            value={maxGain}
+                            onChange={(e) => setMaxGain(e.target.value)}
+                        />
                     </label>
                     <label>
                         Max rounds

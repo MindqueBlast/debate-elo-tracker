@@ -147,7 +147,8 @@ export interface TournamentParams {
     n: number;
     b: number;
     k: number;
-    maxGain: number;
+    /** Most anyone can gain at the tournament. Null: no cap. */
+    maxGain: number | null;
     maxRounds: number | null;
 }
 
