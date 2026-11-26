@@ -115,6 +115,17 @@ export function setTournamentFormula(f: TournamentFormula) {
     FORMULA = f;
 }
 
+/**
+ * Steps: 1 works a result out once from the Elo going in. More splits it into
+ * that many equal slices, each worked out from the Elo after the slices before
+ * it, so a big result is worth a little less as it lifts you (and a bad one
+ * costs a little less as it drops you).
+ */
+let STEPS = 1;
+export function setTournamentSteps(n: number) {
+    STEPS = Math.max(1, Math.round(n));
+}
+
 export function calculateTournamentElo(
     participants: TournamentParticipantInput[],
     params: TournamentParams
@@ -139,20 +150,31 @@ export function calculateTournamentElo(
             p.members && p.members.length > 0 ? p.members : [{ id: p.id, elo: p.elo }];
         const pOf = (elo: number) => Math.pow(elo / TOURNAMENT_FIELD_ELO, 1.5);
         const pAvg = people.reduce((sum, m) => sum + pOf(m.elo), 0) / people.length;
+        // what the result is worth to someone at this Elo
+        const worth = (elo: number) => {
+            const pv = pOf(elo);
+            // wins against what's expected at this Elo (p × E), scaled down by p^shrink
+            const vsExpected = k * (p.W_adjusted - pv * eTourney);
+            return FORMULA === 'expected'
+                ? vsExpected + b
+                : FORMULA === 'middle'
+                  ? vsExpected / Math.sqrt(pv) + b
+                  : FORMULA === 'blend'
+                    ? (vsExpected + vsExpected / pv) / 2 + b
+                    : FORMULA === 'pair'
+                      ? vsExpected / pAvg + b
+                      : vsExpected / pv + b;
+        };
         const members = people.map((m) => {
             const p_value = pOf(m.elo);
-            // wins against what's expected at this person's Elo (p × E), scaled down by p^shrink
-            const vsExpected = k * (p.W_adjusted - p_value * eTourney);
-            let C =
-                FORMULA === 'expected'
-                    ? vsExpected + b
-                    : FORMULA === 'middle'
-                      ? vsExpected / Math.sqrt(p_value) + b
-                      : FORMULA === 'blend'
-                        ? (vsExpected + vsExpected / p_value) / 2 + b
-                        : FORMULA === 'pair'
-                          ? vsExpected / pAvg + b
-                          : vsExpected / p_value + b;
+            let C: number;
+            if (STEPS <= 1) {
+                C = worth(m.elo);
+            } else {
+                let elo = m.elo;
+                for (let i = 0; i < STEPS; i++) elo += worth(elo) / STEPS;
+                C = elo - m.elo;
+            }
             if (maxRounds !== null && p.W_raw === maxRounds && C < 0) {
                 C = 0;
             }
