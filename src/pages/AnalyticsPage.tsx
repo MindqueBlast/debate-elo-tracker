@@ -39,7 +39,6 @@ export function AnalyticsPage() {
         annotations,
         tournaments,
         practiceRounds,
-        season,
         activeIds,
         refresh,
     } = useAppData();
@@ -52,8 +51,9 @@ export function AnalyticsPage() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [showAnnotations, setShowAnnotations] = useState(true);
-    // Who's listed: competed in the latest season, everyone still on the team, or graduates too
-    const [who, setWho] = useState<ChartWho>('active');
+    // "All individuals": everyone ever, not just people who competed in the latest season
+    const [allPeople, setAllPeople] = useState(false);
+    const who: ChartWho = view === 'people' && allPeople ? 'all' : 'active';
     const [eventDate, setEventDate] = useState('');
     const [eventName, setEventName] = useState('');
     const [uploaded, setUploaded] = useState<ChartSeries[] | null>(null);
@@ -64,12 +64,7 @@ export function AnalyticsPage() {
         .filter((d) => chartIncludes(d, who, activeIds))
         .sort((a, b) => a.name.localeCompare(b.name));
     const byId = useMemo(() => lookup(debaters), [debaters]);
-    const whoOptions: { key: ChartWho; label: string }[] = [
-        { key: 'active', label: season ? `Competed in ${seasonLabel(season)}` : 'Active' },
-        { key: 'team', label: 'Everyone on the team' },
-        { key: 'all', label: 'With graduates' },
-    ];
-    const whoCount = (w: ChartWho) => debaters.filter((d) => chartIncludes(d, w, activeIds)).length;
+
 
     // One button per season with results: July 1 through June 30
     const seasonPresets = useMemo(() => {
@@ -96,9 +91,12 @@ export function AnalyticsPage() {
             }));
     }, [pool]);
     const defaultSelection = classOptions[0]?.key ?? 'ALL';
-    // a class that's no longer listed (e.g. graduated people hidden) falls back to the default
+    // a class or person that's no longer listed (e.g. back from All individuals) falls back to the default
+    const listedPerson = (id: string) => pool.some((d) => d.id === id);
     const selectedId =
-        !chosenId || (isClassKey(chosenId) && !classOptions.some((c) => c.key === chosenId))
+        !chosenId ||
+        (isClassKey(chosenId) && !classOptions.some((c) => c.key === chosenId)) ||
+        (view === 'people' && chosenId !== 'ALL' && !isClassKey(chosenId) && !listedPerson(chosenId))
             ? view === 'teams'
                 ? ALL_TEAMS
                 : defaultSelection
@@ -202,17 +200,32 @@ export function AnalyticsPage() {
                     <div className="segmented" role="group" aria-label="Chart by">
                         <button
                             type="button"
-                            aria-pressed={view === 'people'}
-                            onClick={() => switchView('people')}
+                            aria-pressed={view === 'people' && !allPeople}
+                            onClick={() => {
+                                switchView('people');
+                                setAllPeople(false);
+                                // people who aren't active drop off the comparison
+                                setCompareIds((ids) => ids.filter((id) => activeIds.has(id)));
+                            }}
                         >
                             Individuals
+                        </button>
+                        <button
+                            type="button"
+                            aria-pressed={view === 'people' && allPeople}
+                            onClick={() => {
+                                switchView('people');
+                                setAllPeople(true);
+                            }}
+                        >
+                            All individuals
                         </button>
                         <button
                             type="button"
                             aria-pressed={view === 'teams'}
                             onClick={() => switchView('teams')}
                         >
-                            Teams (averaged)
+                            Teams<span className="wide-only"> (averaged)</span>
                         </button>
                     </div>
                     <div className="field">
@@ -251,11 +264,7 @@ export function AnalyticsPage() {
                             ) : (
                                 <>
                                     <option value={ALL_TEAMS}>
-                                        {who === 'all'
-                                            ? 'All teams'
-                                            : who === 'team'
-                                              ? 'All teams still on the team'
-                                              : 'All current teams'}
+                                        All current teams
                                     </option>
                                     {teamPool.map((t) => (
                                         <option key={t.key} value={t.key}>
@@ -336,20 +345,6 @@ export function AnalyticsPage() {
                             }}
                         >
                             {p.label}
-                        </button>
-                    ))}
-                </div>
-                <div className="season-presets" role="group" aria-label="Who to list">
-                    <span className="note">People:</span>
-                    {whoOptions.map((o) => (
-                        <button
-                            key={o.key}
-                            type="button"
-                            className="season-presets__btn"
-                            aria-pressed={who === o.key}
-                            onClick={() => setWho(o.key)}
-                        >
-                            {o.label} <span className="num muted">{whoCount(o.key)}</span>
                         </button>
                     ))}
                 </div>

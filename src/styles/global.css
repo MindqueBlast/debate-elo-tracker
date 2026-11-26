@@ -1437,6 +1437,21 @@ input[type='file']::file-selector-button:hover {
     transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 
+.segmented button {
+    white-space: nowrap;
+}
+
+/* phones: three tabs on one line */
+@media (max-width: 480px) {
+    .segmented button {
+        padding: var(--space-1) var(--space-2);
+    }
+
+    .segmented .wide-only {
+        display: none;
+    }
+}
+
 .segmented button[aria-pressed='true'] {
     background: var(--bg-overlay);
     color: var(--text);
