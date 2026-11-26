@@ -160,7 +160,7 @@ export function TournamentEditor({
                     Date
                     <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                 </label>
-                <label title="30 invitational · 15 local / NYSFL / NCFL elims · 10 HAFTR / BDL">
+                <label title="30 invitational · 15 local / NYSFL / NCFL elims · 10 Citron / BDL">
                     Bonus
                     <input inputMode="decimal" value={bonus} onChange={(e) => setBonus(e.target.value)} />
                 </label>
