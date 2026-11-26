@@ -223,11 +223,6 @@ function People() {
                             <Button type="submit">Add person</Button>
                         </div>
                     </form>
-                    <p className="note">
-                        New people start at {BASE_ELO.Novice} in Novice, {BASE_ELO.JV} in JV and{' '}
-                        {BASE_ELO.Varsity} in Varsity, unless you enter a number. Class of = the year
-                        they graduate (the first two digits of their student ID).
-                    </p>
                 </Card>
             )}
             <div className="toolbar">
