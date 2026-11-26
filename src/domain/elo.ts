@@ -156,6 +156,10 @@ export function calculateTournamentElo(
             if (maxRounds !== null && p.W_raw === maxRounds && C < 0) {
                 C = 0;
             }
+            // An undefeated tournament never costs anyone Elo
+            if (p.losses === 0 && C < 0) {
+                C = 0;
+            }
             if (C > maxGain) {
                 C = maxGain;
             }

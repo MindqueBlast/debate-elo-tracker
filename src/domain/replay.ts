@@ -26,6 +26,8 @@ export interface ReplayEntry {
     division: Division;
     rawWins: number;
     rounds?: number;
+    /** Rounds lost (null or missing: not recorded). */
+    losses?: number | null;
 }
 
 export interface ReplayTournament {
@@ -173,6 +175,7 @@ export function replay(input: {
                 division: e.division,
                 W_raw: e.rawWins,
                 n: e.rounds,
+                losses: e.losses ?? null,
             };
         });
         const { eTourney, results } = calculateTournamentElo(inputs, t.params);

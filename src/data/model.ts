@@ -51,6 +51,7 @@ export function toInputs(rows: Rows): Inputs {
                     division: p.division,
                     raw_wins: p.raw_wins,
                     rounds: p.rounds ?? null,
+                    losses: p.losses ?? null,
                 })),
         })),
         practice: rows.practiceRounds.map((r) => ({
