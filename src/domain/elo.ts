@@ -76,6 +76,11 @@ let DIVISION_EXTRA = 1;
 let DIVISION_WEIGHT: Record<string, number> = { Novice: 1, JV: 1, Varsity: 1 };
 /** For comparing versions: the Elo a division's expectations are measured against (default 700 for all). */
 let DIVISION_FIELD: Record<string, number> = {};
+/** For comparing versions: whether the tournament average counts the division extra (default yes). */
+let EXTRA_IN_AVERAGE = true;
+export function setExtraInAverage(on: boolean) {
+    EXTRA_IN_AVERAGE = on;
+}
 export function setDivisionTuning(
     extra: number,
     weight: Record<string, number>,
@@ -154,7 +159,7 @@ export function calculateTournamentElo(
     const withAdjusted = participants.map((p) => {
         const n = p.n ?? params.n;
         const W_adjusted = adjustedWins(p.division, p.W_raw, n);
-        s += W_adjusted;
+        s += EXTRA_IN_AVERAGE ? W_adjusted : p.W_raw;
         roundsTotal += n;
         return { ...p, n, W_adjusted };
     });

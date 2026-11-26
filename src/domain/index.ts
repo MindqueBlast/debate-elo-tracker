@@ -61,6 +61,7 @@ export {
     setTournamentFormula,
     setTournamentSteps,
     setDivisionTuning,
+    setExtraInAverage,
     expectedScore,
     pairingElo,
     validatePracticeMatch,
