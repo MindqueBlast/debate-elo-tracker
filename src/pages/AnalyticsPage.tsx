@@ -1,6 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import {
+    ALL_CLASSES,
     ALL_TEAMS,
+    GRADUATED_CLASSES,
+    isPeopleGroup,
     buildEloSeries,
     chartIncludes,
     chartIncludesTeam,
@@ -129,7 +132,9 @@ export function AnalyticsPage() {
     const selectedId =
         !chosenId ||
         (isClassKey(chosenId) && !classOptions.some((c) => c.key === chosenId)) ||
-        (view === 'people' && chosenId !== 'ALL' && !isClassKey(chosenId) && !listedPerson(chosenId))
+        // everyone / graduates only exist under All individuals
+        ((chosenId === ALL_CLASSES || chosenId === GRADUATED_CLASSES) && graduates.length === 0) ||
+        (view === 'people' && !isPeopleGroup(chosenId) && !listedPerson(chosenId))
             ? view === 'teams'
                 ? ALL_TEAMS
                 : defaultSelection
@@ -161,7 +166,7 @@ export function AnalyticsPage() {
     const switchView = (next: 'people' | 'teams') => {
         if (next === view) return;
         if (next === 'teams') {
-            const a = selectedId === 'ALL' || isClassKey(selectedId) ? undefined : teamFor(selectedId);
+            const a = isPeopleGroup(selectedId) ? undefined : teamFor(selectedId);
             const others = compareIds
                 .map((id) => teamFor(id))
                 .filter((t): t is Team => !!t && t.id !== a?.id)
@@ -179,10 +184,16 @@ export function AnalyticsPage() {
         }
         setView(next);
     };
-    const isGroup = selectedId === 'ALL' || selectedId === ALL_TEAMS || isClassKey(selectedId);
+    const isGroup = selectedId === ALL_TEAMS || isPeopleGroup(selectedId);
     const selectedName =
         selectedId === 'ALL'
-            ? 'all_people'
+            ? graduates.length > 0
+                ? 'current_classes'
+                : 'all_people'
+            : selectedId === ALL_CLASSES
+              ? 'all_classes'
+              : selectedId === GRADUATED_CLASSES
+                ? 'graduated_classes'
             : isClassKey(selectedId)
               ? `class_of_${selectedId.slice('class:'.length)}`
               : selectedId === ALL_TEAMS
@@ -273,7 +284,7 @@ export function AnalyticsPage() {
                                 const next = e.target.value;
                                 setSelectedId(next);
                                 setCompareIds((ids) =>
-                                    next === 'ALL' || next === ALL_TEAMS || isClassKey(next)
+                                    next === ALL_TEAMS || isPeopleGroup(next)
                                         ? []
                                         : ids.filter((id) => id !== next)
                                 );
@@ -281,23 +292,26 @@ export function AnalyticsPage() {
                         >
                             {view === 'people' ? (
                                 <>
-                                    <optgroup label="Classes">
+                                    {graduates.length > 0 ? (
+                                        <>
+                                            <option value={ALL_CLASSES}>
+                                                All classes ({pool.length + graduates.length})
+                                            </option>
+                                            <option value={GRADUATED_CLASSES}>
+                                                Graduated classes ({graduates.length})
+                                            </option>
+                                            <option value="ALL">Current classes ({pool.length})</option>
+                                        </>
+                                    ) : (
                                         <option value="ALL">All classes ({pool.length})</option>
-                                        {currentClasses.map((c) => (
+                                    )}
+                                    <optgroup label="Classes">
+                                        {[...graduatedClasses, ...currentClasses].map((c) => (
                                             <option key={c.key} value={c.key}>
                                                 {c.label} ({c.count})
                                             </option>
                                         ))}
                                     </optgroup>
-                                    {graduatedClasses.length > 0 && (
-                                        <optgroup label="Graduated classes">
-                                            {graduatedClasses.map((c) => (
-                                                <option key={c.key} value={c.key}>
-                                                    {c.label} ({c.count})
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                    )}
                                     <optgroup label="People">
                                         {pool.map((d) => (
                                             <option key={d.id} value={d.id}>

@@ -19,10 +19,17 @@ import type {
 
 /** Chart selection ids: a debater id, 'ALL', 'ALL_TEAMS' or 'team:<id>'. */
 export const ALL_TEAMS = 'ALL_TEAMS';
+/** Everyone on the team plus every graduate (with the whole team listed). 'ALL' is just the team. */
+export const ALL_CLASSES = 'ALL_CLASSES';
+/** Every graduate (with the whole team listed). */
+export const GRADUATED_CLASSES = 'GRADUATED_CLASSES';
 export const teamKey = (id: string) => `team:${id}`;
 /** Everyone graduating in a year ('class:2027'), or with no class year set ('class:none'). */
 export const classKey = (year: number | null) => `class:${year ?? 'none'}`;
 export const isClassKey = (id: string) => id.startsWith('class:');
+/** A selection that draws a group of people rather than one person or team. */
+export const isPeopleGroup = (id: string) =>
+    id === 'ALL' || id === ALL_CLASSES || id === GRADUATED_CLASSES || isClassKey(id);
 /** Someone's class: their class year, or for a graduate with none set, the year they graduated. */
 export function classOf(d: Pick<Debater, 'class_year' | 'status' | 'graduation_date'>): number | null {
     if (d.class_year != null) return d.class_year;
@@ -204,9 +211,13 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
             : null;
     const series: ChartSeries[] = [];
 
-    if (selectedId === 'ALL' || isClassKey(selectedId)) {
+    if (isPeopleGroup(selectedId)) {
         const cls = isClassKey(selectedId) ? selectedId.slice('class:'.length) : null;
+        // graduates are drawn only when the whole team is listed (or everyone is)
+        const graduate = (d: Debater) => d.status === 'graduated' && who !== 'active';
         const pool = debaters.filter((d) => {
+            if (selectedId === GRADUATED_CLASSES) return graduate(d);
+            if (selectedId === ALL_CLASSES) return chartIncludes(d, who, activeIds) || graduate(d);
             if (cls === null) return chartIncludes(d, who, activeIds);
             const inClass = cls === 'none' ? classOf(d) == null : classOf(d) === Number(cls);
             // with the whole team listed, a class view is everyone in that class, graduates too

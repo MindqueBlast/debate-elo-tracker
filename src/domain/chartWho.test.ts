@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildEloSeries, chartIncludes, chartIncludesTeam, classOf } from './chartSeries';
+import {
+    ALL_CLASSES,
+    GRADUATED_CLASSES,
+    buildEloSeries,
+    chartIncludes,
+    chartIncludesTeam,
+    classOf,
+} from './chartSeries';
 import type { Debater, Team } from './types';
 
 const person = (id: string, status: Debater['status'], class_year: number | null = 2027): Debater => ({
@@ -44,8 +51,11 @@ describe('who a chart lists', () => {
             buildEloSeries({ debaters: people, selectedId, who, activeIds }).series.map((s) => s.id);
         expect(ids('class:2025', 'team')).toEqual(['grad']);
         expect(ids('class:2025', 'active')).toEqual([]);
-        // all classes stays the current team
+        // current classes is the team; all classes adds graduates; graduated classes is just them
         expect(ids('ALL', 'team')).toEqual(['competed', 'inactive']);
+        expect(ids(ALL_CLASSES, 'team')).toEqual(['competed', 'inactive', 'grad']);
+        expect(ids(GRADUATED_CLASSES, 'team')).toEqual(['grad']);
+        expect(ids(GRADUATED_CLASSES, 'active')).toEqual([]);
         // a graduate can still be picked on their own
         expect(ids('grad', 'team')).toEqual(['grad']);
     });
