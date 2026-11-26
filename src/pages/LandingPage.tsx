@@ -8,14 +8,14 @@ import '../styles/landing.css';
 
 /** Screens captured from the tracker itself (guest view), one per theme. */
 const SHOTS = {
-    chart: { w: 1400, h: 1048, alt: 'Elo history chart for the class of 2027, three seasons of lines, one per debater' },
+    chart: { w: 1400, h: 1048, alt: 'Elo history chart for the class of 2027, four seasons of lines, one per debater, with tournament dates marked along the bottom' },
     rankings: { w: 1152, h: 944, alt: 'The rankings board: active debaters ordered by Elo' },
     teams: { w: 1600, h: 787, alt: 'Team rankings: each partnership with its division, both partners and their average Elo' },
     profile: { w: 1600, h: 933, alt: 'A debater’s profile: current and peak Elo, tournaments, partners and an Elo history chart' },
     tournaments: { w: 1600, h: 1153, alt: 'The tournament list with its search box: each tournament’s entries and rating changes' },
     tournament: { w: 1300, h: 580, alt: 'NYSFL States results: every pair’s raw wins and each person’s rating change' },
-    phone: { w: 780, h: 1688, alt: 'The dashboard on a phone: three figures across and the top of the board' },
-    compare: { w: 1500, h: 953, alt: 'Analytics comparing two debaters’ Elo across three seasons' },
+    phone: { w: 780, h: 1688, alt: 'The dashboard on a phone: four figures in two rows and the top of the board' },
+    compare: { w: 1500, h: 953, alt: 'Analytics comparing two debaters’ Elo across four seasons' },
 } as const;
 type ShotName = keyof typeof SHOTS;
 
@@ -25,7 +25,7 @@ const PHONE_CROPS: Partial<Record<ShotName, { file: string; w: number; h: number
     rankings: { file: 'rankings-phone', w: 720, h: 771 },
     teams: { file: 'teams-phone', w: 720, h: 771 },
     profile: { file: 'profile-phone', w: 720, h: 1139 },
-    tournament: { file: 'tournament-phone', w: 720, h: 731 },
+    tournament: { file: 'tournament-phone', w: 720, h: 737 },
     tournaments: { file: 'tournaments-phone', w: 720, h: 1495 },
     compare: { file: 'compare-phone', w: 720, h: 730 },
 };
