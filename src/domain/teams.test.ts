@@ -152,11 +152,10 @@ describe('rounds by division', () => {
             [entries[0], { ...entries[1], n: 5 }],
             params
         );
-        // varsity adjusted wins with 6 rounds, novice raw wins (5 rounds doesn't change raw)
-        const vAdj = ((-200 / ((4 / 6) * 100 + 4) + 50) / 100) * 6 + 4;
-        expect(results[0].W_adjusted).toBeCloseTo(vAdj, 10);
+        // wins count as they are; the phantom teams go .500 over the average rounds (5.5)
+        expect(results[0].W_adjusted).toBe(4);
         expect(results[1].W_adjusted).toBe(3);
-        expect(eTourney).toBeCloseTo((vAdj + 3 + (3 * 5.5) / 2) / 5, 10);
+        expect(eTourney).toBeCloseTo((4 + 3 + (3 * 5.5) / 2) / 5, 10);
         expect(results[1].n).toBe(5);
     });
 });
@@ -244,10 +243,11 @@ describe('individual changes', () => {
         expect(eTourney).toBeCloseTo(solo.eTourney, 12);
         expect(results[0].W_adjusted).toBeCloseTo(solo.results[0].W_adjusted, 12);
         const [j, l] = results[0].members;
-        // each person's adjusted wins against what's expected at their Elo (p × E), ÷ √p,
-        // taken in slices, each from the Elo after the slices before it
+        // each person's wins against what's expected at their Elo in varsity (p × E,
+        // p against the varsity bar of 850), ÷ √p, taken in slices, each from the
+        // Elo after the slices before it
         const worth = (elo: number) => {
-            const p = Math.pow(elo / 700, 1.5);
+            const p = Math.pow(elo / 850, 1.5);
             return (45 * (results[0].W_adjusted - p * eTourney)) / Math.sqrt(p) + 30;
         };
         const expected = (elo: number) => {

@@ -9,6 +9,12 @@ import type {
 export const PRACTICE_COMPETITIVE_K = 20;
 export const PRACTICE_BONUS_K = 5;
 export const TOURNAMENT_FIELD_ELO = 700;
+/**
+ * The bar each division's results are measured against: p = (Elo / bar)^1.5.
+ * A harder field has a higher bar, so the same record is worth more in varsity
+ * than in JV, and more in JV than in novice.
+ */
+export const DIVISION_BAR: Record<string, number> = { Novice: 550, JV: 700, Varsity: 850 };
 
 export function expectedScore(winnerElo: number, loserElo: number): number {
     return 1 / (1 + Math.pow(10, (loserElo - winnerElo) / 400));
@@ -70,11 +76,14 @@ export function validatePracticeMatch(
     return null;
 }
 
-/** For comparing versions: scales the JV/varsity extra in adjusted wins (1 = as designed). */
-let DIVISION_EXTRA = 1;
+/**
+ * For comparing versions: scales the extra wins JV and varsity used to get
+ * (0 = off, as now: the division bars do that job; 1 = the old boost).
+ */
+let DIVISION_EXTRA = 0;
 /** For comparing versions: multiplies each change by division (all 1 = as designed). */
 let DIVISION_WEIGHT: Record<string, number> = { Novice: 1, JV: 1, Varsity: 1 };
-/** For comparing versions: the Elo a division's expectations are measured against (default 700 for all). */
+/** For comparing versions: other bars by division (empty = DIVISION_BAR). */
 let DIVISION_FIELD: Record<string, number> = {};
 /** For comparing versions: whether the tournament average counts the division extra (default yes). */
 let EXTRA_IN_AVERAGE = true;
@@ -91,12 +100,21 @@ export function setDivisionTuning(
     DIVISION_FIELD = field;
 }
 
+/** The bar a division is measured against. */
+export function divisionBar(division: string): number {
+    return DIVISION_FIELD[division] ?? DIVISION_BAR[division] ?? TOURNAMENT_FIELD_ELO;
+}
+
+/**
+ * Wins as counted. With the old boost off (now), this is just the raw wins;
+ * the boost gave JV and varsity extra wins, which the division bars replaced.
+ */
 export function adjustedWins(
     division: TournamentParticipantInput['division'],
     W_raw: number,
     n: number
 ): number {
-    if (division === 'Novice') return W_raw;
+    if (division === 'Novice' || DIVISION_EXTRA === 0) return W_raw;
     const winPercent = n > 0 ? (W_raw / n) * 100 : 0;
     if (division === 'JV') {
         return DIVISION_EXTRA * ((-200 / (winPercent + 6.7) + 30) / 100) * n + W_raw;
@@ -117,9 +135,9 @@ export function adjustedWins(
  * how the spreadsheet blends divisions.
  */
 /**
- * How each person's change is worked out (p = (their Elo / 700)^1.5). All of
- * them start from k × (adjusted wins − p × E_tourney): your wins against
- * what's expected of someone at your Elo.
+ * How each person's change is worked out (p = (their Elo / their division's
+ * bar)^1.5, see DIVISION_BAR). All of them start from k × (wins − p × E_tourney):
+ * your wins against what's expected of someone at your Elo in that division.
  * - 'middle' (in use): that ÷ √p, then + b. Halfway between the two below:
  *   a higher-rated partner gains less and loses more for the same result,
  *   without big swings for the top of the board.
@@ -170,7 +188,7 @@ export function calculateTournamentElo(
     const results: TournamentResult[] = withAdjusted.map((p) => {
         const people =
             p.members && p.members.length > 0 ? p.members : [{ id: p.id, elo: p.elo }];
-        const fieldElo = DIVISION_FIELD[p.division] ?? TOURNAMENT_FIELD_ELO;
+        const fieldElo = divisionBar(p.division);
         const pOf = (elo: number) => Math.pow(elo / fieldElo, 1.5);
         const pAvg = people.reduce((sum, m) => sum + pOf(m.elo), 0) / people.length;
         // what the result is worth to someone at this Elo
@@ -220,7 +238,7 @@ export function calculateTournamentElo(
             newElo: p.elo + change,
             change,
             W_adjusted: p.W_adjusted,
-            p_value: Math.pow(p.elo / TOURNAMENT_FIELD_ELO, 1.5),
+            p_value: Math.pow(p.elo / divisionBar(p.division), 1.5),
             W_raw: p.W_raw,
             division: p.division,
             n: p.n,

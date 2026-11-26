@@ -317,8 +317,8 @@ export function LandingPage() {
                             <Typed id="landing-counts" lines={['How a tournament moves your Elo']} />
                             <dl className="l-rows">
                                 <div>
-                                    <dt>Wins, adjusted</dt>
-                                    <dd>Varsity and JV records are adjusted for their division.</dd>
+                                    <dt>Graded by division</dt>
+                                    <dd>Varsity is held to a higher bar than JV, and JV than novice.</dd>
                                 </div>
                                 <div>
                                     <dt>Against the field</dt>
@@ -329,8 +329,8 @@ export function LandingPage() {
                                     <dd>Each partner’s change is worked out from their own Elo.</dd>
                                 </div>
                                 <div>
-                                    <dt>Capped swings</dt>
-                                    <dd>No single tournament can move a rating past its cap.</dd>
+                                    <dt>Smoothed swings</dt>
+                                    <dd>A big result counts in small steps, so it’s worth less as it lifts you.</dd>
                                 </div>
                             </dl>
                         </div>

@@ -52,6 +52,8 @@ export {
     PRACTICE_BONUS_K,
     PRACTICE_COMPETITIVE_K,
     TOURNAMENT_FIELD_ELO,
+    DIVISION_BAR,
+    divisionBar,
     adjustedWins,
     averageElo,
     calculatePracticeElo,

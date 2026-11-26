@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     adjustedWins,
     calculateTournamentElo,
+    DIVISION_BAR,
     defaultLost,
     setTournamentSteps,
     TOURNAMENT_STEPS,
@@ -13,11 +14,25 @@ describe('tournament Elo', () => {
         expect(adjustedWins('Novice', 4, 6)).toBe(4);
     });
 
-    it('raises JV and Varsity adjusted wins above raw', () => {
-        const jv = adjustedWins('JV', 4, 6);
-        const varsity = adjustedWins('Varsity', 4, 6);
-        expect(jv).toBeGreaterThan(4);
+    it('counts JV and varsity wins as they are (the division bars do the adjusting)', () => {
+        expect(adjustedWins('JV', 4, 6)).toBe(4);
+        expect(adjustedWins('Varsity', 4, 6)).toBe(4);
+    });
+
+    it('holds varsity to a higher bar than JV, and JV than novice', () => {
+        expect(DIVISION_BAR.Varsity).toBeGreaterThan(DIVISION_BAR.JV);
+        expect(DIVISION_BAR.JV).toBeGreaterThan(DIVISION_BAR.Novice);
+        // the same 3-3 at the same Elo in the same tournament
+        const at = (division: 'Novice' | 'JV' | 'Varsity') => ({
+            id: division, name: division, elo: 900, division, W_raw: 3, n: 6,
+        });
+        const { results } = calculateTournamentElo(
+            [at('Novice'), at('JV'), at('Varsity')],
+            { n: 6, b: 0, k: 45, maxGain: null, maxRounds: null }
+        );
+        const [novice, jv, varsity] = results.map((r) => r.change);
         expect(varsity).toBeGreaterThan(jv);
+        expect(jv).toBeGreaterThan(novice);
     });
 
     it('caps gain at maxGain', () => {
@@ -54,10 +69,10 @@ describe('tournament Elo', () => {
         const top = (lost: boolean | null | undefined) => ({
             id: 'top',
             name: 'Top',
-            elo: 1250,
+            elo: 1700,
             members: [
-                { id: 'x', elo: 1250 },
-                { id: 'y', elo: 1260 },
+                { id: 'x', elo: 1700 },
+                { id: 'y', elo: 1710 },
             ],
             division: 'Varsity' as const,
             W_raw: 4,
