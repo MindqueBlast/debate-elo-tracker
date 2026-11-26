@@ -454,6 +454,26 @@ export function EloChart({
                     </span>
                 )}
                 <span className="chart-zoom__actions">
+                    {lines.length > 1 && (
+                        <>
+                            <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                disabled={hiddenCount === lines.length}
+                                onClick={() => setHidden(new Set(lines.map((l) => l.id)))}
+                            >
+                                Hide all lines
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                disabled={hiddenCount === 0}
+                                onClick={() => setHidden(new Set())}
+                            >
+                                Show all lines
+                            </button>
+                        </>
+                    )}
                     <button
                         type="button"
                         className="btn btn-secondary btn-sm"
@@ -494,26 +514,6 @@ export function EloChart({
                 <Line data={data} options={options} />
             </div>
             <div className="chart-footer">
-                {lines.length > 1 && (
-                    <span className="chart-footer__lines">
-                        <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            disabled={hiddenCount === lines.length}
-                            onClick={() => setHidden(new Set(lines.map((l) => l.id)))}
-                        >
-                            Hide all lines
-                        </button>
-                        <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            disabled={hiddenCount === 0}
-                            onClick={() => setHidden(new Set())}
-                        >
-                            Show all lines
-                        </button>
-                    </span>
-                )}
                 <p className="chart-zoom__hint">
                     {lines.length > 1 && hiddenCount === lines.length ? (
                         'Click names above the chart to bring lines back'
