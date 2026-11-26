@@ -125,7 +125,7 @@ export {
     validatePlayerName,
 } from './sanitize';
 
-export { competedIn, latestSeason, seasonLabel } from './activity';
+export { competedIn, competedInAny, latestSeason, previousSeason, seasonLabel } from './activity';
 
 export {
     computeAll,

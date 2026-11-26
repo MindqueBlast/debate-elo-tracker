@@ -5,6 +5,8 @@ import {
     chartIncludes,
     chartIncludesTeam,
     classKey,
+    competedInAny,
+    previousSeason,
     type ChartWho,
     isClassKey,
     isCalendarDate,
@@ -39,7 +41,7 @@ export function AnalyticsPage() {
         annotations,
         tournaments,
         practiceRounds,
-        activeIds,
+        season,
         refresh,
     } = useAppData();
     const toast = useToast();
@@ -54,6 +56,13 @@ export function AnalyticsPage() {
     // "All individuals": everyone in each class who's still on the team, competed this season or not
     const [allPeople, setAllPeople] = useState(false);
     const who: ChartWho = view === 'people' && allPeople ? 'team' : 'active';
+    // Individuals: anyone still on the team who competed this season or last
+    const activeIds = useMemo(() => {
+        if (!season) return new Set<string>();
+        const recent = competedInAny(tournaments, [season, previousSeason(season)]);
+        for (const d of debaters) if (d.status === 'graduated') recent.delete(d.id);
+        return recent;
+    }, [tournaments, season, debaters]);
     const [eventDate, setEventDate] = useState('');
     const [eventName, setEventName] = useState('');
     const [uploaded, setUploaded] = useState<ChartSeries[] | null>(null);

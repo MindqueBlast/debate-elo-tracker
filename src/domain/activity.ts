@@ -25,5 +25,18 @@ export function competedIn(tournaments: Tournament[], season: string): Set<strin
     return ids;
 }
 
+/** The season before: "2025-26" for "2026-27". */
+export function previousSeason(season: string): string {
+    const y = Number(season.slice(0, 4)) - 1;
+    return `${y}-${String(y + 1).slice(2)}`;
+}
+
+/** Everyone with a tournament result in any of these seasons. */
+export function competedInAny(tournaments: Tournament[], seasons: string[]): Set<string> {
+    const ids = new Set<string>();
+    for (const s of seasons) for (const id of competedIn(tournaments, s)) ids.add(id);
+    return ids;
+}
+
 /** "2025–26" for labels. */
 export const seasonLabel = (season: string) => season.replace('-', '–');

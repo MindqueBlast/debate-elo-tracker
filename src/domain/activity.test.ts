@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { competedIn, latestSeason, seasonLabel } from './activity';
+import { competedIn, competedInAny, latestSeason, previousSeason, seasonLabel } from './activity';
 import { rankDebaters } from './ranking';
 import type { Debater, Tournament } from './types';
 
@@ -57,5 +57,16 @@ describe('who counts as active', () => {
             ['c', 1],
             ['d', 2],
         ]);
+    });
+
+    it('counts this season and last together', () => {
+        expect(previousSeason('2026-27')).toBe('2025-26');
+        expect(previousSeason('2000-01')).toBe('1999-00');
+        const ts = [
+            t('old', '2024-10-01', [['gone', null]]),
+            t('last', '2025-11-01', [['norman', 'denny']]),
+            t('now', '2026-10-24', [['jiayi', 'leon']]),
+        ];
+        expect([...competedInAny(ts, ['2026-27', '2025-26'])].sort()).toEqual(['denny', 'jiayi', 'leon', 'norman']);
     });
 });
