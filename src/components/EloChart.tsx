@@ -27,6 +27,7 @@ import {
     type ZoomLevel,
 } from '../domain';
 import { EmptyChart } from './illustrations/EmptyChart';
+import { LineFinder } from './LineFinder';
 import { DURATIONS, useReducedMotion } from '../lib/motion';
 
 ChartJS.register(
@@ -199,6 +200,21 @@ export function EloChart({
         [lines, hidden]
     );
     const hiddenCount = lines.filter((l) => hidden.has(l.id)).length;
+    // the same names and colours as the legend, for the line search
+    const finderLines = useMemo(
+        () =>
+            series
+                .map((s, i) => ({ id: s.id, label: s.label, color: HEX[i % HEX.length] }))
+                .filter((l) => l.id !== ANNOTATIONS),
+        [series]
+    );
+    const toggleLine = (id: string) =>
+        setHidden((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
     // First and last moments with data (for the step arrows and tick spacing)
     const extent = useMemo(() => {
         let min = Infinity;
@@ -319,13 +335,7 @@ export function EloChart({
                     // clicking a name crosses it off (or brings it back)
                     onClick: (_event, item) => {
                         const id = series[item.datasetIndex ?? -1]?.id;
-                        if (!id) return;
-                        setHidden((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(id)) next.delete(id);
-                            else next.add(id);
-                            return next;
-                        });
+                        if (id) toggleLine(id);
                     },
                     labels: {
                         // names A–Z (colours stay with each person); important dates last
@@ -456,6 +466,7 @@ export function EloChart({
                 <span className="chart-zoom__actions">
                     {lines.length > 1 && (
                         <>
+                            <LineFinder lines={finderLines} hidden={hidden} onToggle={toggleLine} />
                             <button
                                 type="button"
                                 className="btn btn-secondary btn-sm"
@@ -516,7 +527,7 @@ export function EloChart({
             <div className="chart-footer">
                 <p className="chart-zoom__hint">
                     {lines.length > 1 && hiddenCount === lines.length ? (
-                        'Click names above the chart to bring lines back'
+                        'Click names above the chart, or find one, to bring lines back'
                     ) : onPointClick ? (
                         'Click a point to delete it'
                     ) : (
