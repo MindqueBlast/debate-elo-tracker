@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../auth/AuthProvider';
@@ -44,10 +44,11 @@ export function AppShell() {
                 Skip to content
             </a>
             <header className="topnav">
-                <NavLink to="/app" className="brand">
+                {/* the wordmark goes to the public home page; Dashboard is the first tab */}
+                <Link to="/" className="brand" aria-label="Syosset Elo home page">
                     <Logo />
                     <span className="brand-text">Syosset Elo</span>
-                </NavLink>
+                </Link>
                 <nav
                     className={`nav-links ${open ? 'open' : ''}`}
                     aria-label="Primary"

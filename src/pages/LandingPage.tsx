@@ -91,6 +91,24 @@ export function LandingPage() {
     const [view, setView] = useState<(typeof VIEWS)[number]['key']>('rankings');
     const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
+    // already signed in (or browsing as a guest): one way back in, no sign-in buttons
+    const counter = role ? (
+        <div className="l-counter">
+            <Link to="/app" className="l-btn">
+                Open Tracker
+            </Link>
+        </div>
+    ) : (
+        <div className="l-counter">
+            <button type="button" className="l-btn" onClick={browseAsGuest}>
+                Browse as guest
+            </button>
+            <Link to="/login" className="l-btn l-btn--line">
+                Sign in
+            </Link>
+        </div>
+    );
+
     function browseAsGuest() {
         enterGuestMode();
         navigate('/app');
@@ -147,14 +165,7 @@ export function LandingPage() {
                             <p className="l-hero__line">
                                 Every tournament result moves each debater’s Elo, charted season by season.
                             </p>
-                            <div className="l-counter">
-                                <button type="button" className="l-btn" onClick={browseAsGuest}>
-                                    Browse as guest
-                                </button>
-                                <Link to="/login" className="l-btn l-btn--line">
-                                    Sign in
-                                </Link>
-                            </div>
+                            {counter}
                             <p className="l-hero__terms">Guests see everything. Only admins record results.</p>
                             <p className="l-byline">
                                 By <strong>Aaditya Sahu</strong> and <strong>Jiayi Meng</strong>
@@ -289,14 +300,7 @@ export function LandingPage() {
                 <div className="l-container l-split l-split--5-7">
                     <div className="l-head">
                         <h2 id="landing-stand">Find your name on the board</h2>
-                        <div className="l-counter">
-                            <button type="button" className="l-btn" onClick={browseAsGuest}>
-                                Browse as guest
-                            </button>
-                            <Link to="/login" className="l-btn l-btn--line">
-                                Sign in
-                            </Link>
-                        </div>
+                        {counter}
                     </div>
                     <Shot name="compare" theme={theme} edge caption="Analytics: any two debaters, side by side." />
                 </div>
@@ -311,12 +315,20 @@ export function LandingPage() {
                             Syosset Debate Elo Tracker
                         </Link>
                         <div className="l-footer__links">
-                            <button type="button" className="l-text-btn" onClick={browseAsGuest}>
-                                Browse as guest
-                            </button>
-                            <Link to="/login" className="l-text-btn">
-                                Sign in
-                            </Link>
+                            {role ? (
+                                <Link to="/app" className="l-text-btn">
+                                    Open Tracker
+                                </Link>
+                            ) : (
+                                <>
+                                    <button type="button" className="l-text-btn" onClick={browseAsGuest}>
+                                        Browse as guest
+                                    </button>
+                                    <Link to="/login" className="l-text-btn">
+                                        Sign in
+                                    </Link>
+                                </>
+                            )}
                         </div>
                         <p className="l-footer__legal">© 2026 Syosset PF</p>
                     </div>
