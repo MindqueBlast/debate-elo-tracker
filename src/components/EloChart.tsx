@@ -145,8 +145,49 @@ function clickedDate(
     return ms == null || !Number.isFinite(ms) ? null : dateOf(ms);
 }
 
+/** How long a line takes to sweep out to its new start (or back in). */
+const SWEEP_MS = 800;
+
+type Sweep = {
+    /** grow: lines gained earlier points; shrink: they're losing them */
+    mode: 'grow' | 'shrink';
+    /** per line, the date (ms) where the part that comes or goes meets the rest */
+    joins: Map<string, number>;
+    start: number;
+};
+
+const samePoint = (a: { x: string; y: number }, b: { x: string; y: number }) =>
+    a.x === b.x && Math.abs(a.y - b.y) < 1e-6;
+/** Whether `long` is `short` with extra points in front. */
+const endsWith = (long: ChartSeries['data'], short: ChartSeries['data']) =>
+    long.length > short.length &&
+    short.length > 0 &&
+    short.every((p, i) => samePoint(p, long[long.length - short.length + i]));
+
+/**
+ * When the same lines come back with points added or removed only at the
+ * start (e.g. Extend records), that part can sweep in or out instead of every
+ * point sliding to a new place. Anything else: null.
+ */
+function startChange(prev: ChartSeries[], next: ChartSeries[]): Omit<Sweep, 'start'> | null {
+    if (prev.length !== next.length) return null;
+    const joins = new Map<string, number>();
+    let mode: Sweep['mode'] | null = null;
+    for (let i = 0; i < next.length; i++) {
+        const a = prev[i].data;
+        const b = next[i].data;
+        if (prev[i].id !== next[i].id) return null;
+        if (a.length === b.length && a.every((p, j) => samePoint(p, b[j]))) continue;
+        const m = endsWith(b, a) ? 'grow' : endsWith(a, b) ? 'shrink' : null;
+        if (!m || (mode && mode !== m)) return null;
+        mode = m;
+        joins.set(next[i].id, msOf(m === 'grow' ? a[0].x : b[0].x));
+    }
+    return mode ? { mode, joins } : null;
+}
+
 export function EloChart({
-    series,
+    series: seriesProp,
     yMin,
     yMax,
     isEmpty,
@@ -164,6 +205,83 @@ export function EloChart({
     const reduced = useReducedMotion();
     const clickRef = useRef(onPointClick);
     clickRef.current = onPointClick;
+
+    // What's drawn. Usually the series passed in; while a line sweeps back in,
+    // the old (longer) lines stay up until the sweep finishes.
+    const [series, setSeries] = useState(seriesProp);
+    const drawnRef = useRef(seriesProp);
+    drawnRef.current = series;
+    const sweepRef = useRef<Sweep | null>(null);
+    // a sweep redraws by itself, so Chart.js shouldn't also slide points around
+    const [instant, setInstant] = useState(false);
+    useEffect(() => {
+        if (seriesProp === drawnRef.current) return;
+        const change = reduced ? null : startChange(drawnRef.current, seriesProp);
+        if (!change) {
+            sweepRef.current = null;
+            setInstant(false);
+            setSeries(seriesProp);
+            return;
+        }
+        sweepRef.current = { ...change, start: performance.now() };
+        setInstant(true);
+        const timers: number[] = [];
+        if (change.mode === 'grow') {
+            setSeries(seriesProp);
+            // later changes (zoom, hiding lines) animate as usual again
+            timers.push(window.setTimeout(() => setInstant(false), SWEEP_MS + 50));
+        } else {
+            timers.push(
+                window.setTimeout(() => {
+                    sweepRef.current = null;
+                    setSeries(seriesProp);
+                }, SWEEP_MS)
+            );
+            timers.push(window.setTimeout(() => setInstant(false), SWEEP_MS + 100));
+        }
+        return () => timers.forEach((t) => window.clearTimeout(t));
+    }, [seriesProp, reduced]);
+    const sweepPlugin = useMemo(() => {
+        const clipped = new Set<number>();
+        const progress = (s: Sweep) => {
+            const t = Math.min(1, (performance.now() - s.start) / SWEEP_MS);
+            // eases in and out, so it reads as being drawn
+            return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        };
+        return {
+            id: 'sweep',
+            beforeDatasetDraw(chart: Chart, args: { index: number }) {
+                const s = sweepRef.current;
+                const id = (chart.data.datasets[args.index] as { id?: string }).id;
+                const join = s && id ? s.joins.get(id) : undefined;
+                if (!s || join === undefined) return;
+                const area = chart.chartArea;
+                const joinPx = Math.max(area.left, chart.scales.x.getPixelForValue(join));
+                const e = progress(s);
+                // grow: the edge travels from the join out to the left; shrink: back in to the join
+                const edge =
+                    s.mode === 'grow' ? joinPx - (joinPx - area.left) * e : area.left + (joinPx - area.left) * e;
+                const ctx = chart.ctx;
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(edge, area.top - 20, area.right - edge + 20, area.bottom - area.top + 40);
+                ctx.clip();
+                clipped.add(args.index);
+            },
+            afterDatasetDraw(chart: Chart, args: { index: number }) {
+                if (clipped.delete(args.index)) chart.ctx.restore();
+            },
+            afterDraw(chart: Chart) {
+                const s = sweepRef.current;
+                if (!s) return;
+                if (performance.now() - s.start < SWEEP_MS) {
+                    requestAnimationFrame(() => chart.draw());
+                } else if (s.mode === 'grow') {
+                    sweepRef.current = null;
+                }
+            },
+        };
+    }, []);
 
     // Zoom resets when a different person or team is shown first
     const [zoom, setZoom] = useState<Zoom>(ALL_TIME);
@@ -522,7 +640,12 @@ export function EloChart({
                     setZoom(zoomedOut(beforeClickRef.current));
                 }}
             >
-                <Line data={data} options={options} />
+                <Line
+                    data={data}
+                    options={options}
+                    plugins={[sweepPlugin]}
+                    updateMode={instant ? 'none' : undefined}
+                />
             </div>
             <div className="chart-footer">
                 <p className="chart-zoom__hint">
