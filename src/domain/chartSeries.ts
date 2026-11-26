@@ -90,7 +90,7 @@ export interface BuildEloSeriesOptions {
     extendTeams?: boolean;
     /**
      * Classes to draw ('class:2027', …). With selectedId ALL_TEAMS, the teams with a member in
-     * one of them; otherwise everyone in them (graduates too when the whole team is listed).
+     * one of them; otherwise everyone listed in them, plus their graduates.
      */
     classes?: string[];
 }
@@ -104,11 +104,8 @@ function inClassView(
 ): boolean {
     const year = classOf(d);
     if (!keys.has(classKey(year))) return false;
-    // with the whole team listed, a class view is everyone in that class, graduates too
-    return (
-        chartIncludes(d, who, activeIds) ||
-        (who === 'team' && d.status === 'graduated' && year != null)
-    );
+    // graduates count in their class whichever people are listed
+    return chartIncludes(d, who, activeIds) || (d.status === 'graduated' && year != null);
 }
 
 function pointsFromHistory(

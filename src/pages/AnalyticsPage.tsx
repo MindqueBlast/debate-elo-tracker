@@ -50,8 +50,8 @@ export function AnalyticsPage() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [showAnnotations, setShowAnnotations] = useState(true);
-    // "All individuals": everyone in each class who's still on the team, competed this season or not,
-    // plus graduates
+    // "All individuals": everyone in each class who's still on the team, competed this season or not
+    // (both views also list graduated classes)
     const [allPeople, setAllPeople] = useState(false);
     // Teams: before both partners were on the team, show whoever was
     const [extendRecords, setExtendRecords] = useState(true);
@@ -71,8 +71,8 @@ export function AnalyticsPage() {
 
     const byId = useMemo(() => lookup(debaters), [debaters]);
     const pool = debaters.filter((d) => chartIncludes(d, who, activeIds));
-    // graduates only show under All individuals
-    const graduates = who === 'team' ? debaters.filter((d) => d.status === 'graduated') : [];
+    // graduates show in both people views, in their graduated classes
+    const graduates = view === 'people' ? debaters.filter((d) => d.status === 'graduated') : [];
 
     // One button per season with results: July 1 through June 30
     const seasonPresets = useMemo(() => {

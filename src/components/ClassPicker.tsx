@@ -17,7 +17,8 @@ const sameKeys = (a: string[], b: string[]) =>
 
 /**
  * Which classes a chart shows: a button that opens a checklist. Shortcuts at
- * the top tick a whole group at once; each class below can be ticked on its own.
+ * the top pick a whole group at once (and clicking one that's on clears it);
+ * each class below can be ticked on its own.
  */
 export function ClassPicker({
     id,
@@ -118,8 +119,14 @@ export function ClassPicker({
                                 type="button"
                                 className="class-picker__shortcut"
                                 aria-pressed={on}
-                                onClick={() => onChange(s.keys)}
+                                // clicking one that's on turns it off, leaving nothing picked
+                                onClick={() => onChange(on ? [] : s.keys)}
                             >
+                                <svg className="class-picker__tick" viewBox="0 0 12 12" aria-hidden="true">
+                                    {on && (
+                                        <path d="M2 6.5 5 9.2 10 3.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                                    )}
+                                </svg>
                                 <span>{s.label}</span>
                                 <span className="class-picker__count">{count}</span>
                             </button>

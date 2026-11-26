@@ -68,6 +68,8 @@ describe('who a chart lists', () => {
                 .series.map((s) => s.id);
         expect(ids(['class:2027', 'class:2026'], 'active')).toEqual(['competed', 'senior']);
         expect(ids(['class:2027', 'class:2025'], 'team')).toEqual(['competed', 'inactive', 'grad']);
+        // graduated classes show with only this year's people listed too
+        expect(ids(['class:2027', 'class:2025'], 'active')).toEqual(['competed', 'grad']);
         expect(ids([], 'team')).toEqual([]);
         const team = (a: string, b: string): Team => ({
             id: `${a}+${b}`, name: null, member1_id: a, member2_id: b, division: null, season: null, active: true,
