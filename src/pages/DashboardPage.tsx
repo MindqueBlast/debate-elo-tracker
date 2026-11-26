@@ -22,6 +22,8 @@ export function DashboardPage() {
     const byId = lookup(debaters);
     const active = debaters.filter((d) => activeIds.has(d.id));
     const avg = averageElo(active.map((d) => d.elo));
+    // everyone still on the team, the same people Rankings lists
+    const onTeam = debaters.filter((d) => d.status !== 'graduated').length;
     // practice panels only once someone has recorded a practice round
     const hasPractice = practiceRounds.length > 0;
     const recentRounds = [...practiceRounds]
@@ -45,7 +47,8 @@ export function DashboardPage() {
         <div>
             <PageHeader title="Dashboard" />
             {loading && <p className="note">Refreshing…</p>}
-            <div className={`grid ${hasPractice ? 'grid-4' : 'grid-3'} stat-grid`}>
+            <div className={`grid ${hasPractice ? 'grid-5' : 'grid-4'} stat-grid`}>
+                <StatCard label="Total" value={<AnimatedNumber value={onTeam} />} />
                 <StatCard
                     label={season ? `Active in ${seasonLabel(season)}` : 'Active people'}
                     value={<AnimatedNumber value={active.length} />}

@@ -258,9 +258,14 @@ export function EloChart({
                     // no overshoot between points, which shows when zoomed in
                     cubicInterpolationMode: 'monotone' as const,
                     borderWidth: isAnno ? 0 : series.length > 8 ? 1.25 : 2,
-                    pointRadius: isAnno ? 8 : s.data.map((p) => (noDot(p) ? 0 : radius)),
-                    pointHoverRadius: isAnno ? 5 : s.data.map((p) => (noDot(p) ? 3 : 5)),
-                    pointStyle: isAnno ? ('star' as const) : ('circle' as const),
+                    // important dates: short upright ticks along the bottom, named on hover
+                    pointRadius: isAnno ? 7 : s.data.map((p) => (noDot(p) ? 0 : radius)),
+                    pointHoverRadius: isAnno ? 9 : s.data.map((p) => (noDot(p) ? 3 : 5)),
+                    pointStyle: isAnno ? ('line' as const) : ('circle' as const),
+                    pointRotation: isAnno ? 90 : 0,
+                    pointBorderWidth: isAnno ? 2 : 1,
+                    pointHoverBorderWidth: isAnno ? 3 : 1,
+                    pointBorderColor: isAnno ? 'rgba(220, 59, 59, 0.75)' : color,
                     showLine: !isAnno,
                     spanGaps: false,
                 };
