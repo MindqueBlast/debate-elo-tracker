@@ -157,7 +157,7 @@ export function calculateTournamentElo(
                 C = 0;
             }
             // An undefeated tournament never costs anyone Elo
-            if (p.losses === 0 && C < 0) {
+            if (p.lost === false && C < 0) {
                 C = 0;
             }
             if (C > maxGain) {
@@ -182,6 +182,15 @@ export function calculateTournamentElo(
     });
 
     return { eTourney, results };
+}
+
+/**
+ * Whether an entry starts out marked as having lost a round: always at an
+ * invitational (bonus 30 or more; winning one outright is rare enough to untick
+ * by hand), and otherwise unless they swept prelims.
+ */
+export function defaultLost(bonus: number, prelimWins: number, rounds: number): boolean {
+    return bonus >= 30 || prelimWins < rounds;
 }
 
 /** A pairing's Elo: the average of the people in it. */

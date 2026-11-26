@@ -86,7 +86,7 @@ export function asTournaments(raw: unknown): Tournament[] {
                         division: asDivision(rec.division) ?? 'Novice',
                         team_elo: optionalNumber(rec.team_elo),
                         rounds: optionalNumber(rec.rounds),
-                        losses: optionalNumber(rec.losses),
+                        lost: typeof rec.lost === 'boolean' ? rec.lost : null,
                     };
                 }),
         });

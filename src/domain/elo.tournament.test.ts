@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     adjustedWins,
     calculateTournamentElo,
+    defaultLost,
     validateTournamentParams,
 } from './elo';
 
@@ -33,14 +34,22 @@ describe('tournament Elo', () => {
         expect(results[0].change).toBe(5);
     });
 
-    it('never takes Elo from an entry with no losses', () => {
+    it('marks entries as having lost unless they swept a non-invitational', () => {
+        expect(defaultLost(30, 6, 6)).toBe(true); // invitational, even after a sweep
+        expect(defaultLost(15, 4, 4)).toBe(false); // swept a local
+        expect(defaultLost(15, 3, 4)).toBe(true);
+        expect(defaultLost(10, 2, 2)).toBe(false); // 2-0 at a Citron
+        expect(defaultLost(10, 1, 2)).toBe(true);
+    });
+
+    it('never takes Elo from an undefeated entry', () => {
         // a top pair at a weak local: 4-0 would otherwise cost them
         const field = [
             { id: 'w1', name: 'W1', elo: 500, division: 'Varsity' as const, W_raw: 1, n: 4 },
             { id: 'w2', name: 'W2', elo: 500, division: 'Varsity' as const, W_raw: 2, n: 4 },
         ];
         const params = { n: 4, b: 15, k: 45, maxGain: 300, maxRounds: null };
-        const top = (losses: number | null | undefined) => ({
+        const top = (lost: boolean | null | undefined) => ({
             id: 'top',
             name: 'Top',
             elo: 1250,
@@ -51,24 +60,24 @@ describe('tournament Elo', () => {
             division: 'Varsity' as const,
             W_raw: 4,
             n: 4,
-            losses,
+            lost,
         });
         const unprotected = calculateTournamentElo([top(null), ...field], params).results[0];
         expect(unprotected.change).toBeLessThan(0);
 
-        const undefeated = calculateTournamentElo([top(0), ...field], params).results[0];
+        const undefeated = calculateTournamentElo([top(false), ...field], params).results[0];
         expect(undefeated.change).toBe(0);
         expect(undefeated.members.map((m) => m.change)).toEqual([0, 0]);
 
-        const oneLoss = calculateTournamentElo([top(1), ...field], params).results[0];
-        expect(oneLoss.change).toBeCloseTo(unprotected.change, 9);
+        const lost = calculateTournamentElo([top(true), ...field], params).results[0];
+        expect(lost.change).toBeCloseTo(unprotected.change, 9);
     });
 
-    it('leaves gains alone for an entry with no losses', () => {
+    it('leaves gains alone for an undefeated entry', () => {
         const entry = { id: 'a', name: 'A', elo: 400, division: 'Novice' as const, W_raw: 4, n: 4 };
         const params = { n: 4, b: 15, k: 45, maxGain: 300, maxRounds: null };
         const without = calculateTournamentElo([entry], params).results[0].change;
-        const withZero = calculateTournamentElo([{ ...entry, losses: 0 }], params).results[0].change;
+        const withZero = calculateTournamentElo([{ ...entry, lost: false }], params).results[0].change;
         expect(without).toBeGreaterThan(0);
         expect(withZero).toBe(without);
     });

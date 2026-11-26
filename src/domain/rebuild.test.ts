@@ -37,7 +37,7 @@ const entry = (
     division,
     raw_wins: raw,
     rounds: 6,
-    losses: null,
+    lost: null,
 });
 
 const tourney = (

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import {
     calculatePracticeEloForPairs,
+    defaultLost,
     entryChangeFor,
     getLocalDateString,
     lookup,
@@ -132,20 +133,16 @@ export function MatchesPage() {
         return out;
     }, [splitRounds, roundsBy]);
 
-    // Losses fill in from prelim wins until someone types them (e.g. to add an elim loss)
-    const autoLosses = (e: TournamentEntryDraft): number | null => {
-        const rounds = roundsByDivision?.[e.division] ?? params.n;
-        return Number.isFinite(rounds) && Number.isFinite(e.prelimWins)
-            ? Math.max(0, rounds - e.prelimWins)
-            : null;
-    };
+    // "Lost" follows the tournament and prelim wins until someone ticks or unticks it
+    const autoLost = (e: TournamentEntryDraft): boolean =>
+        defaultLost(params.b, e.prelimWins, roundsByDivision?.[e.division] ?? params.n);
     const draft: TournamentDraft = {
         id: draftId,
         name: tName,
         date: tDate,
         params,
         roundsByDivision,
-        entries: entries.map((e) => ({ ...e, losses: e.losses ?? autoLosses(e) })),
+        entries: entries.map((e) => ({ ...e, lost: e.lost ?? autoLost(e) })),
     };
 
     // Exactly what saving would do, worked out from everyone's Elo going into this date
@@ -227,7 +224,7 @@ export function MatchesPage() {
                 division: pickDivision || defaultDivision(pick, teams, debaters),
                 prelimWins: 0,
                 elimWins: 0,
-                losses: null,
+                lost: null,
             },
         ]);
         setPick(EMPTY_PAIRING);
@@ -600,24 +597,14 @@ export function MatchesPage() {
                                                     }
                                                 />
                                             </label>
-                                            <label title="Rounds lost, prelims and elims (byes aren't losses). Fills in from prelim wins; add 1 if they lost in elims. With no losses, nobody in the entry loses Elo.">
-                                                Losses
-                                                <input
-                                                    type="number"
-                                                    min={0}
-                                                    step={0.5}
-                                                    value={entry.losses ?? autoLosses(entry) ?? ''}
-                                                    style={{ width: 60, marginLeft: 6 }}
-                                                    onChange={(e) =>
-                                                        set({
-                                                            losses:
-                                                                e.target.value === ''
-                                                                    ? null
-                                                                    : Math.max(0, Number(e.target.value)),
-                                                        })
-                                                    }
-                                                />
-                                            </label>
+                                            <input
+                                                type="checkbox"
+                                                className="lost-check"
+                                                aria-label="Lost"
+                                                title="Lost"
+                                                checked={entry.lost ?? autoLost(entry)}
+                                                onChange={(e) => set({ lost: e.target.checked })}
+                                            />
                                             <span className="num" title="Raw wins (elims count double)">
                                                 Raw {rawWinsOf(entry.prelimWins, entry.elimWins)}
                                             </span>
