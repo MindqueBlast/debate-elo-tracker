@@ -51,9 +51,9 @@ export function AnalyticsPage() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [showAnnotations, setShowAnnotations] = useState(true);
-    // "All individuals": everyone ever, not just people who competed in the latest season
+    // "All individuals": everyone in each class who's still on the team, competed this season or not
     const [allPeople, setAllPeople] = useState(false);
-    const who: ChartWho = view === 'people' && allPeople ? 'all' : 'active';
+    const who: ChartWho = view === 'people' && allPeople ? 'team' : 'active';
     const [eventDate, setEventDate] = useState('');
     const [eventName, setEventName] = useState('');
     const [uploaded, setUploaded] = useState<ChartSeries[] | null>(null);
