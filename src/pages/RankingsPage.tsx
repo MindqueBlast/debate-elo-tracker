@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { rankDebaters, rankTeams } from '../domain';
 import { Card, EmptyState, PageHeader } from '../components/Card';
+import { Segmented } from '../components/Segmented';
 import { Standings } from '../components/Standings';
 import { useAppData } from '../state/AppDataProvider';
 
@@ -38,22 +39,15 @@ export function RankingsPage() {
                           : `${rankedTeams.length} ${showDisbanded ? 'teams, disbanded included' : 'teams'}, by the average of both partners.`
                 }
                 actions={
-                    <div className="segmented" role="group" aria-label="Rank">
-                        <button
-                            type="button"
-                            aria-pressed={view === 'people'}
-                            onClick={() => setView('people')}
-                        >
-                            Individuals
-                        </button>
-                        <button
-                            type="button"
-                            aria-pressed={view === 'teams'}
-                            onClick={() => setView('teams')}
-                        >
-                            Teams
-                        </button>
-                    </div>
+                    <Segmented
+                        label="Rank"
+                        value={view}
+                        onChange={setView}
+                        options={[
+                            { value: 'people', label: 'Individuals' },
+                            { value: 'teams', label: 'Teams' },
+                        ]}
+                    />
                 }
             />
             <div className="toolbar">

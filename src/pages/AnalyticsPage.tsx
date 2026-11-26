@@ -24,6 +24,7 @@ import {
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { Card, EmptyState, PageHeader } from '../components/Card';
+import { Segmented } from '../components/Segmented';
 import { ClassPicker, type ClassChoice, type ClassShortcut } from '../components/ClassPicker';
 import { EloChart } from '../components/EloChart';
 import { useAppData } from '../state/AppDataProvider';
@@ -191,35 +192,26 @@ export function AnalyticsPage() {
             />
             <Card className="analytics-chart">
                 <div className="chart-toolbar">
-                    <div className="segmented" role="group" aria-label="Chart by">
-                        <button
-                            type="button"
-                            aria-pressed={view === 'people' && !allPeople}
-                            onClick={() => {
-                                setView('people');
-                                setAllPeople(false);
-                            }}
-                        >
-                            Individuals
-                        </button>
-                        <button
-                            type="button"
-                            aria-pressed={view === 'people' && allPeople}
-                            onClick={() => {
-                                setView('people');
-                                setAllPeople(true);
-                            }}
-                        >
-                            All individuals
-                        </button>
-                        <button
-                            type="button"
-                            aria-pressed={view === 'teams'}
-                            onClick={() => setView('teams')}
-                        >
-                            Teams<span className="wide-only"> (averaged)</span>
-                        </button>
-                    </div>
+                    <Segmented
+                        label="Chart by"
+                        value={view === 'teams' ? 'teams' : allPeople ? 'all' : 'active'}
+                        onChange={(v) => {
+                            setView(v === 'teams' ? 'teams' : 'people');
+                            if (v !== 'teams') setAllPeople(v === 'all');
+                        }}
+                        options={[
+                            { value: 'active', label: 'Individuals' },
+                            { value: 'all', label: 'All individuals' },
+                            {
+                                value: 'teams',
+                                label: (
+                                    <>
+                                        Teams<span className="wide-only"> (averaged)</span>
+                                    </>
+                                ),
+                            },
+                        ]}
+                    />
                     <div className="field">
                         <label htmlFor="analyticsClasses">Show</label>
                         {view === 'teams' ? (

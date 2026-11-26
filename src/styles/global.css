@@ -409,6 +409,18 @@ p {
     animation: rise var(--dur) var(--ease);
 }
 
+/* each page's content settles in once, just after its title rises */
+.page > div > .page-header ~ * {
+    animation: page-in 420ms var(--ease-out) 80ms both;
+}
+
+@keyframes page-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+}
+
 @keyframes rise {
     from {
         opacity: 0;
@@ -2466,9 +2478,24 @@ a.pill:hover {
     }
 }
 
+.segmented button {
+    position: relative;
+}
+
 .segmented button[aria-pressed='true'] {
-    background: var(--text);
     color: var(--bg-elevated);
+}
+
+/* the inked thumb behind the chosen option; it slides between them */
+.segmented__thumb {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-sm);
+    background: var(--text);
+}
+
+.segmented__label {
+    position: relative;
 }
 
 .toolbar {
@@ -3294,5 +3321,248 @@ a.pill:hover {
 
     .access-row__by {
         display: none;
+    }
+}
+
+/* ---- Matches: tournaments by season, practice rounds by month ---- */
+.matches-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+}
+
+.matches-toolbar .input {
+    width: min(320px, 100%);
+}
+
+.matches-toolbar .season-presets {
+    margin: 0;
+}
+
+.matches-toolbar > .btn {
+    margin-left: auto;
+}
+
+/* what opens and closes in place: height animates, nothing spills while it does */
+.reveal {
+    overflow: hidden;
+}
+
+.record-wrap {
+    padding-bottom: var(--space-5);
+}
+
+.season-group {
+    margin-bottom: var(--space-6);
+}
+
+.season-group__head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
+    padding-bottom: 10px;
+    border-bottom: 3px solid var(--text);
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 34px;
+    line-height: 1;
+}
+
+.season-group__count {
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.tourney-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.tourney {
+    border-bottom: 1px solid var(--line);
+}
+
+.tourney__row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) 112px 84px 80px 20px;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 54px;
+    padding: 8px var(--space-2);
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--dur) var(--ease);
+}
+
+.tourney__row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 3px;
+    background: var(--scarlet);
+    transform: scaleY(0);
+    transition: transform var(--dur) var(--ease);
+}
+
+.tourney__row:hover {
+    background: var(--bg-hover);
+}
+
+.tourney__row:hover::before,
+.tourney.is-open .tourney__row::before,
+.tourney__row:focus-visible::before {
+    transform: scaleY(1);
+}
+
+.tourney__row:focus-visible {
+    outline-offset: -2px;
+}
+
+.tourney__date {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.tourney__name {
+    min-width: 0;
+    overflow: hidden;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 24px;
+    line-height: 1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.tourney__type,
+.tourney__count {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.tourney__best {
+    font-size: 20px;
+}
+
+.tourney__chev {
+    color: var(--text-muted);
+    transition: transform 260ms var(--ease-out);
+}
+
+.tourney.is-open .tourney__chev {
+    transform: rotate(180deg);
+}
+
+.tourney__body {
+    padding: 4px var(--space-2) var(--space-4) calc(64px + var(--space-2) + var(--space-3));
+}
+
+.tourney__body .tourney-meta {
+    margin-top: 0;
+}
+
+.tourney__body .tourney-block--editing {
+    margin-left: calc((64px + var(--space-3)) * -1);
+}
+
+/* practice: the form beside the list */
+.practice-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    align-items: start;
+}
+
+.practice-filter {
+    width: min(260px, 100%);
+    margin-bottom: var(--space-4);
+}
+
+.practice-month + .practice-month {
+    margin-top: var(--space-4);
+}
+
+.practice-month__head {
+    padding-bottom: 6px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--line-strong);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.practice-row {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.practice-row:last-child {
+    border-bottom: none;
+}
+
+.practice-row__date {
+    font-family: var(--font-figure);
+    font-stretch: 62%;
+    font-weight: 800;
+    font-size: 24px;
+    line-height: 1;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.practice-row__main {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+@media (max-width: 960px) {
+    .practice-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 760px) {
+    .matches-toolbar > .btn {
+        margin-left: 0;
+    }
+
+    .tourney__row {
+        grid-template-columns: 52px minmax(0, 1fr) 64px 16px;
+        row-gap: 2px;
+    }
+
+    .tourney__type,
+    .tourney__count {
+        display: none;
+    }
+
+    .tourney__name {
+        font-size: 21px;
+        white-space: normal;
+    }
+
+    .tourney__body {
+        padding-left: var(--space-2);
+    }
+
+    .tourney__body .tourney-block--editing {
+        margin-left: 0;
     }
 }

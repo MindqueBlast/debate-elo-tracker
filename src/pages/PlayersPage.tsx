@@ -29,6 +29,7 @@ import {
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { Card, EmptyState, PageHeader } from '../components/Card';
+import { Segmented } from '../components/Segmented';
 import { Modal } from '../components/Modal';
 import { useAppData } from '../state/AppDataProvider';
 import { useToast } from '../state/ToastProvider';
@@ -61,22 +62,15 @@ export function PlayersPage() {
                         : 'Save partnerships so results can be entered as teams.'
                 }
                 actions={
-                    <div className="segmented" role="group" aria-label="Show">
-                        <button
-                            type="button"
-                            aria-pressed={tab === 'people'}
-                            onClick={() => setTab('people')}
-                        >
-                            People
-                        </button>
-                        <button
-                            type="button"
-                            aria-pressed={tab === 'teams'}
-                            onClick={() => setTab('teams')}
-                        >
-                            Teams
-                        </button>
-                    </div>
+                    <Segmented
+                        label="Show"
+                        value={tab}
+                        onChange={setTab}
+                        options={[
+                            { value: 'people', label: 'People' },
+                            { value: 'teams', label: 'Teams' },
+                        ]}
+                    />
                 }
             />
             {tab === 'people' ? <People /> : <Teams />}
