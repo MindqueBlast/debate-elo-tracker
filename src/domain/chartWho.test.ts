@@ -60,6 +60,25 @@ describe('who a chart lists', () => {
         expect(ids('grad', 'team')).toEqual(['grad']);
     });
 
+    it('draws several classes at once, and teams by their members\' classes', () => {
+        const senior = person('senior', 'active', 2026);
+        const everyone = [...people, senior];
+        const ids = (classes: string[], who: 'active' | 'team') =>
+            buildEloSeries({ debaters: everyone, selectedId: 'ALL', classes, who, activeIds: new Set(['competed', 'senior']) })
+                .series.map((s) => s.id);
+        expect(ids(['class:2027', 'class:2026'], 'active')).toEqual(['competed', 'senior']);
+        expect(ids(['class:2027', 'class:2025'], 'team')).toEqual(['competed', 'inactive', 'grad']);
+        expect(ids([], 'team')).toEqual([]);
+        const team = (a: string, b: string): Team => ({
+            id: `${a}+${b}`, name: null, member1_id: a, member2_id: b, division: null, season: null, active: true,
+        });
+        const teams = [team('competed', 'senior'), team('inactive', 'competed')];
+        const teamIds = (classes: string[]) =>
+            buildEloSeries({ debaters: everyone, teams, selectedId: 'ALL_TEAMS', classes }).series.map((s) => s.id);
+        expect(teamIds(['class:2026'])).toEqual(['team:competed+senior']);
+        expect(teamIds(['class:2027'])).toEqual(['team:competed+senior', 'team:inactive+competed']);
+    });
+
     it('keeps important dates within the lines shown', () => {
         const done = { ...grad, history: [{ date: '2024-09-01', elo: 700 }, { date: '2025-05-01', elo: 800 }] };
         const annotations = ['2024-08-01', '2024-10-01', '2025-05-01', '2026-10-01'].map((date, i) => ({

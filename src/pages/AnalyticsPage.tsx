@@ -1,9 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import {
-    ALL_CLASSES,
     ALL_TEAMS,
-    GRADUATED_CLASSES,
-    isPeopleGroup,
     buildEloSeries,
     chartIncludes,
     chartIncludesTeam,
@@ -12,16 +9,11 @@ import {
     competedInAny,
     previousSeason,
     type ChartWho,
-    isClassKey,
     isCalendarDate,
     lookup,
     seasonLabel,
     seasonOf,
     snapshotFromSeries,
-    teamElo,
-    teamKey,
-    teamName,
-    type Team,
 } from '../domain';
 import {
     addAnnotation,
@@ -32,6 +24,7 @@ import {
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { Card, EmptyState, PageHeader } from '../components/Card';
+import { ClassPicker, type ClassChoice, type ClassShortcut } from '../components/ClassPicker';
 import { EloChart } from '../components/EloChart';
 import { useAppData } from '../state/AppDataProvider';
 import { useToast } from '../state/ToastProvider';
@@ -51,14 +44,14 @@ export function AnalyticsPage() {
     const toast = useToast();
     const wrapRef = useRef<HTMLDivElement>(null);
     const [view, setView] = useState<'people' | 'teams'>('people');
-    // '' = the default: the oldest class still on the team
-    const [chosenId, setSelectedId] = useState('');
-    const [compareIds, setCompareIds] = useState<string[]>([]);
+    // null = the default: the oldest class still on the team (people) or every class (teams)
+    const [pickedClasses, setPickedClasses] = useState<string[] | null>(null);
+    const [pickedTeamClasses, setPickedTeamClasses] = useState<string[] | null>(null);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [showAnnotations, setShowAnnotations] = useState(true);
     // "All individuals": everyone in each class who's still on the team, competed this season or not,
-    // with graduates listed separately
+    // plus graduates
     const [allPeople, setAllPeople] = useState(false);
     // Teams: before both partners were on the team, show whoever was
     const [extendRecords, setExtendRecords] = useState(true);
@@ -76,22 +69,10 @@ export function AnalyticsPage() {
     // the newest ten dates show first; the rest are a click away
     const [datesShown, setDatesShown] = useState(10);
 
-    const pool = debaters
-        .filter((d) => chartIncludes(d, who, activeIds))
-        .sort((a, b) => a.name.localeCompare(b.name));
     const byId = useMemo(() => lookup(debaters), [debaters]);
-    // graduates only show under All individuals, in their own groups
-    const graduates = useMemo(
-        () =>
-            who === 'team'
-                ? debaters
-                      .filter((d) => d.status === 'graduated')
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                : [],
-        [debaters, who]
-    );
-    const listed = [...pool, ...graduates];
-
+    const pool = debaters.filter((d) => chartIncludes(d, who, activeIds));
+    // graduates only show under All individuals
+    const graduates = who === 'team' ? debaters.filter((d) => d.status === 'graduated') : [];
 
     // One button per season with results: July 1 through June 30
     const seasonPresets = useMemo(() => {
@@ -102,13 +83,10 @@ export function AnalyticsPage() {
         });
     }, [tournaments]);
 
-    // "Class of 2027", "Class of 2028", … for everyone listed (plus anyone with no year set)
-    const classGroups = (people: typeof debaters) => {
+    // "Class of 2027", "Class of 2028", … with how many people (or teams) each has
+    const classChoices = (years: (number | null)[]): ClassChoice[] => {
         const counts = new Map<number | null, number>();
-        for (const d of people) {
-            const y = classOf(d);
-            counts.set(y, (counts.get(y) ?? 0) + 1);
-        }
+        for (const y of years) counts.set(y, (counts.get(y) ?? 0) + 1);
         return [...counts.entries()]
             .sort((a, b) => (a[0] ?? 9999) - (b[0] ?? 9999))
             .map(([year, count]) => ({
@@ -117,98 +95,65 @@ export function AnalyticsPage() {
                 count,
             }));
     };
-    // a class with someone still on the team is current; one with only graduates is listed apart
-    // (and needs a year to be picked out)
+    const keysOf = (cs: ClassChoice[]) => cs.map((c) => c.key);
+
+    // People: a class with someone still on the team is current; one with only graduates
+    // is a graduated class (and needs a year to be picked out)
     const currentKeys = new Set(pool.map((d) => classKey(classOf(d))));
-    const allClasses = classGroups(listed);
-    const currentClasses = allClasses.filter((c) => currentKeys.has(c.key));
-    const graduatedClasses = allClasses.filter(
-        (c) => !currentKeys.has(c.key) && c.key !== classKey(null)
+    const peopleClasses = classChoices([...pool, ...graduates].map(classOf)).filter(
+        (c) => currentKeys.has(c.key) || c.key !== classKey(null)
     );
-    const classOptions = [...currentClasses, ...graduatedClasses];
-    const defaultSelection = currentClasses[0]?.key ?? 'ALL';
-    // a class or person that's no longer listed (e.g. back from All individuals) falls back to the default
-    const listedPerson = (id: string) => listed.some((d) => d.id === id);
-    const selectedId =
-        !chosenId ||
-        (isClassKey(chosenId) && !classOptions.some((c) => c.key === chosenId)) ||
-        // everyone / graduates only exist under All individuals
-        ((chosenId === ALL_CLASSES || chosenId === GRADUATED_CLASSES) && graduates.length === 0) ||
-        (view === 'people' && !isPeopleGroup(chosenId) && !listedPerson(chosenId))
-            ? view === 'teams'
-                ? ALL_TEAMS
-                : defaultSelection
-            : chosenId;
-    const canCompare = (d: { id: string }) => d.id !== selectedId && !compareIds.includes(d.id);
-    const teamPool = useMemo(
-        () =>
-            teams
-                .filter((t) => chartIncludesTeam(t, who, byId))
-                .map((t) => ({
-                    key: teamKey(t.id),
-                    name: teamName(t, byId),
-                    elo: teamElo(t, byId),
-                }))
-                .sort((a, b) => a.name.localeCompare(b.name)),
-        [teams, who, byId]
+    const currentClasses = peopleClasses.filter((c) => currentKeys.has(c.key));
+    const graduatedClasses = peopleClasses.filter((c) => !currentKeys.has(c.key));
+    const peopleShortcuts: ClassShortcut[] =
+        graduatedClasses.length > 0
+            ? [
+                  { label: 'All classes', keys: keysOf(peopleClasses) },
+                  { label: 'Graduated classes', keys: keysOf(graduatedClasses) },
+                  { label: 'Current classes', keys: keysOf(currentClasses) },
+              ]
+            : [{ label: 'All classes', keys: keysOf(peopleClasses) }];
+
+    // Teams: the classes of the people on each current team (a team counts in both partners' classes)
+    const teamClasses = classChoices(
+        teams
+            .filter((t) => chartIncludesTeam(t, who, byId))
+            .flatMap((t) => [
+                ...new Set(
+                    [t.member1_id, t.member2_id]
+                        .map((id) => byId.get(id))
+                        .filter((d) => !!d)
+                        .map((d) => classOf(d!))
+                ),
+            ])
     );
+    const teamShortcuts: ClassShortcut[] = [{ label: 'All classes', keys: keysOf(teamClasses) }];
 
-    // A person's team: their current one if they have it, else their latest
-    const teamFor = (personId: string): Team | undefined => {
-        const theirs = teams.filter(
-            (t) => t.member1_id === personId || t.member2_id === personId
-        );
-        return theirs.find((t) => t.active) ?? theirs[theirs.length - 1];
+    // What's picked, minus classes this view doesn't have (e.g. graduated ones back on Individuals);
+    // if nothing picked is left, the default
+    const effective = (picked: string[] | null, choices: ClassChoice[], fallback: string[]) => {
+        if (picked === null) return fallback;
+        const kept = picked.filter((k) => choices.some((c) => c.key === k));
+        return picked.length > 0 && kept.length === 0 ? fallback : kept;
     };
-
-    // Switching keeps the same people on screen where it can:
-    // Jiayi vs Leon <-> their team, a team <-> its two members
-    const switchView = (next: 'people' | 'teams') => {
-        if (next === view) return;
-        if (next === 'teams') {
-            const a = isPeopleGroup(selectedId) ? undefined : teamFor(selectedId);
-            const others = compareIds
-                .map((id) => teamFor(id))
-                .filter((t): t is Team => !!t && t.id !== a?.id)
-                .map((t) => teamKey(t.id));
-            setSelectedId(a ? teamKey(a.id) : ALL_TEAMS);
-            setCompareIds(a ? [...new Set(others)] : []);
-        } else {
-            const teamOf = (key: string) => teams.find((t) => teamKey(t.id) === key);
-            const team = teamOf(selectedId);
-            const people = [selectedId, ...compareIds]
-                .map(teamOf)
-                .flatMap((t) => (t ? [t.member1_id, t.member2_id] : []));
-            setSelectedId(team ? team.member1_id : '');
-            setCompareIds(team ? [...new Set(people)].filter((id) => id !== team.member1_id) : []);
-        }
-        setView(next);
-    };
-    const isGroup = selectedId === ALL_TEAMS || isPeopleGroup(selectedId);
-    const selectedName =
-        selectedId === 'ALL'
-            ? graduates.length > 0
-                ? 'current_classes'
-                : 'all_people'
-            : selectedId === ALL_CLASSES
-              ? 'all_classes'
-              : selectedId === GRADUATED_CLASSES
-                ? 'graduated_classes'
-            : isClassKey(selectedId)
-              ? `class_of_${selectedId.slice('class:'.length)}`
-              : selectedId === ALL_TEAMS
-                ? 'all_teams'
-              : (teamPool.find((t) => t.key === selectedId)?.name ??
-                debaters.find((d) => d.id === selectedId)?.name ??
-                'elo');
+    const selectedKey = (
+        view === 'teams'
+            ? effective(pickedTeamClasses, teamClasses, keysOf(teamClasses))
+            : effective(pickedClasses, peopleClasses, currentClasses[0] ? [currentClasses[0].key] : [])
+    ).join();
+    // the same list from render to render while the picks don't change
+    const selectedClasses = useMemo(() => (selectedKey ? selectedKey.split(',') : []), [selectedKey]);
+    const exportName = `${view === 'teams' ? 'teams' : 'class'}_${
+        selectedClasses.map((k) => k.slice('class:'.length)).join('_') || 'none'
+    }`;
 
     const result = useMemo(
         () =>
             buildEloSeries({
                 debaters,
                 teams,
-                selectedId,
-                compareIds: isGroup ? [] : compareIds,
+                selectedId: view === 'teams' ? ALL_TEAMS : 'ALL',
+                classes: selectedClasses,
                 startDate: startDate || null,
                 endDate: endDate || null,
                 who,
@@ -224,9 +169,8 @@ export function AnalyticsPage() {
             teams,
             tournaments,
             practiceRounds,
-            isGroup,
-            selectedId,
-            compareIds,
+            view,
+            selectedClasses,
             startDate,
             endDate,
             who,
@@ -249,10 +193,8 @@ export function AnalyticsPage() {
                             type="button"
                             aria-pressed={view === 'people' && !allPeople}
                             onClick={() => {
-                                switchView('people');
+                                setView('people');
                                 setAllPeople(false);
-                                // people who aren't active drop off the comparison
-                                setCompareIds((ids) => ids.filter((id) => activeIds.has(id)));
                             }}
                         >
                             Individuals
@@ -261,7 +203,7 @@ export function AnalyticsPage() {
                             type="button"
                             aria-pressed={view === 'people' && allPeople}
                             onClick={() => {
-                                switchView('people');
+                                setView('people');
                                 setAllPeople(true);
                             }}
                         >
@@ -270,126 +212,31 @@ export function AnalyticsPage() {
                         <button
                             type="button"
                             aria-pressed={view === 'teams'}
-                            onClick={() => switchView('teams')}
+                            onClick={() => setView('teams')}
                         >
                             Teams<span className="wide-only"> (averaged)</span>
                         </button>
                     </div>
                     <div className="field">
-                        <label htmlFor="analyticsDebater">Show</label>
-                        <select
-                            id="analyticsDebater"
-                            value={selectedId}
-                            onChange={(e) => {
-                                const next = e.target.value;
-                                setSelectedId(next);
-                                setCompareIds((ids) =>
-                                    next === ALL_TEAMS || isPeopleGroup(next)
-                                        ? []
-                                        : ids.filter((id) => id !== next)
-                                );
-                            }}
-                        >
-                            {view === 'people' ? (
-                                <>
-                                    {graduates.length > 0 ? (
-                                        <>
-                                            <option value={ALL_CLASSES}>
-                                                All classes ({pool.length + graduates.length})
-                                            </option>
-                                            <option value={GRADUATED_CLASSES}>
-                                                Graduated classes ({graduates.length})
-                                            </option>
-                                            <option value="ALL">Current classes ({pool.length})</option>
-                                        </>
-                                    ) : (
-                                        <option value="ALL">All classes ({pool.length})</option>
-                                    )}
-                                    <optgroup label="Classes">
-                                        {[...graduatedClasses, ...currentClasses].map((c) => (
-                                            <option key={c.key} value={c.key}>
-                                                {c.label} ({c.count})
-                                            </option>
-                                        ))}
-                                    </optgroup>
-                                    <optgroup label="People">
-                                        {pool.map((d) => (
-                                            <option key={d.id} value={d.id}>
-                                                {d.name} ({Math.round(d.elo)})
-                                            </option>
-                                        ))}
-                                    </optgroup>
-                                    {graduates.length > 0 && (
-                                        <optgroup label="Graduates">
-                                            {graduates.map((d) => (
-                                                <option key={d.id} value={d.id}>
-                                                    {d.name} ({Math.round(d.elo)})
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                    )}
-                                </>
-                            ) : (
-                                <>
-                                    <option value={ALL_TEAMS}>
-                                        All current teams
-                                    </option>
-                                    {teamPool.map((t) => (
-                                        <option key={t.key} value={t.key}>
-                                            {t.name} ({Math.round(t.elo)})
-                                        </option>
-                                    ))}
-                                </>
-                            )}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label htmlFor="compareDebater">Compare with</label>
-                        <select
-                            id="compareDebater"
-                            value=""
-                            disabled={isGroup}
-                            onChange={(e) => {
-                                const id = e.target.value;
-                                if (id) setCompareIds((ids) => [...ids, id]);
-                            }}
-                        >
-                            <option value="">
-                                {isGroup
-                                    ? 'Pick one to compare'
-                                    : compareIds.length
-                                      ? 'Add another…'
-                                      : view === 'people'
-                                        ? 'Add a person…'
-                                        : 'Add a team…'}
-                            </option>
-                            {view === 'people' ? (
-                                <>
-                                    {pool.filter(canCompare).map((d) => (
-                                        <option key={d.id} value={d.id}>
-                                            {d.name}
-                                        </option>
-                                    ))}
-                                    {graduates.some(canCompare) && (
-                                        <optgroup label="Graduates">
-                                            {graduates.filter(canCompare).map((d) => (
-                                                <option key={d.id} value={d.id}>
-                                                    {d.name}
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                    )}
-                                </>
-                            ) : (
-                                teamPool
-                                    .filter((t) => t.key !== selectedId && !compareIds.includes(t.key))
-                                    .map((t) => (
-                                        <option key={t.key} value={t.key}>
-                                            {t.name}
-                                        </option>
-                                    ))
-                            )}
-                        </select>
+                        <label htmlFor="analyticsClasses">Show</label>
+                        {view === 'teams' ? (
+                            <ClassPicker
+                                id="analyticsClasses"
+                                classes={teamClasses}
+                                selected={selectedClasses}
+                                shortcuts={teamShortcuts}
+                                noun={['team', 'teams']}
+                                onChange={setPickedTeamClasses}
+                            />
+                        ) : (
+                            <ClassPicker
+                                id="analyticsClasses"
+                                classes={peopleClasses}
+                                selected={selectedClasses}
+                                shortcuts={peopleShortcuts}
+                                onChange={setPickedClasses}
+                            />
+                        )}
                     </div>
                     <div className="field">
                         <label htmlFor="from">From</label>
@@ -427,44 +274,6 @@ export function AnalyticsPage() {
                         </button>
                     ))}
                 </div>
-                {!isGroup && compareIds.length > 0 && (
-                    <div className="chips compare-chips">
-                        <span className="note">Comparing:</span>
-                        {compareIds.map((id) => {
-                            const name =
-                                teamPool.find((t) => t.key === id)?.name ??
-                                (() => {
-                                    const team = teams.find((t) => teamKey(t.id) === id);
-                                    return team ? teamName(team, byId) : undefined;
-                                })() ??
-                                byId.get(id)?.name ??
-                                'Unknown';
-                            return (
-                                <span key={id} className="pill pill-removable">
-                                    {name}
-                                    <button
-                                        type="button"
-                                        aria-label={`Stop comparing ${name}`}
-                                        onClick={() =>
-                                            setCompareIds((ids) => ids.filter((x) => x !== id))
-                                        }
-                                    >
-                                        ×
-                                    </button>
-                                </span>
-                            );
-                        })}
-                        {compareIds.length > 1 && (
-                            <button
-                                type="button"
-                                className="btn btn-ghost btn-sm"
-                                onClick={() => setCompareIds([])}
-                            >
-                                Clear
-                            </button>
-                        )}
-                    </div>
-                )}
                 <div className="analytics-checks">
                     <label className="row check">
                         <input
@@ -499,7 +308,7 @@ export function AnalyticsPage() {
                             const canvas = wrapRef.current?.querySelector('canvas');
                             if (!canvas) return;
                             const a = document.createElement('a');
-                            a.download = `${selectedName.replace(/[^\w+-]+/g, '_')}_elo_graph.png`;
+                            a.download = `${exportName}_elo_graph.png`;
                             a.href = canvas.toDataURL('image/png');
                             a.click();
                         }}

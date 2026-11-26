@@ -88,6 +88,27 @@ export interface BuildEloSeriesOptions {
     practiceRounds?: PracticeRound[];
     /** Team lines start with whichever partner came first, showing just them until both are on the team. */
     extendTeams?: boolean;
+    /**
+     * Classes to draw ('class:2027', …). With selectedId ALL_TEAMS, the teams with a member in
+     * one of them; otherwise everyone in them (graduates too when the whole team is listed).
+     */
+    classes?: string[];
+}
+
+/** Whether a person is drawn in a class view: in one of the classes and listed for this choice. */
+function inClassView(
+    d: Debater,
+    keys: ReadonlySet<string>,
+    who: ChartWho,
+    activeIds?: ReadonlySet<string>
+): boolean {
+    const year = classOf(d);
+    if (!keys.has(classKey(year))) return false;
+    // with the whole team listed, a class view is everyone in that class, graduates too
+    return (
+        chartIncludes(d, who, activeIds) ||
+        (who === 'team' && d.status === 'graduated' && year != null)
+    );
 }
 
 function pointsFromHistory(
@@ -203,6 +224,7 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         tournaments,
         practiceRounds,
         extendTeams = false,
+        classes,
     } = options;
 
     const index =
@@ -211,7 +233,29 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
             : null;
     const series: ChartSeries[] = [];
 
-    if (isPeopleGroup(selectedId)) {
+    if (classes) {
+        const keys = new Set(classes);
+        const byId = lookup(debaters);
+        if (selectedId === ALL_TEAMS) {
+            for (const team of teams) {
+                if (!chartIncludesTeam(team, who, byId)) continue;
+                const inClass = [team.member1_id, team.member2_id].some((id) => {
+                    const d = byId.get(id);
+                    return !!d && keys.has(classKey(classOf(d)));
+                });
+                if (inClass) series.push(teamSeries(team, debaters, index, startDate, endDate, extendTeams));
+            }
+        } else {
+            for (const debater of debaters) {
+                if (!inClassView(debater, keys, who, activeIds)) continue;
+                series.push({
+                    id: debater.id,
+                    label: debater.name,
+                    data: pointsFromHistory(debater, prepareHistory(debater, startDate, endDate), index),
+                });
+            }
+        }
+    } else if (isPeopleGroup(selectedId)) {
         const cls = isClassKey(selectedId) ? selectedId.slice('class:'.length) : null;
         // graduates are drawn only when the whole team is listed (or everyone is)
         const graduate = (d: Debater) => d.status === 'graduated' && who !== 'active';
