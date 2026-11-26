@@ -2,7 +2,10 @@ import { useMemo, useRef, useState } from 'react';
 import {
     ALL_TEAMS,
     buildEloSeries,
+    chartIncludes,
+    chartIncludesTeam,
     classKey,
+    type ChartWho,
     isClassKey,
     isCalendarDate,
     lookup,
@@ -49,8 +52,8 @@ export function AnalyticsPage() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [showAnnotations, setShowAnnotations] = useState(true);
-    // Off = only people who competed in the latest season, and teams that haven't disbanded
-    const [showGraduated, setShowGraduated] = useState(false);
+    // Who's listed: competed in the latest season, everyone still on the team, or graduates too
+    const [who, setWho] = useState<ChartWho>('active');
     const [eventDate, setEventDate] = useState('');
     const [eventName, setEventName] = useState('');
     const [uploaded, setUploaded] = useState<ChartSeries[] | null>(null);
@@ -58,9 +61,15 @@ export function AnalyticsPage() {
     const [datesShown, setDatesShown] = useState(10);
 
     const pool = debaters
-        .filter((d) => showGraduated || activeIds.has(d.id))
+        .filter((d) => chartIncludes(d, who, activeIds))
         .sort((a, b) => a.name.localeCompare(b.name));
     const byId = useMemo(() => lookup(debaters), [debaters]);
+    const whoOptions: { key: ChartWho; label: string }[] = [
+        { key: 'active', label: season ? `Competed in ${seasonLabel(season)}` : 'Active' },
+        { key: 'team', label: 'Everyone on the team' },
+        { key: 'all', label: 'With graduates' },
+    ];
+    const whoCount = (w: ChartWho) => debaters.filter((d) => chartIncludes(d, w, activeIds)).length;
 
     // One button per season with results: July 1 through June 30
     const seasonPresets = useMemo(() => {
@@ -97,14 +106,14 @@ export function AnalyticsPage() {
     const teamPool = useMemo(
         () =>
             teams
-                .filter((t) => showGraduated || t.active)
+                .filter((t) => chartIncludesTeam(t, who, byId))
                 .map((t) => ({
                     key: teamKey(t.id),
                     name: teamName(t, byId),
                     elo: teamElo(t, byId),
                 }))
                 .sort((a, b) => a.name.localeCompare(b.name)),
-        [teams, showGraduated, byId]
+        [teams, who, byId]
     );
 
     // A person's team: their current one if they have it, else their latest
@@ -159,7 +168,7 @@ export function AnalyticsPage() {
                 compareIds: isGroup ? [] : compareIds,
                 startDate: startDate || null,
                 endDate: endDate || null,
-                showGraduated,
+                who,
                 activeIds,
                 annotations,
                 showAnnotations,
@@ -176,7 +185,7 @@ export function AnalyticsPage() {
             compareIds,
             startDate,
             endDate,
-            showGraduated,
+            who,
             activeIds,
             annotations,
             showAnnotations,
@@ -242,7 +251,11 @@ export function AnalyticsPage() {
                             ) : (
                                 <>
                                     <option value={ALL_TEAMS}>
-                                        {showGraduated ? 'All teams' : 'All current teams'}
+                                        {who === 'all'
+                                            ? 'All teams'
+                                            : who === 'team'
+                                              ? 'All teams still on the team'
+                                              : 'All current teams'}
                                     </option>
                                     {teamPool.map((t) => (
                                         <option key={t.key} value={t.key}>
@@ -326,6 +339,20 @@ export function AnalyticsPage() {
                         </button>
                     ))}
                 </div>
+                <div className="season-presets" role="group" aria-label="Who to list">
+                    <span className="note">People:</span>
+                    {whoOptions.map((o) => (
+                        <button
+                            key={o.key}
+                            type="button"
+                            className="season-presets__btn"
+                            aria-pressed={who === o.key}
+                            onClick={() => setWho(o.key)}
+                        >
+                            {o.label} <span className="num muted">{whoCount(o.key)}</span>
+                        </button>
+                    ))}
+                </div>
                 {!isGroup && compareIds.length > 0 && (
                     <div className="chips compare-chips">
                         <span className="note">Comparing:</span>
@@ -372,15 +399,6 @@ export function AnalyticsPage() {
                             onChange={(e) => setShowAnnotations(e.target.checked)}
                         />
                         Show important dates
-                    </label>
-                    <label className="row check">
-                        <input
-                            type="checkbox"
-                            checked={!showGraduated}
-                            onChange={(e) => setShowGraduated(!e.target.checked)}
-                        />
-                        Show active only{season ? ` (competed in ${seasonLabel(season)})` : ''} and
-                        current teams
                     </label>
                 </div>
                 <div ref={wrapRef} className="chart-fullscreen-host">

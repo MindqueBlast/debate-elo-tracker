@@ -97,7 +97,10 @@ export {
 export {
     ALL_TEAMS,
     buildEloSeries,
+    chartIncludes,
+    chartIncludesTeam,
     classKey,
+    type ChartWho,
     isClassKey,
     snapshotFromSeries,
     teamKey,

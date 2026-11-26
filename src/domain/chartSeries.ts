@@ -24,6 +24,32 @@ export const teamKey = (id: string) => `team:${id}`;
 export const classKey = (year: number | null) => `class:${year ?? 'none'}`;
 export const isClassKey = (id: string) => id.startsWith('class:');
 
+/**
+ * Who a chart lists: people who competed this season, everyone still on the
+ * team (inactive people included), or everyone ever, graduates too.
+ */
+export type ChartWho = 'active' | 'team' | 'all';
+
+export function chartIncludes(
+    d: Debater,
+    who: ChartWho,
+    activeIds?: ReadonlySet<string>
+): boolean {
+    if (who === 'all') return true;
+    if (who === 'team') return d.status !== 'graduated';
+    return activeIds ? activeIds.has(d.id) : d.status === 'active';
+}
+
+/** Teams that go with each choice: current ones, ones whose two people are both still on the team, or all. */
+export function chartIncludesTeam(t: Team, who: ChartWho, byId: Map<string, Debater>): boolean {
+    if (who === 'all' || t.active) return true;
+    if (who === 'active') return false;
+    return [t.member1_id, t.member2_id].every((id) => {
+        const d = byId.get(id);
+        return !!d && d.status !== 'graduated';
+    });
+}
+
 export interface BuildEloSeriesOptions {
     debaters: Debater[];
     teams?: Team[];
@@ -33,8 +59,10 @@ export interface BuildEloSeriesOptions {
     compareIds?: string[];
     startDate?: string | null;
     endDate?: string | null;
-    /** Show everyone (otherwise only active people and current teams). */
+    /** Show everyone (otherwise only active people and current teams). Same as who: 'all'. */
     showGraduated?: boolean;
+    /** Who group views list (defaults to 'active', or 'all' with showGraduated). */
+    who?: ChartWho;
     /** Who counts as active (competed this season); defaults to anyone not graduated. */
     activeIds?: ReadonlySet<string>;
     annotations?: Annotation[];
@@ -148,6 +176,7 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         startDate,
         endDate,
         showGraduated = false,
+        who = showGraduated ? 'all' : 'active',
         activeIds,
         annotations = [],
         showAnnotations = false,
@@ -165,7 +194,7 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         const cls = isClassKey(selectedId) ? selectedId.slice('class:'.length) : null;
         const pool = debaters.filter(
             (d) =>
-                (showGraduated || (activeIds ? activeIds.has(d.id) : d.status === 'active')) &&
+                chartIncludes(d, who, activeIds) &&
                 (cls === null ||
                     (cls === 'none' ? d.class_year == null : d.class_year === Number(cls)))
         );
@@ -178,7 +207,8 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
             });
         }
     } else if (selectedId === ALL_TEAMS) {
-        for (const team of teams.filter((t) => t.active || showGraduated)) {
+        const byId = lookup(debaters);
+        for (const team of teams.filter((t) => chartIncludesTeam(t, who, byId))) {
             series.push(teamSeries(team, debaters, index, startDate, endDate));
         }
     } else {
