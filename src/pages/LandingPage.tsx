@@ -4,8 +4,6 @@ import { Logo } from '../components/Logo';
 import { useTheme } from '../state/ThemeProvider';
 import { useAuth } from '../auth/AuthProvider';
 import { SeasonReplay } from '../components/SeasonReplay';
-import { FlapText } from '../components/FlapText';
-import { CREATORS } from '../lib/credits';
 import '../styles/landing.css';
 
 /** Screens captured from the tracker itself (guest view), one per theme. */
@@ -310,20 +308,9 @@ export function LandingPage() {
 
             <footer className="l-footer">
                 <div className="l-container">
-                    {/* the credits, on the scoreboard's flap tiles */}
-                    <section className="l-credits" aria-labelledby="landing-credits">
-                        <h2 id="landing-credits" className="l-credits__made">
-                            Made by
-                        </h2>
-                        <ul className="l-credits__list">
-                            {CREATORS.map((c) => (
-                                <li key={c.name} className="l-credit">
-                                    <FlapText text={c.name} className="flap--lg" />
-                                    <span className="l-credit__role">{c.role}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </section>
+                    <p className="l-footer__names">
+                        Made by <strong>Aaditya Sahu</strong> and <strong>Jiayi Meng</strong>
+                    </p>
                     <div className="l-footer__row">
                         <Link to="/" className="l-wordmark">
                             <Logo />
