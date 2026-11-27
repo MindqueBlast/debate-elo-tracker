@@ -1,11 +1,12 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from './Button';
 import { Logo } from './Logo';
 import { QuickSearch } from './QuickSearch';
 import { AppBackground } from './AppBackground';
+import { AppCredits } from './AppCredits';
 import { useTheme } from '../state/ThemeProvider';
 
 const LINKS = [
@@ -47,7 +48,7 @@ export function AppShell() {
             ) : (
                 <span className="pill">{roleLabel}</span>
             )}
-            <Button variant="ghost" size="sm" onClick={toggle}>
+            <Button variant="ghost" size="sm" onClick={(e) => toggle(e.currentTarget)}>
                 {theme === 'dark' ? 'Light' : 'Dark'}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => void signOut()}>
@@ -73,11 +74,13 @@ export function AppShell() {
                     aria-label="Primary"
                 >
                     <div className="nav-links__inner">
-                        {LINKS.filter((l) => isAdmin || !l.editorsOnly).map((l) => (
+                        {LINKS.filter((l) => isAdmin || !l.editorsOnly).map((l, i) => (
                             <NavLink
                                 key={l.to}
                                 to={l.to}
                                 end={l.end}
+                                // on phones the menu's links drop in one after another
+                                style={{ '--n': i } as CSSProperties}
                                 className={({ isActive }) =>
                                     `nav-link ${isActive ? 'active' : ''}`
                                 }
@@ -121,6 +124,7 @@ export function AppShell() {
             <main id="main" className="page" key={pathname}>
                 <Outlet />
             </main>
+            <AppCredits />
         </div>
     );
 }

@@ -141,7 +141,7 @@ export function PlayerProfilePage() {
                         <div>
                             <div className="stat-label">Current Elo</div>
                             <div className="profile-elo figure">
-                                <AnimatedNumber value={Math.round(debater.elo)} duration={700} />
+                                <AnimatedNumber value={Math.round(debater.elo)} from={0} duration={1000} />
                             </div>
                         </div>
                         {rank != null && (

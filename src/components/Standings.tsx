@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { AnimatedNumber } from './AnimatedNumber';
 
 export interface StandingRow {
     key: string;
@@ -81,7 +82,13 @@ export function Standings({
                             </span>
                             <span className="lane__elo">
                                 <span className="sr-only">Elo </span>
-                                {Math.round(r.elo)}
+                                {/* rolls up from the bottom of the board as its rail fills */}
+                                <AnimatedNumber
+                                    value={Math.round(r.elo)}
+                                    from={Math.max(0, Math.round(floor))}
+                                    duration={820}
+                                    delay={Math.min(i, 16) * 28}
+                                />
                             </span>
                         </>
                     );

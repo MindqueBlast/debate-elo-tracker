@@ -158,6 +158,8 @@ function clickedDate(
 
 /** How long a line takes to sweep out to its new start (or back in). */
 const SWEEP_MS = 800;
+/** How long lines take to draw in when a chart first shows. */
+const INTRO_MS = 1100;
 
 type Sweep = {
     /** grow: lines gained earlier points; shrink: they're losing them */
@@ -254,8 +256,13 @@ export function EloChart({
         }
         return () => timers.forEach((t) => window.clearTimeout(t));
     }, [seriesProp, reduced]);
+    // When a chart first shows (or shows someone else), its lines draw in
+    // from the left. start is set on the first frame actually drawn.
+    const introRef = useRef<{ start: number | null } | null>(null);
+    const introFor = useRef<string | null>(null);
     const sweepPlugin = useMemo(() => {
         const clipped = new Set<number>();
+        let introClipped = false;
         const progress = (s: Sweep) => {
             const t = Math.min(1, (performance.now() - s.start) / SWEEP_MS);
             // eases in and out, so it reads as being drawn
@@ -263,6 +270,28 @@ export function EloChart({
         };
         return {
             id: 'sweep',
+            // the first draw-in clips every line (and its shading) at once
+            beforeDatasetsDraw(chart: Chart) {
+                const intro = introRef.current;
+                if (!intro) return;
+                if (intro.start === null) intro.start = performance.now();
+                const t = Math.min(1, (performance.now() - intro.start) / INTRO_MS);
+                if (t >= 1) return;
+                const a = chart.chartArea;
+                // eases out, like a pen slowing as it reaches today
+                const edge = a.left - 12 + (a.right - a.left + 24) * (1 - Math.pow(1 - t, 3));
+                chart.ctx.save();
+                chart.ctx.beginPath();
+                chart.ctx.rect(a.left - 20, a.top - 20, edge - a.left + 20, a.bottom - a.top + 40);
+                chart.ctx.clip();
+                introClipped = true;
+            },
+            afterDatasetsDraw(chart: Chart) {
+                if (introClipped) {
+                    introClipped = false;
+                    chart.ctx.restore();
+                }
+            },
             beforeDatasetDraw(chart: Chart, args: { index: number }) {
                 const s = sweepRef.current;
                 const id = (chart.data.datasets[args.index] as { id?: string }).id;
@@ -285,6 +314,12 @@ export function EloChart({
                 if (clipped.delete(args.index)) chart.ctx.restore();
             },
             afterDraw(chart: Chart) {
+                const intro = introRef.current;
+                if (intro) {
+                    if (intro.start !== null && performance.now() - intro.start >= INTRO_MS) introRef.current = null;
+                    // (a chart that closed mid-draw has no canvas left)
+                    else requestAnimationFrame(() => chart.canvas && chart.draw());
+                }
                 const s = sweepRef.current;
                 if (!s) return;
                 if (performance.now() - s.start < SWEEP_MS) {
@@ -299,6 +334,10 @@ export function EloChart({
     // Zoom resets when a different person or team is shown first
     const [zoom, setZoom] = useState<Zoom>(ALL_TIME);
     const primaryId = series.find((s) => s.id !== ANNOTATIONS)?.id ?? '';
+    if (introFor.current !== primaryId) {
+        introFor.current = primaryId;
+        introRef.current = reduced || !primaryId ? null : { start: null };
+    }
     const [zoomFor, setZoomFor] = useState(primaryId);
     // Lines switched off from the legend (or all at once)
     const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());

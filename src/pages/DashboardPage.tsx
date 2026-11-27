@@ -66,20 +66,20 @@ export function DashboardPage() {
                 sub={loading ? 'Refreshing the board…' : 'Where the team stands today.'}
             />
             <div className={`grid ${hasPractice ? 'grid-4' : 'grid-3'} stat-grid`}>
-                <StatCard label="Total" value={<AnimatedNumber value={onTeam} duration={700} />} />
+                <StatCard label="Total" value={<AnimatedNumber value={onTeam} from={0} duration={900} />} />
                 <StatCard
                     label="Average Elo"
-                    value={<AnimatedNumber value={Math.round(avg)} duration={700} />}
+                    value={<AnimatedNumber value={Math.round(avg)} from={0} duration={900} />}
                 />
                 {hasPractice && (
                     <StatCard
                         label="Practice rounds"
-                        value={<AnimatedNumber value={practiceRounds.length} duration={700} />}
+                        value={<AnimatedNumber value={practiceRounds.length} from={0} duration={900} />}
                     />
                 )}
                 <StatCard
                     label="Tournaments"
-                    value={<AnimatedNumber value={tournaments.length} duration={700} />}
+                    value={<AnimatedNumber value={tournaments.length} from={0} duration={900} />}
                 />
             </div>
             <div className="grid grid-2">

@@ -4,6 +4,8 @@ import { Logo } from '../components/Logo';
 import { useTheme } from '../state/ThemeProvider';
 import { useAuth } from '../auth/AuthProvider';
 import { SeasonReplay } from '../components/SeasonReplay';
+import { FlapText } from '../components/FlapText';
+import { CREATORS } from '../lib/credits';
 import '../styles/landing.css';
 
 /** Screens captured from the tracker itself (guest view), one per theme. */
@@ -140,7 +142,7 @@ export function LandingPage() {
                             <span className="l-wordmark__short">Syosset Elo</span>
                         </Link>
                         <div className="l-nav__actions">
-                            <button type="button" className="l-text-btn" onClick={toggle}>
+                            <button type="button" className="l-text-btn" onClick={(e) => toggle(e.currentTarget)}>
                                 {theme === 'dark' ? 'Light' : 'Dark'}
                             </button>
                             {role ? (
@@ -308,7 +310,20 @@ export function LandingPage() {
 
             <footer className="l-footer">
                 <div className="l-container">
-                    <p className="l-footer__names">Made by Aaditya Sahu and Jiayi Meng</p>
+                    {/* the credits, on the scoreboard's flap tiles */}
+                    <section className="l-credits" aria-labelledby="landing-credits">
+                        <h2 id="landing-credits" className="l-credits__made">
+                            Made by
+                        </h2>
+                        <ul className="l-credits__list">
+                            {CREATORS.map((c) => (
+                                <li key={c.name} className="l-credit">
+                                    <FlapText text={c.name} className="flap--lg" />
+                                    <span className="l-credit__role">{c.role}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </section>
                     <div className="l-footer__row">
                         <Link to="/" className="l-wordmark">
                             <Logo />

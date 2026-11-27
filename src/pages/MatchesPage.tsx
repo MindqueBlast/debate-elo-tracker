@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -769,11 +769,15 @@ export function MatchesPage() {
                                     </span>
                                 </h2>
                                 <ol className="tourney-list">
-                                    {list.map((t) => {
+                                    {list.map((t, i) => {
                                         const open = openIds.has(t.id) || editingId === t.id;
                                         const best = bestOf(t);
                                         return (
-                                            <li key={t.id} className={`tourney${open ? ' is-open' : ''}`}>
+                                            <li
+                                                key={t.id}
+                                                className={`tourney${open ? ' is-open' : ''}`}
+                                                style={{ '--i': i } as CSSProperties}
+                                            >
                                                 <button
                                                     type="button"
                                                     className="tourney__row"
@@ -837,8 +841,12 @@ export function MatchesPage() {
                                                                                     DIVS.indexOf(a.division) - DIVS.indexOf(b.division) ||
                                                                                     avgChange(b) - avgChange(a)
                                                                             )
-                                                                            .map((p) => (
-                                                                                <div key={p.id ?? p.debater_id} className="note entry-line">
+                                                                            .map((p, i) => (
+                                                                                <div
+                                                                                    key={p.id ?? p.debater_id}
+                                                                                    className="note entry-line"
+                                                                                    style={{ '--i': i } as CSSProperties}
+                                                                                >
                                                                                     <span className="pill pill-div">{SHORT[p.division]}</span>
                                                                                     <span className="entry-line__name">
                                                                                         <Deltas
@@ -997,8 +1005,8 @@ export function MatchesPage() {
                             monthGroups.map(([month, rounds]) => (
                                 <section key={month} className="practice-month" aria-label={monthLabel(month)}>
                                     <h3 className="practice-month__head">{monthLabel(month)}</h3>
-                                    {rounds.map((r) => (
-                                        <div key={r.id} className="practice-row">
+                                    {rounds.map((r, i) => (
+                                        <div key={r.id} className="practice-row" style={{ '--i': i } as CSSProperties}>
                                             <span className="practice-row__date num">{Number(r.date.slice(8, 10))}</span>
                                             <span className="practice-row__main">
                                                 <span>

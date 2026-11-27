@@ -632,9 +632,48 @@
     color-scheme: dark;
 }
 
-.l-footer__names {
-    margin-bottom: 20px;
+/* the credits: both names on flap tiles, big enough to read from the back of the room */
+.l-credits {
+    padding: 24px 0 40px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.landing .l-credits__made {
+    max-width: none;
+    margin-bottom: 18px;
+    font-family: var(--font);
     font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: #a6a8b0;
+}
+
+.l-credits__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px 56px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.l-credit {
+    display: grid;
+    gap: 12px;
+}
+
+.flap--lg {
+    font-size: clamp(30px, 4.4vw, 60px);
+}
+
+.l-credit__role {
+    font-size: 14px;
+    color: #a6a8b0;
+}
+
+.l-credit:hover .flap__tile {
+    background: linear-gradient(#2e3036 0 50%, #24262b 50% 100%);
 }
 
 .l-footer__row {
@@ -760,5 +799,63 @@
 
     .l-close {
         padding: 80px 0;
+    }
+}
+
+/* ---- scroll: each part of the page rises into place as it comes into view.
+   Tied to the scroll position itself (so it can never be left half-shown),
+   only where the browser supports it, and never with reduced motion. ---- */
+@supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+        .l-body .l-head,
+        .l-body .l-split > div:first-child:not(.l-head),
+        .l-ledger__col,
+        .l-rows > div,
+        .l-close .l-head {
+            animation: l-rise linear both;
+            animation-timeline: view();
+            animation-range: entry 0% entry 90%;
+        }
+
+        .l-body .l-shot,
+        .l-close .l-shot {
+            animation: l-shot-rise linear both;
+            animation-timeline: view();
+            animation-range: entry 0% cover 40%;
+        }
+
+        .l-credit {
+            animation: l-rise linear both;
+            animation-timeline: view();
+            animation-range: entry 0% entry 100%;
+        }
+
+        /* the hero board drifts up a little slower than the page as you leave it */
+        .l-hero__board {
+            animation: l-drift linear both;
+            animation-timeline: view();
+            animation-range: exit 0% exit 100%;
+        }
+    }
+}
+
+@keyframes l-rise {
+    from {
+        opacity: 0;
+        transform: translateY(56px);
+    }
+}
+
+@keyframes l-shot-rise {
+    from {
+        opacity: 0;
+        transform: translateY(80px) scale(0.94);
+    }
+}
+
+@keyframes l-drift {
+    to {
+        transform: translateY(18%);
+        opacity: 0.4;
     }
 }
