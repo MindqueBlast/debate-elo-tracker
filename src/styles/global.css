@@ -2919,11 +2919,6 @@ a.pill:hover {
     font-weight: 800;
 }
 
-.matchup-note {
-    margin: var(--space-3) 0 var(--space-5);
-    max-width: 72ch;
-}
-
 .matchup-shared {
     margin-top: var(--space-2);
 }

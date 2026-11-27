@@ -127,8 +127,6 @@ export function MatchupPage() {
 
     const same = a.key === b.key;
     const chance = winChance(a.elo, b.elo);
-    const gap = Math.abs(a.elo - b.elo);
-    const favourite = chance >= 0.5 ? a : b;
     const aheadA = shared.filter((s) => s.ea.raw_wins > s.eb.raw_wins).length;
     const aheadB = shared.filter((s) => s.eb.raw_wins > s.ea.raw_wins).length;
 
@@ -197,12 +195,6 @@ export function MatchupPage() {
                             <b className="figure">{pct(1 - chance)}</b>
                         </span>
                     </div>
-                    <p className="matchup-note">
-                        {gap < 1
-                            ? 'Dead even on ratings.'
-                            : `On ratings alone, ${favourite.name} ${favourite.members.length > 1 ? 'are' : 'is'} favoured by ${Math.round(gap)} Elo: about ${pct(Math.max(chance, 1 - chance))} to ${pct(Math.min(chance, 1 - chance))}.`}{' '}
-                        <span className="muted">Read the standard Elo way, where 400 points is about 10 to 1.</span>
-                    </p>
                 </>
             )}
 
