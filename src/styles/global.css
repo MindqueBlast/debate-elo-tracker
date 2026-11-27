@@ -2883,7 +2883,7 @@ a.pill:hover {
     /* each side keeps room for its figure, however lopsided */
     grid-template-columns: minmax(64px, calc(var(--chance) * 100%)) minmax(64px, 1fr);
     height: 44px;
-    margin-top: var(--space-4);
+    margin: var(--space-4) 0 var(--space-5);
     border-radius: var(--radius);
     overflow: hidden;
     color: #fff;
