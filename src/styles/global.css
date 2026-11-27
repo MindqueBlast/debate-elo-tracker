@@ -3724,6 +3724,11 @@ a.pill:hover {
 .app-credits {
     position: relative;
     z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 6px 24px;
     margin-top: auto;
     width: min(var(--page-max), calc(100% - 48px));
     margin-inline: auto;
@@ -3731,10 +3736,15 @@ a.pill:hover {
     border-top: 1px solid var(--line);
 }
 
+.app-credits__brand,
 .app-credits__line {
     margin: 0;
     font-size: 13px;
     color: var(--text-muted);
+}
+
+.app-credits__brand:hover {
+    color: var(--text);
 }
 
 .app-credits__name {

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { CREATORS } from '../lib/credits';
 import { useAppData } from '../state/AppDataProvider';
 
-/** One quiet line at the foot of every page; each name opens that person's profile. */
+/** One quiet line at the foot of every page: the tracker on the left, who made it on the right (each name opens that person's profile). */
 export function AppCredits() {
     const { debaters } = useAppData();
     const profileOf = (first: string) => {
@@ -16,6 +16,9 @@ export function AppCredits() {
 
     return (
         <footer className="app-credits">
+            <Link to="/" className="app-credits__brand">
+                Syosset Elo Tracker
+            </Link>
             <p className="app-credits__line">
                 Made by{' '}
                 {CREATORS.map((c, i) => {
