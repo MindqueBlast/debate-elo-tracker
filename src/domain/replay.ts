@@ -63,6 +63,8 @@ export interface ReplayEntryResult {
     /** Each person's own change, by id. */
     changes: Record<string, number>;
     rounds: number;
+    /** The wins their Elo going in called for (p × E_tourney, averaged over the pair). */
+    expectedWins: number;
 }
 
 export interface ReplayResult {
@@ -190,12 +192,14 @@ export function replay(input: {
                 played.add(m.id);
                 changes[m.id] = m.change;
             }
+            const pAvg = res.members.reduce((sum, m) => sum + m.p_value, 0) / Math.max(1, res.members.length);
             entries[entry.id] = {
                 teamElo: res.oldElo,
                 adjustedWins: res.W_adjusted,
                 change: res.change,
                 changes,
                 rounds: res.n,
+                expectedWins: pAvg * eTourney,
             };
         });
         // Flat point for everyone on the roster who sat this one out

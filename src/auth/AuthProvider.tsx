@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth';
 import type { UserRole } from './allowlist';
 import { fetchRole } from './access';
 import { signInWithGoogle, signOutUser, subscribeAuth } from './firebase';
+import { setActor } from '../data/mutations';
 
 const GUEST_KEY = 'det-guest';
 
@@ -93,6 +94,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         return unsub;
     }, [devMode, guestMode]);
+
+    // saves are logged under whoever is signed in (test mode on a dev machine: VITE_DEV_EMAIL)
+    useEffect(() => {
+        setActor(user?.email ?? (devMode && import.meta.env.DEV ? (import.meta.env.VITE_DEV_EMAIL ?? null) : null));
+    }, [user, devMode]);
 
     const effectiveRole: UserRole | null = devMode
         ? 'admin'

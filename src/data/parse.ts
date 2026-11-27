@@ -68,6 +68,7 @@ export function asTournaments(raw: unknown): Tournament[] {
             affect: optionalNumber(t.affect),
             max_gain: optionalNumber(t.max_gain),
             max_rounds: optionalNumber(t.max_rounds),
+            rated: t.rated !== false,
             created_at: typeof t.created_at === 'string' ? t.created_at : null,
             tournament_participants: participantsRaw
                 .filter((p) => p && typeof p === 'object')

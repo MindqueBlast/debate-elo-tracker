@@ -1,7 +1,21 @@
 import { supabase } from './supabase';
 import {
+    applyChanges,
+    compact,
     computeAll,
     diffDerived,
+    getEloConfig,
+    invertChanges,
+    isEmptyChanges,
+    mergeChanges,
+    newSeasonChanges,
+    scoringRewrite,
+    stillAsSaved,
+    validateConfig,
+    withEloConfig,
+    type Changes,
+    type EloConfig,
+    type State,
     findTeam,
     getLocalDateString,
     seasonOf,
@@ -9,11 +23,11 @@ import {
     validateTournamentParams,
     withoutPerson,
     type Debater,
+    type DateName,
     type Derived,
     type DerivedEntry,
     type Division,
     type InputAdjustment,
-    type InputEntry,
     type InputPerson,
     type InputPractice,
     type Inputs,
@@ -34,42 +48,86 @@ export class MutationError extends Error {
 
 // ----------------------------------------------------------- saving changes
 
-type DateName = { date: string; name: string };
+/** Who's saving, for the change log (set when someone signs in). */
+let actor: string | null = null;
+export function setActor(email: string | null) {
+    actor = email ? email.trim().toLowerCase() : null;
+}
 
-/** The stored facts a save adds, changes or removes. */
-interface Changes {
-    people_upsert?: InputPerson[];
-    people_delete?: string[];
-    tournaments_upsert?: Omit<InputTournament, 'entries'>[];
-    tournaments_delete?: string[];
-    entries_upsert?: (InputEntry & { tournament_id: string })[];
-    entries_delete?: string[];
-    practice_upsert?: InputPractice[];
-    practice_delete?: string[];
-    adjustments_upsert?: InputAdjustment[];
-    adjustments_delete?: string[];
-    annotations_insert?: DateName[];
-    annotations_delete?: DateName[];
+export interface CommitOptions {
+    /** What the change log calls this ("Recorded Harvard"). Without one, nothing is logged. */
+    action?: string;
+    /** False for changes the log can't take back (scoring settings, restores). */
+    undoable?: boolean;
+    /** Take a backup of everything first, with this reason. */
+    snapshot?: string;
+    /** The admin password, for saves that need it. */
+    password?: string;
+    requirePassword?: boolean;
+    /** A setting saved along with the change (needs the password). */
+    settings?: { key: string; value: unknown };
+    /** The logged change this one takes back. */
+    undoes?: string;
+    /** Work the numbers out under these settings instead of the current ones. */
+    config?: EloConfig;
+}
+
+/** The state a save starts from, for working out how to undo it. */
+export const stateOf = (data: AppSnapshot): State => ({
+    inputs: data.inputs,
+    teams: data.teams,
+    annotations: data.annotations.map(({ date, name }) => ({ date, name })),
+});
+
+/** The database's own words for the errors people can act on. */
+function saveError(message: string | undefined, fallback: string): MutationError {
+    const m = message ?? '';
+    if (m.includes('stale_data')) {
+        return new MutationError('Someone else saved a change since this page loaded. Refresh and try again.');
+    }
+    if (m.includes('already_undone')) return new MutationError('That change was already undone.');
+    for (const known of ['Wrong password.', 'No admin password has been set yet.', 'Only admins can do that.']) {
+        if (m.includes(known)) return new MutationError(known);
+    }
+    return new MutationError(fallback);
 }
 
 /**
  * Save a change. Everything is recalculated from the very beginning with the
  * change in place, then the change and every number that moved are stored in
  * one go: all of it saves or none of it does. If someone else saved since this
- * page loaded, nothing is written and the person is asked to refresh.
+ * page loaded, nothing is written and the person is asked to refresh. With an
+ * action, the change goes in the change log along with how to undo it.
  */
 async function commit(
     data: AppSnapshot,
     next: Inputs,
     changes: Changes,
-    failMessage: string
+    failMessage: string,
+    opts: CommitOptions = {}
 ): Promise<Derived> {
-    const derived = computeAll(next, getLocalDateString());
+    const derived = withEloConfig(opts.config ?? getEloConfig(), () => computeAll(next, getLocalDateString()));
     const moved = diffDerived(derived, data.stored);
     const { error } = await supabase.rpc('apply_changes', {
         payload: {
             revision: data.revision,
-            ...changes,
+            actor,
+            ...compact(changes),
+            ...(opts.snapshot ? { snapshot: opts.snapshot } : {}),
+            ...(opts.settings ? { settings: opts.settings } : {}),
+            ...(opts.password !== undefined ? { password: opts.password } : {}),
+            ...(opts.requirePassword ? { require_password: true } : {}),
+            ...(opts.action
+                ? {
+                      log: {
+                          action: opts.action,
+                          before: invertChanges(stateOf(data), changes),
+                          after: compact(changes),
+                          undoable: opts.undoable !== false,
+                          ...(opts.undoes ? { undoes: opts.undoes } : {}),
+                      },
+                  }
+                : {}),
             derived: {
                 people: Object.entries(moved.people).map(([id, p]) => ({
                     id,
@@ -82,18 +140,20 @@ async function commit(
             },
         },
     });
-    if (error) {
-        if (error.message?.includes('stale_data')) {
-            throw new MutationError(
-                'Someone else saved a change since this page loaded. Refresh and try again.'
-            );
-        }
-        throw new MutationError(failMessage);
-    }
+    if (error) throw saveError(error.message, failMessage);
     return derived;
 }
 
 const newId = () => crypto.randomUUID();
+
+/** "Jiayi+Leon", for log entries. */
+function namesOf(data: AppSnapshot, ids: (string | null | undefined)[]): string {
+    const names = new Map(data.inputs.people.map((p) => [p.id, p.name]));
+    return ids
+        .filter((id): id is string => !!id)
+        .map((id) => names.get(id) ?? 'someone')
+        .join('+');
+}
 
 const replaceById = <T extends { id: string }>(list: T[], item: T) =>
     list.some((x) => x.id === item.id)
@@ -137,7 +197,8 @@ export async function addDebater(
         data,
         { ...data.inputs, people: [...data.inputs.people, person] },
         { people_upsert: [person] },
-        'Failed to add person.'
+        'Failed to add person.',
+        { action: `Added ${person.name}` }
     );
 }
 
@@ -178,7 +239,8 @@ export async function updateDebater(
         data,
         { ...data.inputs, people: replaceById(data.inputs.people, person) },
         { people_upsert: [person] },
-        'Failed to save changes.'
+        'Failed to save changes.',
+        { action: `Edited ${person.name}` }
     );
 }
 
@@ -208,7 +270,8 @@ export async function removeDebater(data: AppSnapshot, id: string) {
                 .filter((t) => t.name)
                 .map((t) => ({ date: t.date, name: t.name as string })),
         },
-        'Failed to remove.'
+        'Failed to remove.',
+        { action: `Removed ${namesOf(data, [id])}` }
     );
 }
 
@@ -225,7 +288,8 @@ export async function toggleGraduate(data: AppSnapshot, debater: Debater) {
         data,
         { ...data.inputs, people: replaceById(data.inputs.people, person) },
         { people_upsert: [person] },
-        'Failed to update status.'
+        'Failed to update status.',
+        { action: graduating ? `Graduated ${person.name}` : `Made ${person.name} active again` }
     );
     if (graduating) {
         // A graduated person's teams come off the active list
@@ -261,16 +325,19 @@ export async function setDebaterElo(
         data,
         { ...data.inputs, adjustments: [...data.inputs.adjustments, adj] },
         { adjustments_upsert: [adj] },
-        'Failed to set Elo.'
+        'Failed to set Elo.',
+        { action: `Set ${debater.name}’s Elo to ${Math.round(newElo)}` }
     );
 }
 
 export async function deleteAdjustment(data: AppSnapshot, id: string) {
+    const who = data.inputs.adjustments.find((a) => a.id === id)?.debater_id;
     await commit(
         data,
         { ...data.inputs, adjustments: data.inputs.adjustments.filter((a) => a.id !== id) },
         { adjustments_delete: [id] },
-        'Failed to remove the adjustment.'
+        'Failed to remove the adjustment.',
+        { action: `Removed an Elo adjustment for ${namesOf(data, [who])}` }
     );
 }
 
@@ -400,7 +467,8 @@ export async function recordPracticeRound(
         data,
         { ...data.inputs, practice: [...data.inputs.practice, round] },
         { practice_upsert: [round] },
-        'Failed to save the round.'
+        'Failed to save the round.',
+        { action: `Recorded a practice round: ${namesOf(data, input.winner)} def. ${namesOf(data, input.loser)}` }
     );
     const r = derived.practice[round.id];
     return [
@@ -412,11 +480,17 @@ export async function recordPracticeRound(
 }
 
 export async function deletePracticeRound(data: AppSnapshot, id: string) {
+    const r = data.inputs.practice.find((x) => x.id === id);
     await commit(
         data,
         { ...data.inputs, practice: data.inputs.practice.filter((r) => r.id !== id) },
         { practice_delete: [id] },
-        'Failed to delete the round.'
+        'Failed to delete the round.',
+        {
+            action: r
+                ? `Deleted a practice round: ${namesOf(data, [r.winner_id, r.winner_partner_id])} def. ${namesOf(data, [r.loser_id, r.loser_partner_id])}`
+                : 'Deleted a practice round',
+        }
     );
 }
 
@@ -458,6 +532,7 @@ function draftInput(data: AppSnapshot, draft: TournamentDraft): InputTournament 
         affect: draft.params.k,
         max_gain: draft.params.maxGain,
         max_rounds: draft.params.maxRounds,
+        rated: existing?.rated !== false,
         created_at: existing?.created_at ?? draft.created_at ?? null,
         entries: draft.entries.map((e) => {
             const kept = existing?.entries.find((x) => x.id === e.key);
@@ -506,7 +581,7 @@ export function draftFromTournament(t: Tournament): TournamentDraft {
         params: {
             n: rounds.length ? Math.max(...rounds) : 6,
             b: t.bonus ?? 0,
-            k: t.affect ?? 45,
+            k: t.affect ?? getEloConfig().k,
             maxGain: t.max_gain ?? null,
             maxRounds: t.max_rounds ?? null,
         },
@@ -589,7 +664,8 @@ export async function saveTournament(
             annotations_insert,
             annotations_delete,
         },
-        before ? 'Failed to save the tournament.' : 'Failed to record tournament results.'
+        before ? 'Failed to save the tournament.' : 'Failed to record tournament results.',
+        { action: `${before ? 'Edited' : 'Recorded'} ${row.name ?? 'a tournament'} (${row.date})` }
     );
     const out: Record<string, DerivedEntry> = {};
     for (const e of entries) if (derived.entries[e.id]) out[e.id] = derived.entries[e.id];
@@ -611,7 +687,8 @@ export async function deleteTournament(data: AppSnapshot, tournament: Tournament
                 ? [{ date: tournament.date, name: tournament.name }]
                 : [],
         },
-        'Failed to delete the tournament.'
+        'Failed to delete the tournament.',
+        { action: `Deleted ${tournament.name ?? 'a tournament'} (${tournament.date})` }
     );
 }
 
@@ -638,4 +715,144 @@ export async function editAnnotationDate(id: string, date: string) {
         .update({ date })
         .eq('id', id);
     if (error) throw new MutationError('Failed to edit date.');
+}
+
+// ------------------------------------------------------------ admin tools
+
+/** One entry in the change log. */
+export interface LoggedChange {
+    id: string;
+    created_at: string;
+    actor: string | null;
+    action: string;
+    before: Changes;
+    after: Changes;
+    undoable: boolean;
+    undoes: string | null;
+    undone_at: string | null;
+    undone_by: string | null;
+}
+
+/**
+ * New scoring settings. Records that followed the old settings are rewritten
+ * (see scoringRewrite), everyone is recalculated under the new ones, and a
+ * backup of everything is taken first. Needs the admin password.
+ */
+export async function saveScoring(data: AppSnapshot, config: EloConfig, password: string) {
+    const invalid = validateConfig(config);
+    if (invalid) throw new MutationError(invalid);
+    const rewrite = scoringRewrite(data.inputs, data.config, config);
+    await commit(
+        data,
+        rewrite.inputs,
+        { tournaments_upsert: rewrite.tournaments, people_upsert: rewrite.people },
+        'Failed to save the scoring settings.',
+        {
+            action: 'Changed the scoring settings',
+            undoable: false,
+            snapshot: 'Before changing the scoring settings',
+            password,
+            settings: { key: 'elo', value: config },
+            config,
+        }
+    );
+}
+
+/** End of the year: graduate a class and move people up a division. Needs the admin password. */
+export async function startNewSeason(
+    data: AppSnapshot,
+    classYear: number,
+    picks: { graduate: string[]; moveUp: string[] },
+    password: string
+) {
+    const state = stateOf(data);
+    const changes = newSeasonChanges(state, classYear, picks);
+    if (!changes.people_upsert?.length) throw new MutationError('Pick at least one person to graduate or move up.');
+    const g = picks.graduate.length;
+    const m = picks.moveUp.length;
+    await commit(data, applyChanges(state, changes).inputs, changes, 'Failed to start the new season.', {
+        action: `New season: graduated ${g} ${g === 1 ? 'person' : 'people'}, moved ${m} up a division`,
+        snapshot: 'Before the new season',
+        password,
+        requirePassword: true,
+    });
+}
+
+/** Fold someone entered twice into the person to keep. A backup is taken first. */
+export async function mergePeople(data: AppSnapshot, keepId: string, dropId: string) {
+    const state = stateOf(data);
+    const changes = mergeChanges(state, keepId, dropId);
+    if (isEmptyChanges(changes)) throw new MutationError('Pick two different people.');
+    const [keep, drop] = [namesOf(data, [keepId]), namesOf(data, [dropId])];
+    await commit(data, applyChanges(state, changes).inputs, changes, 'Failed to merge them.', {
+        action: `Merged ${drop} into ${keep}`,
+        snapshot: `Before merging ${drop} into ${keep}`,
+    });
+}
+
+export interface TournamentFix {
+    id: string;
+    name: string;
+    bonus: number | null;
+    rated: boolean;
+}
+
+/** Fix tournaments' names, types and whether they count, all in one save. */
+export async function fixTournaments(data: AppSnapshot, fixes: TournamentFix[]) {
+    const rows = [];
+    const annotations_delete: DateName[] = [];
+    const annotations_insert: DateName[] = [];
+    for (const f of fixes) {
+        const t = data.inputs.tournaments.find((x) => x.id === f.id);
+        if (!t) continue;
+        const { entries: _e, ...row } = t;
+        const name = f.name.trim() || null;
+        if (name === t.name && f.bonus === t.bonus && f.rated === (t.rated !== false)) continue;
+        if (f.bonus != null && !Number.isFinite(f.bonus)) throw new MutationError('Each bonus needs to be a number.');
+        rows.push({ ...row, name, bonus: f.bonus, rated: f.rated });
+        if (name !== t.name) {
+            if (t.name) annotations_delete.push({ date: t.date, name: t.name });
+            if (name) annotations_insert.push({ date: t.date, name });
+        }
+    }
+    if (!rows.length) return 0;
+    const state = stateOf(data);
+    const changes: Changes = { tournaments_upsert: rows, annotations_delete, annotations_insert };
+    await commit(data, applyChanges(state, changes).inputs, changes, 'Failed to save the tournaments.', {
+        action: rows.length === 1 ? `Fixed ${rows[0].name ?? 'a tournament'} (${rows[0].date})` : `Fixed ${rows.length} tournaments`,
+    });
+    return rows.length;
+}
+
+/**
+ * Take a logged change back. Refused when a later save changed the same
+ * results (undo that one first), or when it would remove someone who has
+ * results now.
+ */
+export async function undoChange(data: AppSnapshot, entry: LoggedChange) {
+    if (!entry.undoable) throw new MutationError('This change can’t be undone here. A backup from before it can be restored.');
+    if (entry.undone_at) throw new MutationError('That change was already undone.');
+    const state = stateOf(data);
+    if (!stillAsSaved(state, entry.after)) {
+        throw new MutationError('Something saved after this changed the same results. Undo that first.');
+    }
+    const removing = new Set(entry.before.people_delete ?? []);
+    if (removing.size) {
+        const busy = [
+            ...state.inputs.tournaments.flatMap((t) => t.entries.flatMap((e) => [e.debater_id, e.partner_id])),
+            ...state.inputs.practice.flatMap((r) => [r.winner_id, r.winner_partner_id, r.loser_id, r.loser_partner_id]),
+            ...state.inputs.adjustments.map((a) => a.debater_id),
+            ...state.teams.flatMap((t) => [t.member1_id, t.member2_id]),
+        ].filter((id): id is string => !!id && removing.has(id));
+        if (busy.length) {
+            throw new MutationError(
+                `${namesOf(data, [busy[0]])} has results or a team now, so undoing this would remove them. Remove them from Players instead.`
+            );
+        }
+    }
+    await commit(data, applyChanges(state, entry.before).inputs, entry.before, 'Failed to undo.', {
+        action: `Undid: ${entry.action}`,
+        undoable: false,
+        undoes: entry.id,
+    });
 }

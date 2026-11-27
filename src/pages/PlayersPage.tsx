@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import {
-    BASE_ELO,
     getLocalDateString,
     lookup,
     parseEloInput,
@@ -127,7 +126,7 @@ function People() {
 
     async function onAdd(e: React.FormEvent) {
         e.preventDefault();
-        const parsed = parseEloInput(elo, BASE_ELO[division]);
+        const parsed = parseEloInput(elo, data.config.startElo[division]);
         if (parsed == null) {
             toast.push('Starting Elo must be a number.', 'warning');
             return;
@@ -207,7 +206,7 @@ function People() {
                             <input
                                 id="personElo"
                                 inputMode="decimal"
-                                placeholder={String(BASE_ELO[division])}
+                                placeholder={String(data.config.startElo[division])}
                                 value={elo}
                                 onChange={(e) => setElo(e.target.value)}
                             />

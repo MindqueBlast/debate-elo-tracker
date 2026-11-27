@@ -13,6 +13,8 @@ import {
     practiceSide,
     seasonLabel,
     seasonOf,
+    TOURNAMENT_TYPES,
+    typeName,
     type Division,
     type Tournament,
     type TournamentParams,
@@ -58,12 +60,6 @@ const monthLabel = (m: string) => `${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slic
 const DIVS: Division[] = ['Varsity', 'JV', 'Novice'];
 const SHORT: Record<Division, string> = { Varsity: 'V', JV: 'JV', Novice: 'N' };
 
-/** Tournament bonus by type, per the league's rules. */
-const TYPES = [
-    { id: 'invitational', label: 'Invitational (5–6+ rounds)', bonus: 30 },
-    { id: 'local', label: 'Local / NYSFL / NCFL / NSDA elims', bonus: 15 },
-    { id: 'citron', label: 'Citron / BDL', bonus: 10 },
-] as const;
 
 const errorText = (err: unknown, fallback: string) =>
     err instanceof MutationError ? err.message : fallback;
@@ -112,8 +108,10 @@ export function MatchesPage() {
     const [tDate, setTDate] = useState(getLocalDateString());
     const [tType, setTType] = useState<string>('invitational');
     const [n, setN] = useState('6');
-    const [b, setB] = useState('30');
-    const [k, setK] = useState('45');
+    // tournament bonus by type, and K, as set in Settings → Scoring
+    const TYPES = TOURNAMENT_TYPES.map((t) => ({ ...t, bonus: data.config.bonuses[t.id] }));
+    const [b, setB] = useState(() => String(data.config.bonuses.invitational));
+    const [k, setK] = useState(() => String(data.config.k));
     // blank: no cap on gains
     const [maxGain, setMaxGain] = useState('');
     const [maxRounds, setMaxRounds] = useState('');
@@ -290,8 +288,8 @@ export function MatchesPage() {
         setTDate(getLocalDateString());
         setTType('invitational');
         setN('6');
-        setB('30');
-        setK('45');
+        setB(String(data.config.bonuses.invitational));
+        setK(String(data.config.k));
         setMaxGain('');
         setMaxRounds('');
         setSplitRounds(false);
@@ -397,8 +395,7 @@ export function MatchesPage() {
         await refresh();
     }
 
-    const typeOf = (bonus: number | null | undefined) =>
-        TYPES.find((t) => t.bonus === bonus)?.label.split(' (')[0].split(' /')[0] ?? (bonus != null ? `Bonus ${bonus}` : 'Tournament');
+    const typeOf = (bonus: number | null | undefined) => typeName(bonus, data.config);
     // the best single change anyone from Syosset had there
     const bestOf = (t: Tournament) =>
         Math.max(
@@ -787,7 +784,10 @@ export function MatchesPage() {
                                                 >
                                                     <span className="tourney__date num">{shortDate(t.date)}</span>
                                                     <span className="tourney__name">{t.name || 'Unnamed'}</span>
-                                                    <span className="tourney__type">{typeOf(t.bonus)}</span>
+                                                    <span className="tourney__type">
+                                                        {typeOf(t.bonus)}
+                                                        {t.rated === false && <span className="pill tourney__unrated">Unrated</span>}
+                                                    </span>
                                                     <span className="tourney__count num">
                                                         {t.tournament_participants.length}{' '}
                                                         {t.tournament_participants.length === 1 ? 'entry' : 'entries'}
@@ -796,7 +796,7 @@ export function MatchesPage() {
                                                         className={`tourney__best delta ${best >= 0 ? 'delta-pos' : 'delta-neg'}`}
                                                         title="The best single change from Syosset there"
                                                     >
-                                                        {Number.isFinite(best) ? signed(best) : ''}
+                                                        {t.rated !== false && Number.isFinite(best) ? signed(best) : ''}
                                                     </span>
                                                     <svg className="tourney__chev" width="14" height="14" viewBox="0 0 12 12" aria-hidden="true">
                                                         <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
@@ -830,10 +830,15 @@ export function MatchesPage() {
                                                                 ) : (
                                                                     <>
                                                                         <div className="tourney-meta">
-                                                                            <span className="num" title="The tournament’s average wins, what each result is measured against">
-                                                                                E_tourney {t.e_tourney.toFixed(2)}
-                                                                            </span>
+                                                                            {t.rated !== false && (
+                                                                                <span className="num" title="The tournament’s average wins, what each result is measured against">
+                                                                                    E_tourney {t.e_tourney.toFixed(2)}
+                                                                                </span>
+                                                                            )}
                                                                             {t.bonus != null && <span className="num">Bonus {t.bonus}</span>}
+                                                                            {t.rated === false && (
+                                                                                <span>Doesn’t count toward Elo (Settings → Data)</span>
+                                                                            )}
                                                                         </div>
                                                                         {[...t.tournament_participants]
                                                                             .sort(

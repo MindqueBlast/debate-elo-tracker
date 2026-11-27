@@ -4,6 +4,7 @@ import { Logo } from '../components/Logo';
 import { useTheme } from '../state/ThemeProvider';
 import { useAuth } from '../auth/AuthProvider';
 import { SeasonReplay } from '../components/SeasonReplay';
+import { useGuestAccess } from '../state/useGuestAccess';
 import '../styles/landing.css';
 
 /** Screens captured from the tracker itself (guest view), one per theme. */
@@ -90,6 +91,7 @@ export function LandingPage() {
     const navigate = useNavigate();
     const [view, setView] = useState<(typeof VIEWS)[number]['key']>('rankings');
     const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+    const guestOk = useGuestAccess();
 
     // already signed in (or browsing as a guest): one way back in, no sign-in buttons
     const counter = role ? (
@@ -100,10 +102,12 @@ export function LandingPage() {
         </div>
     ) : (
         <div className="l-counter">
-            <button type="button" className="l-btn" onClick={browseAsGuest}>
-                Browse as guest
-            </button>
-            <Link to="/login" className="l-btn l-btn--line">
+            {guestOk && (
+                <button type="button" className="l-btn" onClick={browseAsGuest}>
+                    Browse as guest
+                </button>
+            )}
+            <Link to="/login" className={`l-btn${guestOk ? ' l-btn--line' : ''}`}>
                 Sign in
             </Link>
         </div>
@@ -166,7 +170,9 @@ export function LandingPage() {
                                 Every tournament result moves each debater’s Elo, charted season by season.
                             </p>
                             {counter}
-                            <p className="l-hero__terms">Guests see everything. Only admins record results.</p>
+                            <p className="l-hero__terms">
+                                {guestOk ? 'Guests see everything. Only admins record results.' : 'Only admins record results.'}
+                            </p>
                             <p className="l-byline">
                                 By <strong>Aaditya Sahu</strong> and <strong>Jiayi Meng</strong>
                             </p>
@@ -323,9 +329,11 @@ export function LandingPage() {
                                 </Link>
                             ) : (
                                 <>
-                                    <button type="button" className="l-text-btn" onClick={browseAsGuest}>
-                                        Browse as guest
-                                    </button>
+                                    {guestOk && (
+                                        <button type="button" className="l-text-btn" onClick={browseAsGuest}>
+                                            Browse as guest
+                                        </button>
+                                    )}
                                     <Link to="/login" className="l-text-btn">
                                         Sign in
                                     </Link>

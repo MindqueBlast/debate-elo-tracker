@@ -138,6 +138,9 @@ export { competedIn, competedInAny, latestSeason, previousSeason, seasonLabel } 
 
 export {
     computeAll,
+    gradeInputs,
+    isRated,
+    type Grade,
     DEFAULT_PARAMS,
     diffDerived,
     isEmptyDerived,
@@ -165,3 +168,42 @@ export {
     type Mover,
     type SeasonRow,
 } from './insights';
+export {
+    DEFAULT_CONFIG,
+    TOURNAMENT_TYPES,
+    getEloConfig,
+    parseConfig,
+    sameConfig,
+    setEloConfig,
+    typeName,
+    typeOfBonus,
+    validateConfig,
+    withEloConfig,
+    type EloConfig,
+    type TournamentType,
+} from './config';
+export {
+    applyChanges,
+    compact,
+    invertChanges,
+    isEmptyChanges,
+    stillAsSaved,
+    type Changes,
+    type DateName,
+    type EntryRow,
+    type State,
+    type TournamentRow,
+} from './changes';
+export {
+    dataChecks,
+    firstDivision,
+    graduatingYear,
+    mergeChanges,
+    newSeasonChanges,
+    planNewSeason,
+    scoringRewrite,
+    type Check,
+    type CheckItem,
+    type ScoringRewrite,
+    type SeasonPlan,
+} from './admin';

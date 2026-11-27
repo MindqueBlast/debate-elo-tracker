@@ -2,6 +2,9 @@ import { supabase } from './supabase';
 import {
     competedIn,
     computeAll,
+    DEFAULT_CONFIG,
+    setEloConfig,
+    type EloConfig,
     getLocalDateString,
     latestSeason,
     sanitizeDebaters,
@@ -24,6 +27,7 @@ import {
     asTournaments,
 } from './parse';
 import { storedResults, toInputs, withResults } from './model';
+import { loadSettings } from './settings';
 
 export interface AppSnapshot {
     /** Elo and history here are always freshly calculated from every result. */
@@ -39,6 +43,10 @@ export interface AppSnapshot {
     stored: Derived;
     /** Goes up with every save; a save based on older data is refused. */
     revision: number;
+    /** The scoring settings everything here was calculated with. */
+    config: EloConfig;
+    /** Whether "Browse as guest" is offered. */
+    guestAccess: boolean;
     /** The latest season with results ("2025-26"). */
     season: string;
     /** Everyone who competed in that season: who counts as active. */
@@ -55,6 +63,8 @@ export const EMPTY_SNAPSHOT: AppSnapshot = {
     inputs: { people: [], tournaments: [], practice: [], adjustments: [] },
     stored: { people: {}, entries: {}, tournaments: {}, practice: {} },
     revision: 0,
+    config: DEFAULT_CONFIG,
+    guestAccess: true,
     season: '',
     activeIds: new Set(),
 };
@@ -68,6 +78,7 @@ export async function loadSnapshot(): Promise<AppSnapshot> {
         tournamentsRes,
         adjustmentsRes,
         stateRes,
+        settings,
     ] = await Promise.all([
         supabase.from('debaters').select('*').order('created_at'),
         supabase.from('teams').select('*').order('created_at'),
@@ -76,7 +87,10 @@ export async function loadSnapshot(): Promise<AppSnapshot> {
         supabase.from('tournaments').select('*, tournament_participants(*)'),
         supabase.from('elo_adjustments').select('*'),
         supabase.from('app_state').select('revision').eq('id', 1).maybeSingle(),
+        // the scoring numbers feed the math, so they have to load too
+        loadSettings(),
     ]);
+    setEloConfig(settings.elo);
 
     // Everything that feeds the Elo math has to load, or the numbers would be wrong
     for (const res of [debatersRes, roundsRes, tournamentsRes, adjustmentsRes, stateRes]) {
@@ -102,6 +116,8 @@ export async function loadSnapshot(): Promise<AppSnapshot> {
         inputs,
         stored: storedResults(rows),
         revision: Number(stateRes.data?.revision ?? 0),
+        config: settings.elo,
+        guestAccess: settings.guestAccess,
         season,
         activeIds: competedIn(fresh.tournaments, season),
     };

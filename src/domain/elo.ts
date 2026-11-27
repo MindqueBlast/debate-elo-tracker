@@ -5,16 +5,18 @@ import type {
     TournamentParticipantInput,
     TournamentResult,
 } from './types';
+import { DEFAULT_CONFIG, getEloConfig } from './config';
 
-export const PRACTICE_COMPETITIVE_K = 20;
-export const PRACTICE_BONUS_K = 5;
+/** The defaults; the math uses whatever is set in Settings → Scoring (see config.ts). */
+export const PRACTICE_COMPETITIVE_K = DEFAULT_CONFIG.practiceK;
+export const PRACTICE_BONUS_K = DEFAULT_CONFIG.practiceBonus;
 export const TOURNAMENT_FIELD_ELO = 700;
 /**
  * The bar each division's results are measured against: p = (Elo / bar)^1.5.
  * A harder field has a higher bar, so the same record is worth more in varsity
  * than in JV, and more in JV than in novice.
  */
-export const DIVISION_BAR: Record<string, number> = { Novice: 550, JV: 700, Varsity: 850 };
+export const DIVISION_BAR: Record<string, number> = { ...DEFAULT_CONFIG.bars };
 
 export function expectedScore(winnerElo: number, loserElo: number): number {
     return 1 / (1 + Math.pow(10, (loserElo - winnerElo) / 400));
@@ -25,10 +27,9 @@ export function calculatePracticeElo(
     loserElo: number
 ): PracticeEloResult {
     const E = expectedScore(winnerElo, loserElo);
-    const winnerChange =
-        (PRACTICE_COMPETITIVE_K + PRACTICE_BONUS_K) * (1 - E);
-    const loserChange =
-        -PRACTICE_COMPETITIVE_K * (1 - E) + PRACTICE_BONUS_K * E;
+    const { practiceK, practiceBonus } = getEloConfig();
+    const winnerChange = (practiceK + practiceBonus) * (1 - E);
+    const loserChange = -practiceK * (1 - E) + practiceBonus * E;
     return {
         expected: E,
         winnerChange,
@@ -50,18 +51,19 @@ export function calculatePracticeEloForPairs(
     const avg = (xs: { elo: number }[]) => xs.reduce((s, x) => s + x.elo, 0) / xs.length;
     const winnerElo = avg(winners);
     const loserElo = avg(losers);
+    const { practiceK, practiceBonus } = getEloConfig();
     return {
         expected: expectedScore(winnerElo, loserElo),
         winnerElo,
         loserElo,
         winners: winners.map((w) => {
             const E = expectedScore(w.elo, loserElo);
-            const change = (PRACTICE_COMPETITIVE_K + PRACTICE_BONUS_K) * (1 - E);
+            const change = (practiceK + practiceBonus) * (1 - E);
             return { id: w.id, oldElo: w.elo, newElo: w.elo + change, change };
         }),
         losers: losers.map((l) => {
             const E = expectedScore(winnerElo, l.elo);
-            const change = -PRACTICE_COMPETITIVE_K * (1 - E) + PRACTICE_BONUS_K * E;
+            const change = -practiceK * (1 - E) + practiceBonus * E;
             return { id: l.id, oldElo: l.elo, newElo: l.elo + change, change };
         }),
     };
@@ -100,9 +102,15 @@ export function setDivisionTuning(
     DIVISION_FIELD = field;
 }
 
+type EloBars = ReturnType<typeof getEloConfig>['bars'];
+
 /** The bar a division is measured against. */
 export function divisionBar(division: string): number {
-    return DIVISION_FIELD[division] ?? DIVISION_BAR[division] ?? TOURNAMENT_FIELD_ELO;
+    return (
+        DIVISION_FIELD[division] ??
+        getEloConfig().bars[division as keyof EloBars] ??
+        TOURNAMENT_FIELD_ELO
+    );
 }
 
 /**
@@ -183,7 +191,9 @@ export function calculateTournamentElo(
     });
     const avgRounds = t > 0 ? roundsTotal / t : params.n;
 
-    const eTourney = (s + (3 * avgRounds) / 2) / (t + 3);
+    // imaginary .500 teams steady the average of a small field
+    const phantoms = getEloConfig().phantoms;
+    const eTourney = (s + (phantoms * avgRounds) / 2) / (t + phantoms);
 
     const results: TournamentResult[] = withAdjusted.map((p) => {
         const people =

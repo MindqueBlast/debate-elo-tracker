@@ -40,6 +40,7 @@ export function toInputs(rows: Rows): Inputs {
             affect: t.affect ?? null,
             max_gain: t.max_gain ?? null,
             max_rounds: t.max_rounds ?? null,
+            rated: t.rated !== false,
             created_at: t.created_at ?? null,
             entries: t.tournament_participants
                 .filter((p): p is typeof p & { id: string } => !!p.id)

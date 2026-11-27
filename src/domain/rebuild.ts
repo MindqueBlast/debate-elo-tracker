@@ -13,6 +13,8 @@ import {
     type ReplayPractice,
     type ReplayTournament,
 } from './replay';
+import { expectedScore } from './elo';
+import { getEloConfig } from './config';
 import type { DebaterStatus, Division, HistoryPoint } from './types';
 
 // ------------------------------------------------------------------ inputs
@@ -52,6 +54,8 @@ export interface InputTournament {
     affect: number | null;
     max_gain: number | null;
     max_rounds: number | null;
+    /** False: kept on the list but doesn't count toward anyone's Elo. */
+    rated?: boolean | null;
     created_at?: string | null;
     entries: InputEntry[];
 }
@@ -156,7 +160,11 @@ function rosterSeasons(
     return seasonsBetween(seasonOf(start), end);
 }
 
-export function computeAll(inputs: Inputs, today: string): Derived {
+/** Whether a tournament counts toward Elo. */
+export const isRated = (t: { rated?: boolean | null }) => t.rated !== false;
+
+/** Everything sorted and shaped for a replay from the very beginning. */
+function prepare(inputs: Inputs, today: string) {
     const known = new Set(inputs.people.map((p) => p.id));
     const keep = (ids: (string | null | undefined)[]) =>
         ids.filter((id): id is string => !!id && known.has(id));
@@ -195,7 +203,7 @@ export function computeAll(inputs: Inputs, today: string): Derived {
         };
     });
 
-    const replayTournaments: ReplayTournament[] = tournaments.map((t) => {
+    const replayTournaments: ReplayTournament[] = tournaments.filter(isRated).map((t) => {
         const entries = t.entries
             .map((e) => ({ e, members: keep([e.debater_id, e.partner_id]) }))
             .filter((x) => x.members.length > 0);
@@ -206,7 +214,7 @@ export function computeAll(inputs: Inputs, today: string): Derived {
             params: {
                 n: rounds.length ? Math.max(...rounds) : DEFAULT_PARAMS.n,
                 b: t.bonus ?? DEFAULT_PARAMS.b,
-                k: t.affect ?? DEFAULT_PARAMS.k,
+                k: t.affect ?? getEloConfig().k,
                 maxGain: t.max_gain ?? DEFAULT_PARAMS.maxGain,
                 maxRounds: t.max_rounds,
             },
@@ -238,18 +246,42 @@ export function computeAll(inputs: Inputs, today: string): Derived {
         label: `Manual adjustment ${signed(a.amount)}${a.note ? ` (${a.note})` : ''}`,
     }));
 
-    const result = replay({
+    return {
+        known,
         people,
-        tournaments: replayTournaments,
-        practice: replayPractice,
-        adjustments: replayAdjustments,
-    });
+        tournaments,
+        practice,
+        replayInput: {
+            people,
+            tournaments: replayTournaments,
+            practice: replayPractice,
+            adjustments: replayAdjustments,
+        },
+    };
+}
+
+export function computeAll(inputs: Inputs, today: string): Derived {
+    const { known, people, tournaments, practice, replayInput } = prepare(inputs, today);
+    const result = replay(replayInput);
 
     const out: Derived = { people: {}, entries: {}, tournaments: {}, practice: {} };
     for (const p of people) {
         out.people[p.id] = { elo: result.elo[p.id], history: result.history[p.id] };
     }
     for (const t of tournaments) {
+        if (!isRated(t)) {
+            // on the list, but nobody's Elo moves for it
+            out.tournaments[t.id] = { e_tourney: 0 };
+            for (const e of t.entries) {
+                out.entries[e.id] = {
+                    elo_change: 0,
+                    partner_elo_change: e.partner_id ? 0 : null,
+                    adjusted_wins: e.raw_wins,
+                    team_elo: 0,
+                };
+            }
+            continue;
+        }
         const r = result.tournaments[t.id];
         if (!r) continue;
         out.tournaments[t.id] = { e_tourney: r.eTourney };
@@ -278,6 +310,55 @@ export function computeAll(inputs: Inputs, today: string): Derived {
         };
     }
     return out;
+}
+
+// ------------------------------------------------- how well Elo predicted
+
+export interface Grade {
+    /** Tournament entries graded. */
+    entries: number;
+    /** On average, how many wins each entry's Elo going in was off by. Lower is better. */
+    miss: number;
+    /** Average of (wins − expected): above 0, entries tended to beat their Elo. */
+    bias: number;
+    /** Practice rounds graded. */
+    rounds: number;
+    /** Share of practice rounds the higher-rated side won (null with none). */
+    called: number | null;
+}
+
+/**
+ * Replays everything and grades each result against what the Elo going in
+ * expected: wins at tournaments (p × E_tourney, the formula's own expectation)
+ * and the winner of each practice round.
+ */
+export function gradeInputs(inputs: Inputs, today: string): Grade {
+    const { replayInput } = prepare(inputs, today);
+    const result = replay(replayInput);
+    let entries = 0;
+    let missSum = 0;
+    let biasSum = 0;
+    for (const t of Object.values(result.tournaments)) {
+        for (const e of Object.values(t.entries)) {
+            entries++;
+            missSum += Math.abs(e.adjustedWins - e.expectedWins);
+            biasSum += e.adjustedWins - e.expectedWins;
+        }
+    }
+    let rounds = 0;
+    let right = 0;
+    for (const r of Object.values(result.practice)) {
+        rounds++;
+        const e = expectedScore(r.winnerElo, r.loserElo);
+        right += e > 0.5 ? 1 : e === 0.5 ? 0.5 : 0;
+    }
+    return {
+        entries,
+        miss: entries ? missSum / entries : 0,
+        bias: entries ? biasSum / entries : 0,
+        rounds,
+        called: rounds ? right / rounds : null,
+    };
 }
 
 // ------------------------------------------------------- what to write back

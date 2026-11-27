@@ -106,6 +106,8 @@ export interface Tournament {
     affect?: number | null;
     max_gain?: number | null;
     max_rounds?: number | null;
+    /** False: kept on the list but doesn't count toward Elo. */
+    rated?: boolean | null;
     created_at?: string | null;
     tournament_participants: TournamentParticipant[];
 }
