@@ -166,7 +166,6 @@ export function AnalyticsPage() {
                 tournaments,
                 practiceRounds,
                 extendTeams: extendRecords,
-                minTournaments,
             }),
         [
             debaters,
@@ -182,18 +181,25 @@ export function AnalyticsPage() {
             annotations,
             showAnnotations,
             extendRecords,
-            minTournaments,
         ]
     );
 
     // the slider runs to the second-busiest line's count, so one outlier doesn't stretch it
-    const field = [...(result.fieldCounts ?? [])].sort((a, b) => b - a);
+    const counts = result.lineTournaments ?? {};
+    const lineIds = result.series.filter((s) => s.id !== '__annotations__').map((s) => s.id);
+    const field = lineIds.map((id) => counts[id] ?? 0).sort((a, b) => b - a);
     const sliderMax = Math.max(1, field[1] ?? field[0] ?? 1);
     // a smaller field (one class instead of all) pulls the minimum down with it
     useLayoutEffect(() => {
         if (minTournaments > sliderMax) setMinTournaments(sliderMax);
     }, [minTournaments, sliderMax]);
-    const linesShown = result.series.filter((s) => s.id !== '__annotations__').length;
+    const minShown = Math.min(minTournaments, sliderMax);
+    // lines under the minimum stay in the legend, crossed off
+    const belowKey = lineIds.filter((id) => (counts[id] ?? 0) < minShown).join('|');
+    const belowMin = useMemo(() => new Set(belowKey ? belowKey.split('|') : []), [belowKey]);
+    const linesShown = lineIds.length - belowMin.size;
+    // what the chart is of; the slider alone doesn't make it a different chart
+    const chartSubject = `${view}|${who}|${selectedClasses.join(',')}`;
 
     const sortedDates = [...annotations].sort((a, b) => b.date.localeCompare(a.date));
 
@@ -299,6 +305,8 @@ export function AnalyticsPage() {
                         yMax={result.yMax}
                         isEmpty={result.isEmpty}
                         framed
+                        resetKey={chartSubject}
+                        autoHidden={belowMin}
                     />
                 </div>
                 <div className="row stack-top">
@@ -364,16 +372,16 @@ export function AnalyticsPage() {
                                 min={1}
                                 max={sliderMax}
                                 step={1}
-                                value={Math.min(minTournaments, sliderMax)}
+                                value={minShown}
                                 disabled={sliderMax <= 1}
-                                aria-valuetext={`${minTournaments} or more, ${linesShown} ${linesShown === 1 ? 'line' : 'lines'} shown`}
+                                aria-valuetext={`${minShown} or more, ${linesShown} ${linesShown === 1 ? 'line' : 'lines'} shown`}
                                 onChange={(e) => setMinTournaments(Number(e.target.value))}
                             />
                             <output className="figure" htmlFor="minTourneys">
-                                {Math.min(minTournaments, sliderMax)}
+                                {minShown}
                             </output>
                             <span className="note min-tourneys__count">
-                                {linesShown} of {result.fieldCounts?.length ?? linesShown}
+                                {linesShown} of {lineIds.length}
                             </span>
                         </label>
                     </div>

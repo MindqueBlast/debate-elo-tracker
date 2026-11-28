@@ -28,7 +28,7 @@ import {
 } from '../domain';
 import { EmptyChart } from './illustrations/EmptyChart';
 import { LineFinder } from './LineFinder';
-import { DURATIONS, useReducedMotion } from '../lib/motion';
+import { useReducedMotion } from '../lib/motion';
 import { useTheme } from '../state/ThemeProvider';
 
 ChartJS.register(
@@ -160,6 +160,14 @@ function clickedDate(
 const SWEEP_MS = 800;
 /** How long lines take to draw in when a chart first shows. */
 const INTRO_MS = 1100;
+/** A line that's added draws in from the left this fast... */
+const REVEAL_MS = 750;
+/** ...and one taken away (or hidden) fades out over this. */
+const FADE_MS = 450;
+/** Zooming and other changes ease in and out over this. */
+const CHANGE_MS = 420;
+
+const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
 
 type Sweep = {
     /** grow: lines gained earlier points; shrink: they're losing them */
@@ -206,6 +214,8 @@ export function EloChart({
     isEmpty,
     onPointClick,
     framed = false,
+    resetKey,
+    autoHidden,
 }: {
     series: ChartSeries[];
     yMin: number | null;
@@ -214,6 +224,19 @@ export function EloChart({
     /** When given, clicking a point calls this instead of zooming. */
     onPointClick?: (debaterId: string, date: string) => void;
     framed?: boolean;
+    /**
+     * What the chart is of. When it changes, zoom and hidden lines reset and
+     * the lines draw in afresh; when only some lines come and go (a filter),
+     * those lines draw in or fade out and the rest stay put. Defaults to the
+     * first line's id.
+     */
+    resetKey?: string;
+    /**
+     * Lines a filter has crossed off: they stay in the legend, crossed out,
+     * and come back when the filter lets them. Crossing a line off (or back
+     * on) this way replaces anything done to it by hand.
+     */
+    autoHidden?: ReadonlySet<string>;
 }) {
     const reduced = useReducedMotion();
     const { theme } = useTheme();
@@ -224,17 +247,79 @@ export function EloChart({
     // What's drawn. Usually the series passed in; while a line sweeps back in,
     // the old (longer) lines stay up until the sweep finishes.
     const [series, setSeries] = useState(seriesProp);
-    const drawnRef = useRef(seriesProp);
-    drawnRef.current = series;
+    const subject = resetKey ?? seriesProp.find((s) => s.id !== ANNOTATIONS)?.id ?? '';
+    const subjectRef = useRef(subject);
+    // Lines a filter took away, still drawn while they fade out
+    const leavingRef = useRef(new Map<string, { s: ChartSeries; timer: number }>());
+    const [leaving, setLeaving] = useState<ReadonlySet<string>>(() => new Set());
+    // Lines a filter (or the legend) brought in, drawing in from the left: id → start
+    const revealRef = useRef(new Map<string, number | null>());
+    const [entering, setEntering] = useState<ReadonlySet<string>>(() => new Set());
+    const revealDone = useRef<(ids: string[]) => void>(() => undefined);
+    revealDone.current = (ids) =>
+        setEntering((prev) => {
+            const next = new Set(prev);
+            ids.forEach((id) => next.delete(id));
+            return next;
+        });
+    const drawn = useMemo(() => {
+        const extra = [...leavingRef.current.values()].map((l) => l.s).filter((s) => !series.some((x) => x.id === s.id));
+        if (!extra.length) return series;
+        return [
+            ...series.filter((s) => s.id !== ANNOTATIONS),
+            ...extra,
+            ...series.filter((s) => s.id === ANNOTATIONS),
+        ];
+        // leaving changes whenever the fading lines do
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [series, leaving]);
+    const drawnRef = useRef(drawn);
+    drawnRef.current = drawn;
     const sweepRef = useRef<Sweep | null>(null);
     // a sweep redraws by itself, so Chart.js shouldn't also slide points around
     const [instant, setInstant] = useState(false);
+    useEffect(
+        () => () => {
+            for (const l of leavingRef.current.values()) window.clearTimeout(l.timer);
+        },
+        []
+    );
     useEffect(() => {
-        if (seriesProp === drawnRef.current) return;
+        if (seriesProp === series) return;
+        const sameSubject = subjectRef.current === subject;
+        subjectRef.current = subject;
         const change = reduced ? null : startChange(drawnRef.current, seriesProp);
         if (!change) {
             sweepRef.current = null;
             setInstant(false);
+            const nextIds = new Set(seriesProp.map((s) => s.id));
+            // a line that comes back while fading out just fades back in
+            for (const [id, l] of leavingRef.current) {
+                if (nextIds.has(id) || !sameSubject || reduced) {
+                    window.clearTimeout(l.timer);
+                    leavingRef.current.delete(id);
+                }
+            }
+            if (sameSubject && !reduced) {
+                const drawnIds = new Set(drawnRef.current.map((s) => s.id));
+                for (const s of drawnRef.current) {
+                    if (s.id === ANNOTATIONS || nextIds.has(s.id) || leavingRef.current.has(s.id)) continue;
+                    const timer = window.setTimeout(() => {
+                        leavingRef.current.delete(s.id);
+                        setLeaving(new Set(leavingRef.current.keys()));
+                    }, FADE_MS);
+                    leavingRef.current.set(s.id, { s, timer });
+                }
+                const added = seriesProp.filter((s) => s.id !== ANNOTATIONS && !drawnIds.has(s.id)).map((s) => s.id);
+                if (added.length) {
+                    added.forEach((id) => revealRef.current.set(id, null));
+                    setEntering((prev) => new Set([...prev, ...added]));
+                }
+            } else {
+                revealRef.current.clear();
+                setEntering(new Set());
+            }
+            setLeaving(new Set(leavingRef.current.keys()));
             setSeries(seriesProp);
             return;
         }
@@ -255,7 +340,9 @@ export function EloChart({
             timers.push(window.setTimeout(() => setInstant(false), SWEEP_MS + 100));
         }
         return () => timers.forEach((t) => window.clearTimeout(t));
-    }, [seriesProp, reduced]);
+        // series is what's drawn now; only a new prop starts a change
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [seriesProp, reduced, subject]);
     // When a chart first shows (or shows someone else), its lines draw in
     // from the left. start is set on the first frame actually drawn.
     const introRef = useRef<{ start: number | null } | null>(null);
@@ -296,7 +383,23 @@ export function EloChart({
                 const s = sweepRef.current;
                 const id = (chart.data.datasets[args.index] as { id?: string }).id;
                 const join = s && id ? s.joins.get(id) : undefined;
-                if (!s || join === undefined) return;
+                if (!s || join === undefined) {
+                    // a line that's just been added draws in from the left, the rest stay put
+                    if (!id || !revealRef.current.has(id)) return;
+                    const now = performance.now();
+                    const start = revealRef.current.get(id) ?? now;
+                    revealRef.current.set(id, start);
+                    const t = Math.min(1, (now - start) / REVEAL_MS);
+                    if (t >= 1) return;
+                    const a = chart.chartArea;
+                    const edge = a.left - 12 + (a.right - a.left + 24) * easeOut(t);
+                    chart.ctx.save();
+                    chart.ctx.beginPath();
+                    chart.ctx.rect(a.left - 20, a.top - 20, edge - a.left + 20, a.bottom - a.top + 40);
+                    chart.ctx.clip();
+                    clipped.add(args.index);
+                    return;
+                }
                 const area = chart.chartArea;
                 const joinPx = Math.max(area.left, chart.scales.x.getPixelForValue(join));
                 const e = progress(s);
@@ -314,6 +417,19 @@ export function EloChart({
                 if (clipped.delete(args.index)) chart.ctx.restore();
             },
             afterDraw(chart: Chart) {
+                if (revealRef.current.size) {
+                    const now = performance.now();
+                    const done = [...revealRef.current]
+                        .filter(([, start]) => start !== null && now - start >= REVEAL_MS)
+                        .map(([id]) => id);
+                    done.forEach((id) => revealRef.current.delete(id));
+                    if (done.length) revealDone.current(done);
+                    // keep drawing while any are still on their way in (hidden ones wait until shown)
+                    const visible = chart.data.datasets.some(
+                        (d) => revealRef.current.has((d as { id?: string }).id ?? '') && !d.hidden
+                    );
+                    if (visible) requestAnimationFrame(() => chart.canvas && chart.draw());
+                }
                 const intro = introRef.current;
                 if (intro) {
                     if (intro.start !== null && performance.now() - intro.start >= INTRO_MS) introRef.current = null;
@@ -331,21 +447,33 @@ export function EloChart({
         };
     }, []);
 
-    // Zoom resets when a different person or team is shown first
+    // Zoom resets when the chart is of something else (not when a filter thins it out)
     const [zoom, setZoom] = useState<Zoom>(ALL_TIME);
-    const primaryId = series.find((s) => s.id !== ANNOTATIONS)?.id ?? '';
-    if (introFor.current !== primaryId) {
-        introFor.current = primaryId;
-        introRef.current = reduced || !primaryId ? null : { start: null };
+    const hasLines = series.some((s) => s.id !== ANNOTATIONS);
+    if (introFor.current !== subject) {
+        introFor.current = subject;
+        introRef.current = reduced || !hasLines ? null : { start: null };
     }
-    const [zoomFor, setZoomFor] = useState(primaryId);
-    // Lines switched off from the legend (or all at once)
-    const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
-    if (zoomFor !== primaryId) {
-        setZoomFor(primaryId);
+    const [zoomFor, setZoomFor] = useState(subject);
+    // Lines switched off from the legend (or all at once), and ones fading on their way off
+    const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set(autoHidden ?? []));
+    const [fading, setFading] = useState<ReadonlySet<string>>(() => new Set());
+    const fadeTimers = useRef(new Map<string, number>());
+    const autoKey = autoHidden ? [...autoHidden].sort().join('|') : '';
+    const autoRef = useRef({ key: autoKey, ids: new Set(autoHidden ?? []), subject });
+    if (zoomFor !== subject) {
+        setZoomFor(subject);
         setZoom(ALL_TIME);
-        setHidden(new Set());
+        setHidden(new Set(autoHidden ?? []));
+        setFading(new Set());
+        autoRef.current = { key: autoKey, ids: new Set(autoHidden ?? []), subject };
     }
+    useEffect(
+        () => () => {
+            for (const t of fadeTimers.current.values()) window.clearTimeout(t);
+        },
+        []
+    );
     const zoomRef = useRef(zoom);
     zoomRef.current = zoom;
     const beforeClickRef = useRef<Zoom>(zoom);
@@ -365,26 +493,105 @@ export function EloChart({
                 .map((s) => ({ id: s.id, points: s.data.map((p) => ({ t: msOf(p.x), y: p.y })) })),
         [series]
     );
+    // the Elo axis fits the lines not hidden by hand; ones a filter crossed off
+    // still count, so moving the filter never rescales the rest
+    const handHidden = (id: string) => hidden.has(id) && !autoRef.current.ids.has(id);
     const shown = useMemo(
-        () => lines.filter((l) => !hidden.has(l.id)).map((l) => l.points),
-        [lines, hidden]
+        () => lines.filter((l) => !handHidden(l.id)).map((l) => l.points),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [lines, hidden, autoKey]
     );
     const hiddenCount = lines.filter((l) => hidden.has(l.id)).length;
+    const handHiddenCount = lines.filter((l) => handHidden(l.id)).length;
+
+    // Each line keeps its colour while others come and go: a new line takes
+    // the colour fewest lines on the chart are using
+    const colorIndex = useRef(new Map<string, number>());
+    const colorOf = useMemo(() => {
+        const used = new Array(ink.palette.length).fill(0);
+        const ids = drawn.filter((s) => s.id !== ANNOTATIONS).map((s) => s.id);
+        for (const id of ids) {
+            const i = colorIndex.current.get(id);
+            if (i !== undefined) used[i]++;
+        }
+        for (const id of ids) {
+            if (colorIndex.current.has(id)) continue;
+            const i = used.indexOf(Math.min(...used));
+            colorIndex.current.set(id, i);
+            used[i]++;
+        }
+        return (id: string) => ink.palette[(colorIndex.current.get(id) ?? 0) % ink.palette.length];
+    }, [drawn, ink]);
+
     // the same names and colours as the legend, for the line search
     const finderLines = useMemo(
         () =>
             series
-                .map((s, i) => ({ id: s.id, label: s.label, color: ink.palette[i % ink.palette.length] }))
-                .filter((l) => l.id !== ANNOTATIONS),
-        [series, ink]
+                .filter((s) => s.id !== ANNOTATIONS)
+                .map((s) => ({ id: s.id, label: s.label, color: colorOf(s.id) })),
+        [series, colorOf]
     );
-    const toggleLine = (id: string) =>
-        setHidden((prev) => {
+    const offLines = useMemo(() => new Set([...hidden, ...fading]), [hidden, fading]);
+    // the legend crosses a line off the moment it starts fading, in its own colour
+    const legendRef = useRef({ off: offLines, leaving, colorOf });
+    legendRef.current = { off: offLines, leaving, colorOf };
+
+    // hiding fades a line out first; showing draws it back in
+    const hideLines = (ids: string[]) => {
+        if (reduced) {
+            setHidden((prev) => new Set([...prev, ...ids]));
+            return;
+        }
+        setFading((prev) => new Set([...prev, ...ids]));
+        for (const id of ids) {
+            window.clearTimeout(fadeTimers.current.get(id));
+            fadeTimers.current.set(
+                id,
+                window.setTimeout(() => {
+                    fadeTimers.current.delete(id);
+                    setHidden((prev) => new Set([...prev, id]));
+                    setFading((prev) => {
+                        const next = new Set(prev);
+                        next.delete(id);
+                        return next;
+                    });
+                }, FADE_MS)
+            );
+        }
+    };
+    const showLines = (ids: string[]) => {
+        for (const id of ids) {
+            window.clearTimeout(fadeTimers.current.get(id));
+            fadeTimers.current.delete(id);
+            // one that was fully off draws back in; one still fading just fades back
+            if (!reduced && hidden.has(id)) revealRef.current.set(id, null);
+        }
+        const drop = (prev: ReadonlySet<string>) => {
             const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
+            ids.forEach((id) => next.delete(id));
             return next;
-        });
+        };
+        setHidden(drop);
+        setFading(drop);
+    };
+    const toggleLine = (id: string) => (offLines.has(id) ? showLines([id]) : hideLines([id]));
+
+    // the filter moved: whoever it now leaves out fades and is crossed off,
+    // whoever it lets back in draws back in; nobody else changes
+    const lineOps = useRef({ hideLines, showLines });
+    lineOps.current = { hideLines, showLines };
+    useEffect(() => {
+        const prev = autoRef.current;
+        if (prev.key === autoKey || prev.subject !== subject) return;
+        const next = new Set(autoHidden ?? []);
+        const off = [...next].filter((id) => !prev.ids.has(id));
+        const on = [...prev.ids].filter((id) => !next.has(id));
+        autoRef.current = { key: autoKey, ids: next, subject };
+        if (off.length) lineOps.current.hideLines(off);
+        if (on.length) lineOps.current.showLines(on);
+        // autoKey stands for autoHidden
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoKey, subject]);
     // First and last moments with data (for the step arrows and tick spacing)
     const extent = useMemo(() => {
         let min = Infinity;
@@ -404,9 +611,9 @@ export function EloChart({
     // The Elo axis fits what's on screen: the zoomed window and the lines still showing
     const domain = useMemo(() => {
         if (viewStart !== null && viewEnd !== null) return visibleDomain(shown, viewStart, viewEnd);
-        if (hiddenCount > 0) return visibleDomain(shown, -Infinity, Infinity);
+        if (handHiddenCount > 0) return visibleDomain(shown, -Infinity, Infinity);
         return null;
-    }, [shown, viewStart, viewEnd, hiddenCount]);
+    }, [shown, viewStart, viewEnd, handHiddenCount]);
     const viewMin = domain ? domain.min : yMin;
     const viewMax = domain ? domain.max : yMax;
 
@@ -417,11 +624,15 @@ export function EloChart({
           : 0;
     const axis = timeAxis(spanDays);
 
+    const lineCount = series.filter((s) => s.id !== ANNOTATIONS).length;
     const data = useMemo(() => {
         return {
-            datasets: series.map((s, i) => {
+            datasets: drawn.map((s) => {
                 const isAnno = s.id === ANNOTATIONS;
-                const color = ink.palette[i % ink.palette.length];
+                const color = colorOf(s.id);
+                // on its way out: every colour goes clear over FADE_MS
+                const out = !isAnno && (leaving.has(s.id) || fading.has(s.id));
+                const clear = `${color}00`;
                 const radius = s.data.length === 1 || zoom.level >= 3 ? 4 : 2;
                 // dots only where they actually played; skipped tournaments are just line
                 const noDot = (p: ChartSeries['data'][number]) =>
@@ -436,14 +647,21 @@ export function EloChart({
                         date: p.x,
                         event: p.event,
                     })),
-                    borderColor: isAnno ? ink.scarlet : color,
-                    backgroundColor: isAnno ? ink.scarlet : `${color}22`,
-                    fill: !isAnno && series.length <= 2,
+                    borderColor: isAnno ? ink.scarlet : out ? clear : color,
+                    backgroundColor: isAnno ? ink.scarlet : out ? clear : `${color}22`,
+                    ...(out ? { pointBackgroundColor: clear } : {}),
+                    fill: !isAnno && lineCount <= 2,
                     hidden: hidden.has(s.id),
+                    // a line on its way in draws from the left (the sweep plugin) rather than rising
+                    ...(out
+                        ? { animation: { duration: FADE_MS, easing: 'easeOutCubic' as const } }
+                        : entering.has(s.id)
+                          ? { animation: false as const }
+                          : {}),
                     tension: 0.25,
                     // no overshoot between points, which shows when zoomed in
                     cubicInterpolationMode: 'monotone' as const,
-                    borderWidth: isAnno ? 0 : series.length > 8 ? 1.25 : 2,
+                    borderWidth: isAnno ? 0 : lineCount > 8 ? 1.25 : 2,
                     // important dates: short upright ticks along the bottom, named on hover
                     pointRadius: isAnno ? 7 : s.data.map((p) => (noDot(p) ? 0 : radius)),
                     pointHoverRadius: isAnno ? 9 : s.data.map((p) => (noDot(p) ? 3 : 5)),
@@ -451,15 +669,15 @@ export function EloChart({
                     pointRotation: isAnno ? 90 : 0,
                     pointBorderWidth: isAnno ? 2 : 1,
                     pointHoverBorderWidth: isAnno ? 3 : 1,
-                    pointBorderColor: isAnno ? `${ink.scarlet}bf` : color,
+                    pointBorderColor: isAnno ? `${ink.scarlet}bf` : out ? clear : color,
                     showLine: !isAnno,
                     spanGaps: false,
                 };
             }),
         };
-    }, [series, viewMin, zoom.level, hidden, ink]);
+    }, [drawn, viewMin, zoom.level, hidden, ink, colorOf, leaving, fading, entering, lineCount]);
 
-    const chartDuration = reduced ? 0 : DURATIONS.chart * 1000;
+    const chartDuration = reduced ? 0 : CHANGE_MS;
 
     const options = useMemo<ChartOptions<'line'>>(
         () => ({
@@ -467,7 +685,8 @@ export function EloChart({
             maintainAspectRatio: false,
             animation: {
                 duration: chartDuration,
-                easing: 'easeOutQuart',
+                // eases in and out, so zooms and rescales glide rather than snap
+                easing: 'easeInOutCubic',
             },
             interaction: { mode: 'nearest', intersect: false },
             onClick: (event, elements, chart) => {
@@ -501,13 +720,21 @@ export function EloChart({
             },
             plugins: {
                 legend: {
-                    display: series.filter((s) => s.id !== ANNOTATIONS).length > 1,
+                    display: lineCount > 1,
                     // clicking a name crosses it off (or brings it back)
                     onClick: (_event, item) => {
-                        const id = series[item.datasetIndex ?? -1]?.id;
-                        if (id) toggleLine(id);
+                        const id = drawnRef.current[item.datasetIndex ?? -1]?.id;
+                        if (id && id !== ANNOTATIONS && !leavingRef.current.has(id)) toggleLine(id);
                     },
                     labels: {
+                        generateLabels: (chart) =>
+                            ChartJS.defaults.plugins.legend.labels.generateLabels(chart).map((item) => {
+                                const id = (chart.data.datasets[item.datasetIndex ?? -1] as { id?: string } | undefined)?.id;
+                                const { off, leaving: gone, colorOf: col } = legendRef.current;
+                                if (!id || id === ANNOTATIONS || (!off.has(id) && !gone.has(id))) return item;
+                                const c = col(id);
+                                return { ...item, hidden: true, fillStyle: `${c}22`, strokeStyle: c };
+                            }),
                         // names A–Z (colours stay with each person); important dates last
                         sort: (a, b, chartData) => {
                             const anno = (i?: number) =>
@@ -583,7 +810,9 @@ export function EloChart({
                 },
             },
         }),
-        [series, viewMin, viewMax, chartDuration, viewStart, viewEnd, axis.unit, axis.format, ink]
+        // toggleLine changes every render; the legend reads the latest through drawnRef
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [lineCount, viewMin, viewMax, chartDuration, viewStart, viewEnd, axis.unit, axis.format, ink, offLines]
     );
 
     if (isEmpty) {
@@ -644,20 +873,20 @@ export function EloChart({
                     {/* finding and hiding lines pays off on a crowded chart; a few lines toggle from the legend */}
                     {lines.length > 4 && (
                         <>
-                            <LineFinder lines={finderLines} hidden={hidden} onToggle={toggleLine} />
+                            <LineFinder lines={finderLines} hidden={offLines} onToggle={toggleLine} />
                             <button
                                 type="button"
                                 className="btn btn-secondary btn-sm"
-                                disabled={hiddenCount === lines.length}
-                                onClick={() => setHidden(new Set(lines.map((l) => l.id)))}
+                                disabled={offLines.size >= lines.length}
+                                onClick={() => hideLines(lines.map((l) => l.id).filter((id) => !offLines.has(id)))}
                             >
                                 Hide all lines
                             </button>
                             <button
                                 type="button"
                                 className="btn btn-secondary btn-sm"
-                                disabled={hiddenCount === 0}
-                                onClick={() => setHidden(new Set())}
+                                disabled={offLines.size === 0}
+                                onClick={() => showLines([...offLines])}
                             >
                                 Show all lines
                             </button>
@@ -704,6 +933,8 @@ export function EloChart({
                     data={data}
                     options={options}
                     plugins={[sweepPlugin]}
+                    // lines are matched by id, so the ones that stay keep their place
+                    datasetIdKey="id"
                     updateMode={instant ? 'none' : undefined}
                 />
             </div>

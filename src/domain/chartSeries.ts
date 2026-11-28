@@ -311,14 +311,19 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         }
     }
 
+    // the axis and the important dates follow the whole field, so a minimum
+    // only takes lines away and never moves the ones left
+    const field = [...series];
     // how many tournaments each line stands for, before any minimum is applied
     let fieldCounts: number[] | undefined;
+    let lineTournaments: Record<string, number> | undefined;
     if (tournaments) {
         const counts = tournamentCounts(tournaments);
         const pairOf = new Map(teams.map((t) => [teamKey(t.id), [t.member1_id, t.member2_id].sort().join('|')]));
         const countOf = (s: ChartSeries) =>
             pairOf.has(s.id) ? counts.pairs.get(pairOf.get(s.id)!) ?? 0 : counts.people.get(s.id) ?? 0;
         fieldCounts = series.map(countOf);
+        lineTournaments = Object.fromEntries(series.map((s) => [s.id, countOf(s)]));
         if (minTournaments > 1) {
             const kept = series.filter((s) => countOf(s) >= minTournaments);
             series.length = 0;
@@ -326,12 +331,12 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         }
     }
 
-    const domain = yDomain(series);
+    const domain = yDomain(field);
     const hasPoints = series.some((s) => s.data.length > 0);
 
     if (showAnnotations && hasPoints && domain.min !== null) {
         // only dates within the lines shown, so a graduated class's chart ends when they did
-        const xs = series.flatMap((s) => s.data.map((p) => p.x));
+        const xs = field.flatMap((s) => s.data.map((p) => p.x));
         const first = xs.reduce((a, b) => (b < a ? b : a));
         const last = xs.reduce((a, b) => (b > a ? b : a));
         const inRange = annotations.filter((a) => {
@@ -356,6 +361,7 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         yMax: domain.max,
         isEmpty: !hasPoints,
         fieldCounts,
+        lineTournaments,
     };
 }
 

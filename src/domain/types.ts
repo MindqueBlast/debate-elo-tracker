@@ -223,4 +223,6 @@ export interface EloSeriesResult {
     isEmpty: boolean;
     /** With tournaments given: each line's tournament count, before any minimum was applied. */
     fieldCounts?: number[];
+    /** The same, by line id. */
+    lineTournaments?: Record<string, number>;
 }
