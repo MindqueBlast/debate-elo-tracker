@@ -16,12 +16,14 @@ import { useToast } from '../../state/ToastProvider';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { ConfirmModal } from '../../components/ConfirmModal';
+import { ManualChangesCard } from './ManualChangesCard';
 
 const SHOWN = 6;
 
 export function DataTab() {
     return (
         <div className="data-tab">
+            <ManualChangesCard />
             <ChecksCard />
             <TournamentsCard />
         </div>

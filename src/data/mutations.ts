@@ -342,6 +342,26 @@ export async function deleteAdjustment(data: AppSnapshot, id: string) {
     );
 }
 
+/** Take back several manual Elo changes in one save (e.g. all of someone's). */
+export async function deleteAdjustments(data: AppSnapshot, ids: string[]) {
+    const drop = new Set(ids);
+    const gone = data.inputs.adjustments.filter((a) => drop.has(a.id));
+    if (!gone.length) return;
+    const who = [...new Set(gone.map((a) => a.debater_id))];
+    await commit(
+        data,
+        { ...data.inputs, adjustments: data.inputs.adjustments.filter((a) => !drop.has(a.id)) },
+        { adjustments_delete: gone.map((a) => a.id) },
+        'Failed to remove the manual changes.',
+        {
+            action:
+                gone.length === 1
+                    ? `Removed an Elo adjustment for ${namesOf(data, who)}`
+                    : `Removed ${gone.length} manual Elo changes (${who.map((id) => namesOf(data, [id])).join(', ')})`,
+        }
+    );
+}
+
 // ----------------------------------------------------------------- teams
 
 function checkPair(ids: (string | null | undefined)[]): [string, string] {
