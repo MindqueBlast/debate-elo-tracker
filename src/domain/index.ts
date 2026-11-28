@@ -197,7 +197,11 @@ export {
 export {
     dataChecks,
     firstDivision,
+    firstEntry,
     graduatingYear,
+    startEloFixes,
+    startEloFor,
+    wasFreshman,
     mergeChanges,
     newSeasonChanges,
     planNewSeason,

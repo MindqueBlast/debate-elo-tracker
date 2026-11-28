@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, parseConfig, validateConfig, withEloConfig, typeName } from './config';
 import { applyChanges, invertChanges, stillAsSaved, type Changes, type State } from './changes';
-import { dataChecks, mergeChanges, newSeasonChanges, planNewSeason, scoringRewrite } from './admin';
+import { dataChecks, mergeChanges, newSeasonChanges, planNewSeason, scoringRewrite, startEloFixes, startEloFor, wasFreshman } from './admin';
 import { computeAll, gradeInputs, type InputEntry, type InputPerson, type Inputs, type InputTournament } from './rebuild';
 import type { Team } from './types';
 
@@ -224,5 +224,33 @@ describe('data checks', () => {
         const inputs = base();
         inputs.people[1] = { ...inputs.people[1], name: 'a' };
         expect(dataChecks(stateOf(inputs), TODAY).map((c) => c.id)).not.toContain('dupe-people');
+    });
+});
+
+describe('starting Elo', () => {
+    it('knows a freshman by class year and season', () => {
+        expect(wasFreshman(2030, '2026-10-02')).toBe(true);
+        expect(wasFreshman(2029, '2026-10-02')).toBe(false);
+        expect(wasFreshman(null, '2026-10-02')).toBe(false);
+    });
+
+    it('starts freshmen at the novice number, older newcomers at their division’s', () => {
+        const inputs = base();
+        inputs.people.push(
+            person('fr', { class_year: 2030, division: 'JV', start_elo: 600, start_date: '2026-08-01' }),
+            person('so', { class_year: 2029, division: 'JV', start_elo: 400, start_date: '2026-08-01' }),
+            person('hand', { class_year: 2030, division: 'JV', start_elo: 650, start_date: '2026-08-01' })
+        );
+        inputs.tournaments.push(
+            tournament('t9', '2026-10-02', [entry('e9', 'fr', 'so', 3, 'JV'), entry('e10', 'hand', null, 2, 'JV')])
+        );
+        expect(startEloFor(inputs.people.find((p) => p.id === 'fr')!, inputs, DEFAULT_CONFIG)).toBe(400);
+        expect(startEloFor(inputs.people.find((p) => p.id === 'so')!, inputs, DEFAULT_CONFIG)).toBe(600);
+        // a and b are class of 2027, first seen at varsity as juniors
+        expect(startEloFor(inputs.people[0], inputs, DEFAULT_CONFIG)).toBe(800);
+        expect(startEloFixes(inputs, DEFAULT_CONFIG).map((p) => [p.id, p.start_elo])).toEqual([
+            ['fr', 400],
+            ['so', 600],
+        ]);
     });
 });

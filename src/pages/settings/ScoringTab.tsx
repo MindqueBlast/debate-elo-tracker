@@ -47,7 +47,7 @@ const GROUPS: { title: string; note: string; fields: [string, string][] }[] = [
     },
     {
         title: 'Starting Elo',
-        note: 'Where someone new starts, by the division they first debate in. People who started at the old number move to the new one; anyone set by hand stays put.',
+        note: 'Everyone starts at the Novice number, except someone who comes straight into JV or varsity after freshman year with nothing before: they start at that division’s. People who started at the old number move to the new one; anyone set by hand stays put.',
         fields: [
             ['startElo.Novice', 'Novice'],
             ['startElo.JV', 'JV'],

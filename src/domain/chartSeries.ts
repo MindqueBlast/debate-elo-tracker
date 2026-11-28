@@ -92,6 +92,8 @@ export interface BuildEloSeriesOptions {
      * Classes to draw ('class:2027', …). With selectedId ALL_TEAMS, the teams with a member in
      * one of them; otherwise everyone listed in them, plus their graduates.
      */
+    /** Leave out anyone (or any pair) with fewer tournaments than this. Needs tournaments. */
+    minTournaments?: number;
     classes?: string[];
 }
 
@@ -204,6 +206,23 @@ function yDomain(series: ChartSeries[]): { min: number | null; max: number | nul
     return { min: Math.floor((min - pad) / 10) * 10, max: Math.ceil((max + pad) / 10) * 10 };
 }
 
+/** How many tournaments each person entered, and each pair entered together ('a|b', ids sorted). */
+export function tournamentCounts(tournaments: Tournament[]) {
+    const people = new Map<string, number>();
+    const pairs = new Map<string, number>();
+    for (const t of tournaments) {
+        const seen = new Set<string>();
+        const together = new Set<string>();
+        for (const p of t.tournament_participants) {
+            for (const id of [p.debater_id, p.partner_id]) if (id) seen.add(id);
+            if (p.partner_id) together.add([p.debater_id, p.partner_id].sort().join('|'));
+        }
+        for (const id of seen) people.set(id, (people.get(id) ?? 0) + 1);
+        for (const k of together) pairs.set(k, (pairs.get(k) ?? 0) + 1);
+    }
+    return { people, pairs };
+}
+
 export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult {
     const {
         debaters,
@@ -222,6 +241,7 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         practiceRounds,
         extendTeams = false,
         classes,
+        minTournaments = 1,
     } = options;
 
     const index =
@@ -291,6 +311,21 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         }
     }
 
+    // how many tournaments each line stands for, before any minimum is applied
+    let fieldCounts: number[] | undefined;
+    if (tournaments) {
+        const counts = tournamentCounts(tournaments);
+        const pairOf = new Map(teams.map((t) => [teamKey(t.id), [t.member1_id, t.member2_id].sort().join('|')]));
+        const countOf = (s: ChartSeries) =>
+            pairOf.has(s.id) ? counts.pairs.get(pairOf.get(s.id)!) ?? 0 : counts.people.get(s.id) ?? 0;
+        fieldCounts = series.map(countOf);
+        if (minTournaments > 1) {
+            const kept = series.filter((s) => countOf(s) >= minTournaments);
+            series.length = 0;
+            series.push(...kept);
+        }
+    }
+
     const domain = yDomain(series);
     const hasPoints = series.some((s) => s.data.length > 0);
 
@@ -320,6 +355,7 @@ export function buildEloSeries(options: BuildEloSeriesOptions): EloSeriesResult 
         yMin: domain.min,
         yMax: domain.max,
         isEmpty: !hasPoints,
+        fieldCounts,
     };
 }
 

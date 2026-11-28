@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
     ALL_TEAMS,
     buildEloSeries,
@@ -69,6 +69,8 @@ export function AnalyticsPage() {
     const [uploaded, setUploaded] = useState<ChartSeries[] | null>(null);
     // the newest ten dates show first; the rest are a click away
     const [datesShown, setDatesShown] = useState(10);
+    // only lines with at least this many tournaments (1: everyone)
+    const [minTournaments, setMinTournaments] = useState(1);
 
     const byId = useMemo(() => lookup(debaters), [debaters]);
     const pool = debaters.filter((d) => chartIncludes(d, who, activeIds));
@@ -164,6 +166,7 @@ export function AnalyticsPage() {
                 tournaments,
                 practiceRounds,
                 extendTeams: extendRecords,
+                minTournaments,
             }),
         [
             debaters,
@@ -179,8 +182,18 @@ export function AnalyticsPage() {
             annotations,
             showAnnotations,
             extendRecords,
+            minTournaments,
         ]
     );
+
+    // the slider runs to the second-busiest line's count, so one outlier doesn't stretch it
+    const field = [...(result.fieldCounts ?? [])].sort((a, b) => b - a);
+    const sliderMax = Math.max(1, field[1] ?? field[0] ?? 1);
+    // a smaller field (one class instead of all) pulls the minimum down with it
+    useLayoutEffect(() => {
+        if (minTournaments > sliderMax) setMinTournaments(sliderMax);
+    }, [minTournaments, sliderMax]);
+    const linesShown = result.series.filter((s) => s.id !== '__annotations__').length;
 
     const sortedDates = [...annotations].sort((a, b) => b.date.localeCompare(a.date));
 
@@ -329,19 +342,41 @@ export function AnalyticsPage() {
                     >
                         Export JSON
                     </Button>
-                    {view === 'teams' && (
-                        <label
-                            className="row check chart-extend"
-                            title="Before both partners were on the team, show whoever was"
-                        >
+                    <div className="chart-filters">
+                        {view === 'teams' && (
+                            <label
+                                className="row check"
+                                title="Before both partners were on the team, show whoever was"
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={extendRecords}
+                                    onChange={(e) => setExtendRecords(e.target.checked)}
+                                />
+                                Extend records
+                            </label>
+                        )}
+                        <label className="min-tourneys" htmlFor="minTourneys">
+                            <span>Minimum tournaments</span>
                             <input
-                                type="checkbox"
-                                checked={extendRecords}
-                                onChange={(e) => setExtendRecords(e.target.checked)}
+                                id="minTourneys"
+                                type="range"
+                                min={1}
+                                max={sliderMax}
+                                step={1}
+                                value={Math.min(minTournaments, sliderMax)}
+                                disabled={sliderMax <= 1}
+                                aria-valuetext={`${minTournaments} or more, ${linesShown} ${linesShown === 1 ? 'line' : 'lines'} shown`}
+                                onChange={(e) => setMinTournaments(Number(e.target.value))}
                             />
-                            Extend records
+                            <output className="figure" htmlFor="minTourneys">
+                                {Math.min(minTournaments, sliderMax)}
+                            </output>
+                            <span className="note min-tourneys__count">
+                                {linesShown} of {result.fieldCounts?.length ?? linesShown}
+                            </span>
                         </label>
-                    )}
+                    </div>
                 </div>
             </Card>
             <div className="grid grid-2 analytics-below">

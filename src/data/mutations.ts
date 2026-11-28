@@ -10,6 +10,7 @@ import {
     mergeChanges,
     newSeasonChanges,
     scoringRewrite,
+    startEloFixes,
     stillAsSaved,
     validateConfig,
     withEloConfig,
@@ -855,4 +856,21 @@ export async function undoChange(data: AppSnapshot, entry: LoggedChange) {
         undoable: false,
         undoes: entry.id,
     });
+}
+
+/**
+ * Put anyone whose starting Elo is a standard number but not the one the
+ * rule gives them (see startEloFor) on the right one. A backup is taken first.
+ */
+export async function applyStartEloRule(data: AppSnapshot) {
+    const fixes = startEloFixes(data.inputs, data.config);
+    if (!fixes.length) return 0;
+    const state = stateOf(data);
+    const changes: Changes = { people_upsert: fixes };
+    const names = fixes.map((p) => p.name).join(', ');
+    await commit(data, applyChanges(state, changes).inputs, changes, 'Failed to fix starting Elo.', {
+        action: `Starting Elo by when they joined: ${names}`,
+        snapshot: 'Before fixing starting Elo',
+    });
+    return fixes.length;
 }

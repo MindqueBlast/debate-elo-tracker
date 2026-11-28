@@ -221,4 +221,6 @@ export interface EloSeriesResult {
     yMin: number | null;
     yMax: number | null;
     isEmpty: boolean;
+    /** With tournaments given: each line's tournament count, before any minimum was applied. */
+    fieldCounts?: number[];
 }

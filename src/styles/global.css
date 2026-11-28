@@ -4394,3 +4394,61 @@ a.app-credits__name:hover {
     max-width: 72ch;
     margin: -6px 0 var(--space-4);
 }
+
+/* Analytics: under the chart, on the right */
+.chart-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-5);
+    margin-left: auto;
+}
+
+.min-tourneys {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.min-tourneys input[type='range'] {
+    width: 160px;
+    accent-color: var(--scarlet);
+    cursor: pointer;
+}
+
+.min-tourneys input[type='range']:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.min-tourneys output {
+    min-width: 2ch;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--text);
+    text-align: right;
+}
+
+.min-tourneys__count {
+    min-width: 7ch;
+    font-weight: 400;
+}
+
+@media (max-width: 760px) {
+    .chart-filters {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .min-tourneys {
+        width: 100%;
+    }
+
+    .min-tourneys input[type='range'] {
+        flex: 1;
+        width: auto;
+    }
+}

@@ -9,6 +9,7 @@ import {
     rankTeams,
     seasonLabel,
     seasonOf,
+    wasFreshman,
     type Debater,
     type Division,
     type Team,
@@ -124,9 +125,17 @@ function People() {
         return counts;
     }, [teams]);
 
+    // a freshman starts at the novice number whatever their division; anyone
+    // older coming straight into JV or varsity starts at that division's
+    const pickedYear = Number(classPick === 'other' ? classOther : classPick);
+    const defaultStart =
+        division === 'Novice' || wasFreshman(Number.isInteger(pickedYear) ? pickedYear : null, getLocalDateString())
+            ? data.config.startElo.Novice
+            : data.config.startElo[division];
+
     async function onAdd(e: React.FormEvent) {
         e.preventDefault();
-        const parsed = parseEloInput(elo, data.config.startElo[division]);
+        const parsed = parseEloInput(elo, defaultStart);
         if (parsed == null) {
             toast.push('Starting Elo must be a number.', 'warning');
             return;
@@ -206,7 +215,7 @@ function People() {
                             <input
                                 id="personElo"
                                 inputMode="decimal"
-                                placeholder={String(data.config.startElo[division])}
+                                placeholder={String(defaultStart)}
                                 value={elo}
                                 onChange={(e) => setElo(e.target.value)}
                             />

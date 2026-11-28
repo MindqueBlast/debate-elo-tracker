@@ -11,8 +11,8 @@ import type { Division, Team } from './types';
 
 // ------------------------------------------------------------------ scoring
 
-/** The division someone debated in first (their current one if they have no results). */
-export function firstDivision(inputs: Inputs, id: string): Division | null {
+/** Someone's first tournament: when, and in which division (null with no results). */
+export function firstEntry(inputs: Inputs, id: string): { date: string; division: Division } | null {
     let best: { date: string; division: Division } | null = null;
     for (const t of inputs.tournaments) {
         for (const e of t.entries) {
@@ -20,7 +20,50 @@ export function firstDivision(inputs: Inputs, id: string): Division | null {
             if (!best || t.date < best.date) best = { date: t.date, division: e.division };
         }
     }
-    return best?.division ?? inputs.people.find((p) => p.id === id)?.division ?? null;
+    return best;
+}
+
+/** The division someone debated in first (their current one if they have no results). */
+export function firstDivision(inputs: Inputs, id: string): Division | null {
+    return firstEntry(inputs, id)?.division ?? inputs.people.find((p) => p.id === id)?.division ?? null;
+}
+
+/** Whether someone of this class was a freshman (or younger) on a date: class of 2030 in 2026-27. */
+export function wasFreshman(classYear: number | null | undefined, date: string): boolean {
+    if (classYear == null) return false;
+    const seasonEnd = Number(seasonOf(date).slice(0, 4)) + 1;
+    return seasonEnd <= classYear - 3;
+}
+
+/**
+ * Where someone starts. Everyone starts at the novice number, except someone
+ * who came in straight to JV or varsity, past freshman year, with nothing
+ * before: they start at that division's number. "Came in" is their first
+ * tournament (or, with none yet, their division as of `date`).
+ */
+export function startEloFor(
+    person: Pick<InputPerson, 'id' | 'division' | 'class_year' | 'start_date'>,
+    inputs: Inputs,
+    config: EloConfig,
+    date: string = person.start_date
+): number {
+    const first = firstEntry(inputs, person.id);
+    const division = first?.division ?? person.division ?? 'Novice';
+    if (division === 'Novice' || wasFreshman(person.class_year, first?.date ?? date)) return config.startElo.Novice;
+    return config.startElo[division];
+}
+
+/**
+ * People whose starting Elo is one of the standard numbers but not the one
+ * the rule gives them. A number set by hand to something else stays.
+ */
+export function startEloFixes(inputs: Inputs, config: EloConfig): InputPerson[] {
+    const standard = new Set(Object.values(config.startElo));
+    return inputs.people
+        .filter((p) => standard.has(p.start_elo))
+        .map((p) => ({ p, want: startEloFor(p, inputs, config) }))
+        .filter(({ p, want }) => p.start_elo !== want)
+        .map(({ p, want }) => ({ ...p, start_elo: want }));
 }
 
 export interface ScoringRewrite {
@@ -53,9 +96,11 @@ export function scoringRewrite(inputs: Inputs, from: EloConfig, to: EloConfig): 
 
     const people: InputPerson[] = [];
     const nextPeople = inputs.people.map((p) => {
-        const div = firstDivision(inputs, p.id);
-        if (!div || p.start_elo !== from.startElo[div] || from.startElo[div] === to.startElo[div]) return p;
-        const next = { ...p, start_elo: to.startElo[div] };
+        // only people who started where the rule put them follow it to the new number
+        const was = startEloFor(p, inputs, from);
+        const now = startEloFor(p, inputs, to);
+        if (p.start_elo !== was || was === now) return p;
+        const next = { ...p, start_elo: now };
         people.push(next);
         return next;
     });
