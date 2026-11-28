@@ -27,8 +27,10 @@ const SHORT: Record<Division, string> = { Varsity: 'V', JV: 'JV', Novice: 'N' };
 
 export function PlayerProfilePage() {
     const { id } = useParams();
-    const { isAdmin } = useAuth();
+    const { isAdmin, isGuest } = useAuth();
     const { debaters, teams, practiceRounds, tournaments, season, activeIds } = useAppData();
+    // practice rounds are for the team, not guests
+    const showPractice = practiceRounds.length > 0 && !isGuest;
     const isActive = !!id && activeIds.has(id);
     const byId = useMemo(() => lookup(debaters), [debaters]);
     const debater = id ? byId.get(id) : undefined;
@@ -163,7 +165,7 @@ export function PlayerProfilePage() {
                                   ? 'Graduated'
                                   : 'Inactive'}
                         </span>
-                        {practiceRounds.length > 0 && (
+                        {showPractice && (
                             <span className="pill">
                                 {record && record.played
                                     ? `Practice ${record.wins} won, ${record.losses} lost (${record.winRate?.toFixed(1)}%)`
@@ -285,7 +287,7 @@ export function PlayerProfilePage() {
                     </div>
                 </Card>
             )}
-            <div className={`grid ${practiceRounds.length > 0 ? 'grid-2' : ''}`} style={{ marginTop: 16 }}>
+            <div className={`grid ${showPractice ? 'grid-2' : ''}`} style={{ marginTop: 16 }}>
                 <Card>
                     <div className="card-title">Tournament results</div>
                     {results.length === 0 ? (
@@ -329,7 +331,7 @@ export function PlayerProfilePage() {
                     )}
                 </Card>
                 {/* practice only once someone has recorded a practice round */}
-                {practiceRounds.length > 0 && (
+                {showPractice && (
                     <Card>
                         <div className="card-title">Recent practice</div>
                         {recent.length === 0 ? (

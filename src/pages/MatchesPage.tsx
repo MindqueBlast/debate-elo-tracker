@@ -65,7 +65,7 @@ const errorText = (err: unknown, fallback: string) =>
     err instanceof MutationError ? err.message : fallback;
 
 export function MatchesPage() {
-    const { isAdmin } = useAuth();
+    const { isAdmin, isGuest } = useAuth();
     const data = useAppData();
     const { debaters, teams, practiceRounds, tournaments, refresh } = data;
     const toast = useToast();
@@ -81,7 +81,9 @@ export function MatchesPage() {
 
     // which list: tournaments or practice rounds (kept in the address, so it can be linked)
     const [searchParams, setParams] = useSearchParams();
-    const view: 'tournaments' | 'practice' = searchParams.get('view') === 'practice' ? 'practice' : 'tournaments';
+    // guests see tournaments only; practice rounds are for the team
+    const view: 'tournaments' | 'practice' =
+        !isGuest && searchParams.get('view') === 'practice' ? 'practice' : 'tournaments';
     const setView = (v: 'tournaments' | 'practice') =>
         setParams(v === 'practice' ? { view: 'practice' } : {}, { replace: true });
     // the record-a-tournament form opens on demand, so the page leads with results
@@ -421,15 +423,17 @@ export function MatchesPage() {
                         : 'Practice rounds, newest first, with each person’s change.'
                 }
                 actions={
-                    <Segmented
-                        label="Show"
-                        value={view}
-                        onChange={setView}
-                        options={[
-                            { value: 'tournaments', label: `Tournaments (${tournaments.length})` },
-                            { value: 'practice', label: `Practice rounds (${practiceRounds.length})` },
-                        ]}
-                    />
+                    isGuest ? undefined : (
+                        <Segmented
+                            label="Show"
+                            value={view}
+                            onChange={setView}
+                            options={[
+                                { value: 'tournaments', label: `Tournaments (${tournaments.length})` },
+                                { value: 'practice', label: `Practice rounds (${practiceRounds.length})` },
+                            ]}
+                        />
+                    )
                 }
             />
 

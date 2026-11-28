@@ -16,10 +16,12 @@ import { Card, EmptyState, PageHeader, StatCard } from '../components/Card';
 import { EloChart } from '../components/EloChart';
 import { Standings } from '../components/Standings';
 import { useAppData } from '../state/AppDataProvider';
+import { useAuth } from '../auth/AuthProvider';
 
 export function DashboardPage() {
     const { debaters, teams, practiceRounds, tournaments, activeIds, season, loading, error } =
         useAppData();
+    const { isGuest } = useAuth();
     // this season so far: who climbed most, and who is at their best right now
     const climbers = season
         ? seasonMovers(debaters, activeIds, season)
@@ -35,8 +37,8 @@ export function DashboardPage() {
     const avg = averageElo(active.map((d) => d.elo));
     // everyone still on the team, the same people Rankings lists
     const onTeam = debaters.filter((d) => d.status !== 'graduated').length;
-    // practice panels only once someone has recorded a practice round
-    const hasPractice = practiceRounds.length > 0;
+    // practice panels only once someone has recorded a practice round, and not for guests
+    const hasPractice = practiceRounds.length > 0 && !isGuest;
     const recentRounds = [...practiceRounds]
         .sort((a, b) => (a.date < b.date ? 1 : -1))
         .slice(0, 6);
